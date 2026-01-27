@@ -27,8 +27,8 @@ const Header = () => {
           <Link to="/" className="flex items-center">
             <img
               src={logo}
-              alt={t('أكاديمية أيمن', 'Ayman Academy')}
-              className="h-8 md:h-9 w-auto"
+              alt="Ayman Academy"
+              className="h-16"
             />
           </Link>
 
@@ -39,8 +39,8 @@ const Header = () => {
                 key={link.path}
                 to={link.path}
                 className={`text-sm transition-colors ${isActive(link.path)
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
                   }`}
               >
                 {t(link.label.ar, link.label.en)}
@@ -84,8 +84,8 @@ const Header = () => {
                   to={link.path}
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-3 py-2 text-sm rounded transition-colors ${isActive(link.path)
-                      ? 'bg-secondary text-foreground'
-                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    ? 'bg-secondary text-foreground'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
                 >
                   {t(link.label.ar, link.label.en)}

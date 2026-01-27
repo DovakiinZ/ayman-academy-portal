@@ -46,7 +46,7 @@ export default function Login() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <Link to="/">
-                        <img src={logo} alt="Ayman Academy" className="h-10 mx-auto mb-4" />
+                        <img src={logo} alt="Ayman Academy" className="h-24 mx-auto mb-4" />
                     </Link>
                     <h1 className="text-xl font-semibold text-foreground">
                         {t('تسجيل الدخول', 'Sign In')}

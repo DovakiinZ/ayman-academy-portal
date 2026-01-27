@@ -45,7 +45,7 @@ export default function AdminLayout() {
             {/* Mobile header */}
             <header className="lg:hidden sticky top-0 z-50 bg-background border-b border-border px-4 h-14 flex items-center justify-between">
                 <Link to="/admin">
-                    <img src={logo} alt="Ayman Academy" className="h-7" />
+                    <img src={logo} alt="Ayman Academy" className="h-14" />
                 </Link>
                 <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)}>
                     {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -63,7 +63,7 @@ export default function AdminLayout() {
                         {/* Logo */}
                         <div className="hidden lg:flex items-center h-14 px-4 border-b border-border">
                             <Link to="/admin">
-                                <img src={logo} alt="Ayman Academy" className="h-7" />
+                                <img src={logo} alt="Ayman Academy" className="h-14" />
                             </Link>
                         </div>
 

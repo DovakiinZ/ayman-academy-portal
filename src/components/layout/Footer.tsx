@@ -31,7 +31,7 @@ const Footer = () => {
               <img
                 src={logo}
                 alt={t('أكاديمية أيمن', 'Ayman Academy')}
-                className="h-7 w-auto"
+                className="h-16"
               />
             </Link>
             <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
