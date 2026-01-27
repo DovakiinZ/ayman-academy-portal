@@ -1,0 +1,257 @@
+// ============================================
+// AYMAN ACADEMY - DATABASE TYPES
+// ============================================
+
+// Enums
+export type UserRole = 'super_admin' | 'teacher' | 'student';
+export type LanguagePref = 'ar' | 'en';
+export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
+export type ResourceType = 'pdf' | 'link' | 'worksheet' | 'other';
+export type PlanScope = 'all' | 'level' | 'subject' | 'course';
+export type SubscriptionStatus = 'active' | 'inactive' | 'canceled' | 'expired' | 'pending';
+
+// ============================================
+// ENTITIES
+// ============================================
+
+export interface Profile {
+    id: string;
+    full_name: string | null;
+    email: string;
+    role: UserRole;
+    avatar_url: string | null;
+    language_pref: LanguagePref;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface TeacherInvite {
+    id: string;
+    email: string;
+    full_name: string;
+    token_hash: string;
+    status: InviteStatus;
+    expires_at: string;
+    created_by: string;
+    accepted_by: string | null;
+    created_at: string;
+}
+
+export interface Level {
+    id: string;
+    slug: string;
+    title_ar: string;
+    title_en: string | null;
+    sort_order: number;
+    is_active: boolean;
+    created_at: string;
+}
+
+export interface Subject {
+    id: string;
+    level_id: string;
+    slug: string;
+    title_ar: string;
+    title_en: string | null;
+    sort_order: number;
+    is_active: boolean;
+    created_at: string;
+    // Joined
+    level?: Level;
+}
+
+export interface Course {
+    id: string;
+    teacher_id: string;
+    level_id: string;
+    subject_id: string | null;
+    slug: string;
+    title_ar: string;
+    title_en: string | null;
+    description_ar: string | null;
+    description_en: string | null;
+    cover_image_url: string | null;
+    is_published: boolean;
+    is_paid: boolean;
+    price_amount: number | null;
+    price_currency: string;
+    created_at: string;
+    updated_at: string;
+    // Joined
+    teacher?: Profile;
+    level?: Level;
+    subject?: Subject;
+    lessons_count?: number;
+}
+
+export interface Lesson {
+    id: string;
+    course_id: string;
+    slug: string;
+    title_ar: string;
+    title_en: string | null;
+    summary_ar: string | null;
+    summary_en: string | null;
+    duration_seconds: number | null;
+    order_index: number;
+    preview_video_url: string | null;
+    full_video_url: string | null;
+    is_free_preview: boolean;
+    is_published: boolean;
+    created_at: string;
+    updated_at: string;
+    // Joined
+    course?: Course;
+}
+
+export interface LessonResource {
+    id: string;
+    lesson_id: string;
+    type: ResourceType;
+    title_ar: string;
+    title_en: string | null;
+    url: string;
+    created_at: string;
+}
+
+export interface Plan {
+    id: string;
+    code: string;
+    title_ar: string;
+    title_en: string | null;
+    description_ar: string | null;
+    description_en: string | null;
+    scope: PlanScope;
+    level_id: string | null;
+    subject_id: string | null;
+    course_id: string | null;
+    price_amount: number | null;
+    price_currency: string;
+    is_active: boolean;
+    created_at: string;
+}
+
+export interface Subscription {
+    id: string;
+    user_id: string;
+    plan_id: string;
+    status: SubscriptionStatus;
+    starts_at: string;
+    ends_at: string | null;
+    created_by: string | null;
+    created_at: string;
+    // Joined
+    plan?: Plan;
+    user?: Profile;
+}
+
+export interface AccessGrant {
+    id: string;
+    user_id: string;
+    course_id: string | null;
+    subject_id: string | null;
+    level_id: string | null;
+    reason: string | null;
+    granted_by: string;
+    starts_at: string;
+    ends_at: string | null;
+    created_at: string;
+}
+
+export interface LessonProgress {
+    id: string;
+    user_id: string;
+    lesson_id: string;
+    progress_percent: number;
+    last_position_seconds: number;
+    completed_at: string | null;
+    updated_at: string;
+}
+
+export interface AuditLog {
+    id: string;
+    actor_id: string | null;
+    action: string;
+    entity_type: string;
+    entity_id: string | null;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
+}
+
+// ============================================
+// DATABASE SCHEMA TYPE
+// ============================================
+
+export interface Database {
+    public: {
+        Tables: {
+            profiles: {
+                Row: Profile;
+                Insert: Omit<Profile, 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<Profile, 'id'>>;
+            };
+            teacher_invites: {
+                Row: TeacherInvite;
+                Insert: Omit<TeacherInvite, 'id' | 'created_at'>;
+                Update: Partial<Omit<TeacherInvite, 'id'>>;
+            };
+            levels: {
+                Row: Level;
+                Insert: Omit<Level, 'id' | 'created_at'>;
+                Update: Partial<Omit<Level, 'id'>>;
+            };
+            subjects: {
+                Row: Subject;
+                Insert: Omit<Subject, 'id' | 'created_at'>;
+                Update: Partial<Omit<Subject, 'id'>>;
+            };
+            courses: {
+                Row: Course;
+                Insert: Omit<Course, 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<Course, 'id' | 'teacher_id'>>;
+            };
+            lessons: {
+                Row: Lesson;
+                Insert: Omit<Lesson, 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<Lesson, 'id' | 'course_id'>>;
+            };
+            lesson_resources: {
+                Row: LessonResource;
+                Insert: Omit<LessonResource, 'id' | 'created_at'>;
+                Update: Partial<Omit<LessonResource, 'id'>>;
+            };
+            plans: {
+                Row: Plan;
+                Insert: Omit<Plan, 'id' | 'created_at'>;
+                Update: Partial<Omit<Plan, 'id'>>;
+            };
+            subscriptions: {
+                Row: Subscription;
+                Insert: Omit<Subscription, 'id' | 'created_at'>;
+                Update: Partial<Omit<Subscription, 'id'>>;
+            };
+            access_grants: {
+                Row: AccessGrant;
+                Insert: Omit<AccessGrant, 'id' | 'created_at'>;
+                Update: Partial<Omit<AccessGrant, 'id'>>;
+            };
+            lesson_progress: {
+                Row: LessonProgress;
+                Insert: Omit<LessonProgress, 'id' | 'updated_at'>;
+                Update: Partial<Omit<LessonProgress, 'id'>>;
+            };
+            audit_logs: {
+                Row: AuditLog;
+                Insert: Omit<AuditLog, 'id' | 'created_at'>;
+                Update: never;
+            };
+        };
+        Functions: {
+            check_lesson_access: {
+                Args: { p_user_id: string; p_lesson_id: string };
+                Returns: boolean;
+            };
+        };
+    };
+}

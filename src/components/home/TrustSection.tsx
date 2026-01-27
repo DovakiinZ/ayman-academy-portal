@@ -6,32 +6,32 @@ const features = [
     icon: Shield,
     title: { ar: 'محتوى موثوق', en: 'Trusted Content' },
     description: {
-      ar: 'مناهج معتمدة ومراجعة من قبل خبراء تربويين',
-      en: 'Accredited curricula reviewed by educational experts',
+      ar: 'مناهج معتمدة ومراجعة من خبراء',
+      en: 'Accredited curricula reviewed by experts',
     },
   },
   {
     icon: BookCheck,
     title: { ar: 'جودة أكاديمية', en: 'Academic Quality' },
     description: {
-      ar: 'معايير تعليمية عالية ومحتوى محدث باستمرار',
-      en: 'High educational standards and continuously updated content',
+      ar: 'معايير تعليمية عالية',
+      en: 'High educational standards',
     },
   },
   {
     icon: Users,
-    title: { ar: 'دعم مستمر', en: 'Continuous Support' },
+    title: { ar: 'دعم مستمر', en: 'Support' },
     description: {
-      ar: 'فريق دعم متخصص لمساعدة الطلاب وأولياء الأمور',
-      en: 'Dedicated support team to assist students and parents',
+      ar: 'فريق متخصص للمساعدة',
+      en: 'Dedicated support team',
     },
   },
   {
     icon: GraduationCap,
-    title: { ar: 'شهادات معتمدة', en: 'Certified Credentials' },
+    title: { ar: 'شهادات معتمدة', en: 'Certificates' },
     description: {
-      ar: 'شهادات إتمام معترف بها عند إكمال كل مرحلة',
-      en: 'Recognized completion certificates upon finishing each stage',
+      ar: 'شهادات إتمام لكل مرحلة',
+      en: 'Completion certificates',
     },
   },
 ];
@@ -42,31 +42,31 @@ const TrustSection = () => {
   return (
     <section className="section-academic bg-primary text-primary-foreground">
       <div className="container-academic">
-        <div className="text-center mb-12">
-          <h2 className="mb-4">
+        <div className="text-center mb-10">
+          <h2 className="mb-3">
             {t('لماذا أكاديمية أيمن؟', 'Why Ayman Academy?')}
           </h2>
-          <p className="opacity-80 max-w-2xl mx-auto">
+          <p className="opacity-75 text-sm max-w-lg mx-auto">
             {t(
-              'نلتزم بأعلى معايير الجودة الأكاديمية لضمان تجربة تعليمية متميزة',
-              'We adhere to the highest academic quality standards to ensure an excellent learning experience'
+              'نلتزم بأعلى معايير الجودة الأكاديمية',
+              'We adhere to the highest academic quality standards'
             )}
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
           {features.map((feature, index) => (
             <div
               key={index}
-              className="bg-primary-foreground/10 rounded-md p-6 text-center"
+              className="bg-primary-foreground/8 rounded-lg p-5 text-center"
             >
-              <div className="w-12 h-12 rounded-full bg-primary-foreground/20 flex items-center justify-center mx-auto mb-4">
-                <feature.icon className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-lg bg-primary-foreground/12 flex items-center justify-center mx-auto mb-3">
+                <feature.icon className="w-5 h-5" strokeWidth={1.5} />
               </div>
-              <h3 className="font-semibold mb-2">
+              <h3 className="font-medium text-sm mb-1.5">
                 {t(feature.title.ar, feature.title.en)}
               </h3>
-              <p className="text-sm opacity-80">
+              <p className="text-xs opacity-75">
                 {t(feature.description.ar, feature.description.en)}
               </p>
             </div>

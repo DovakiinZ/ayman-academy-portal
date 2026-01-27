@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
+import logo from '@/assets/logo.png';
 
 const Footer = () => {
   const { t } = useLanguage();
@@ -21,22 +22,19 @@ const Footer = () => {
   };
 
   return (
-    <footer className="bg-secondary/50 border-t border-border">
-      <div className="container-academic py-12 md:py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12">
+    <footer className="bg-secondary/40 border-t border-border">
+      <div className="container-academic py-10 md:py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
-          <div className="md:col-span-1">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xl">أ</span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  {t('أكاديمية أيمن', 'Ayman Academy')}
-                </h3>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+          <div className="col-span-2 md:col-span-1">
+            <Link to="/" className="inline-block mb-3">
+              <img
+                src={logo}
+                alt={t('أكاديمية أيمن', 'Ayman Academy')}
+                className="h-7 w-auto"
+              />
+            </Link>
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
               {t(
                 'مؤسسة تعليمية أكاديمية متخصصة في تقديم تعليم متميز للمراحل التأسيسية.',
                 'An academic educational institution specialized in providing premium education for foundational stages.'
@@ -46,7 +44,7 @@ const Footer = () => {
 
           {/* Academy Links */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4 text-sm">
+            <h4 className="font-medium text-foreground mb-3 text-xs">
               {t('الأكاديمية', 'Academy')}
             </h4>
             <ul className="space-y-2">
@@ -54,7 +52,7 @@ const Footer = () => {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {t(link.label.ar, link.label.en)}
                   </Link>
@@ -65,7 +63,7 @@ const Footer = () => {
 
           {/* Support Links */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4 text-sm">
+            <h4 className="font-medium text-foreground mb-3 text-xs">
               {t('الدعم', 'Support')}
             </h4>
             <ul className="space-y-2">
@@ -73,7 +71,7 @@ const Footer = () => {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {t(link.label.ar, link.label.en)}
                   </Link>
@@ -84,7 +82,7 @@ const Footer = () => {
 
           {/* Legal Links */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4 text-sm">
+            <h4 className="font-medium text-foreground mb-3 text-xs">
               {t('السياسات', 'Policies')}
             </h4>
             <ul className="space-y-2">
@@ -92,7 +90,7 @@ const Footer = () => {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {t(link.label.ar, link.label.en)}
                   </Link>
@@ -103,11 +101,11 @@ const Footer = () => {
         </div>
 
         {/* Bottom */}
-        <div className="mt-12 pt-8 border-t border-border">
-          <p className="text-sm text-muted-foreground text-center">
+        <div className="mt-8 pt-6 border-t border-border">
+          <p className="text-xs text-muted-foreground text-center">
             {t(
-              '© 2024 أكاديمية أيمن. جميع الحقوق محفوظة.',
-              '© 2024 Ayman Academy. All rights reserved.'
+              '© 2026 أكاديمية أيمن. جميع الحقوق محفوظة.',
+              '© 2026 Ayman Academy. All rights reserved.'
             )}
           </p>
         </div>
