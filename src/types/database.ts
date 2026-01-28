@@ -180,6 +180,57 @@ export interface AuditLog {
 }
 
 // ============================================
+// STUDENT FEATURES
+// ============================================
+
+export interface Message {
+    id: string;
+    sender_id: string;
+    receiver_id: string;
+    content: string;
+    read_at: string | null;
+    created_at: string;
+    // Joined
+    sender?: Profile;
+    receiver?: Profile;
+}
+
+export interface LessonNote {
+    id: string;
+    user_id: string;
+    lesson_id: string;
+    content: string;
+    position_seconds: number;
+    scroll_position: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface LessonComment {
+    id: string;
+    user_id: string;
+    lesson_id: string;
+    parent_id: string | null;
+    content: string;
+    created_at: string;
+    // Joined
+    user?: Profile;
+    replies?: LessonComment[];
+}
+
+export type RatingEntityType = 'course' | 'lesson';
+
+export interface Rating {
+    id: string;
+    user_id: string;
+    entity_type: RatingEntityType;
+    entity_id: string;
+    stars: number;
+    feedback: string | null;
+    created_at: string;
+}
+
+// ============================================
 // DATABASE SCHEMA TYPE
 // ============================================
 
@@ -245,6 +296,26 @@ export interface Database {
                 Row: AuditLog;
                 Insert: Omit<AuditLog, 'id' | 'created_at'>;
                 Update: never;
+            };
+            messages: {
+                Row: Message;
+                Insert: Omit<Message, 'id' | 'created_at' | 'read_at'>;
+                Update: Partial<Omit<Message, 'id' | 'created_at'>>;
+            };
+            lesson_notes: {
+                Row: LessonNote;
+                Insert: Omit<LessonNote, 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<LessonNote, 'id' | 'created_at'>>;
+            };
+            lesson_comments: {
+                Row: LessonComment;
+                Insert: Omit<LessonComment, 'id' | 'created_at'>;
+                Update: Partial<Omit<LessonComment, 'id' | 'created_at'>>;
+            };
+            ratings: {
+                Row: Rating;
+                Insert: Omit<Rating, 'id' | 'created_at'>;
+                Update: Partial<Omit<Rating, 'id' | 'created_at'>>;
             };
         };
         Functions: {

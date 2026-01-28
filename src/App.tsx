@@ -20,8 +20,18 @@ import NotFound from "./pages/NotFound";
 
 // Auth pages
 import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
 import AcceptInvite from "./pages/auth/AcceptInvite";
 import AccessDenied from "./pages/AccessDenied";
+
+// Student pages
+import StudentLayout from "./components/student/StudentLayout";
+import StudentDashboard from "./pages/student/StudentDashboard";
+import StudentCourses from "./pages/student/StudentCourses";
+import StudentTeachers from "./pages/student/StudentTeachers";
+import StudentProfile from "./pages/student/StudentProfile";
+import Messages from "./pages/student/Messages";
+import LessonPlayer from "./pages/student/LessonPlayer";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -90,6 +100,22 @@ const App = () => (
                 <Route path="courses/:courseId" element={<CourseEditor />} />
                 <Route path="courses/:courseId/lessons" element={<LessonEditor />} />
                 <Route path="profile" element={<TeacherProfile />} />
+              </Route>
+
+              {/* Student Routes */}
+              <Route path="/register" element={<Register />} />
+              <Route path="/student" element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <StudentLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<StudentDashboard />} />
+                <Route path="courses" element={<StudentCourses />} />
+                <Route path="teachers" element={<StudentTeachers />} />
+                <Route path="messages" element={<Messages />} />
+                <Route path="profile" element={<StudentProfile />} />
+                <Route path="course/:id" element={<StudentCourses />} />
+                <Route path="lesson/:id" element={<LessonPlayer />} />
               </Route>
 
               {/* Catch-all */}

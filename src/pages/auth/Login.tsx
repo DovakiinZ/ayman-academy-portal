@@ -104,6 +104,15 @@ export default function Login() {
                     </Button>
                 </form>
 
+                <div className="mt-6 text-center text-sm text-muted-foreground">
+                    <p>
+                        {t('ليس لديك حساب؟', "Don't have an account?")}{' '}
+                        <Link to="/register" className="text-primary hover:underline font-medium">
+                            {t('إنشاء حساب جديد', 'Create new account')}
+                        </Link>
+                    </p>
+                </div>
+
                 {/* Back to home */}
                 <div className="mt-6 text-center">
                     <Link

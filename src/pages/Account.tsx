@@ -50,18 +50,22 @@ const Account = () => {
                     className="w-full px-4 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
-                <Button className="w-full">
-                  {t('تسجيل الدخول', 'Sign In')}
-                </Button>
+                <Link to="/login" className="w-full block">
+                  <Button className="w-full">
+                    {t('تسجيل الدخول', 'Sign In')}
+                  </Button>
+                </Link>
               </div>
 
               <div className="mt-6 pt-6 border-t border-border">
                 <p className="text-sm text-muted-foreground mb-4">
                   {t('ليس لديك حساب؟', "Don't have an account?")}
                 </p>
-                <Button variant="outline" className="w-full">
-                  {t('إنشاء حساب جديد', 'Create New Account')}
-                </Button>
+                <Link to="/register" className="w-full block">
+                  <Button variant="outline" className="w-full">
+                    {t('إنشاء حساب جديد', 'Create New Account')}
+                  </Button>
+                </Link>
               </div>
 
               {/* Language Toggle */}
