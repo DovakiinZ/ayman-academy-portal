@@ -8,8 +8,6 @@ const Footer = () => {
   const footerLinks = {
     academy: [
       { path: '/stages', label: { ar: 'المراحل الدراسية', en: 'Educational Stages' } },
-      { path: '/instructors', label: { ar: 'المعلمون', en: 'Instructors' } },
-      { path: '/plans', label: { ar: 'الاشتراكات', en: 'Subscription Plans' } },
     ],
     support: [
       { path: '/contact', label: { ar: 'تواصل معنا', en: 'Contact Us' } },

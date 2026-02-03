@@ -1,23 +1,50 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Menu, X, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Menu, X, User, LogIn, LayoutDashboard, LogOut, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import logo from '@/assets/logo.png';
 
 const Header = () => {
   const { t, toggleLanguage, language } = useLanguage();
+  const { isAuthenticated, role, signOut, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   const navLinks = [
     { path: '/', label: { ar: 'الرئيسية', en: 'Home' } },
     { path: '/stages', label: { ar: 'المراحل الدراسية', en: 'Stages' } },
-    { path: '/instructors', label: { ar: 'المعلمون', en: 'Instructors' } },
     { path: '/plans', label: { ar: 'الاشتراكات', en: 'Plans' } },
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Get dashboard link based on role
+  const getDashboardLink = () => {
+    switch (role) {
+      case 'super_admin':
+        return '/admin';
+      case 'teacher':
+        return '/teacher';
+      case 'student':
+        return '/student/dashboard';
+      default:
+        return '/';
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    window.location.href = '/';
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-background/98 backdrop-blur-sm border-b border-border/60">
@@ -57,12 +84,46 @@ const Header = () => {
               {language === 'ar' ? 'EN' : 'عربي'}
             </button>
 
-            <Link to="/account" className="hidden md:block">
-              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
-                <User className="w-4 h-4" />
-                {t('حسابي', 'Account')}
-              </Button>
-            </Link>
+            {/* Auth Section - Desktop */}
+            <div className="hidden md:block">
+              {isLoading ? (
+                <div className="w-24 h-8 bg-muted rounded animate-pulse" />
+              ) : isAuthenticated ? (
+                // Logged in: Show dropdown
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1.5">
+                      <User className="w-4 h-4" />
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link to={getDashboardLink()} className="flex items-center gap-2 cursor-pointer">
+                        <LayoutDashboard className="w-4 h-4" />
+                        {t('لوحتي', 'My Dashboard')}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleSignOut}
+                      className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      {t('تسجيل الخروج', 'Sign Out')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                // Not logged in: Show login button
+                <Link to="/login">
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
+                    <LogIn className="w-4 h-4" />
+                    {t('تسجيل الدخول', 'Sign In')}
+                  </Button>
+                </Link>
+              )}
+            </div>
 
             {/* Mobile menu button */}
             <button
@@ -91,13 +152,45 @@ const Header = () => {
                   {t(link.label.ar, link.label.en)}
                 </Link>
               ))}
-              <Link
-                to="/account"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground rounded"
-              >
-                {t('حسابي', 'My Account')}
-              </Link>
+
+              {/* Mobile Auth Section */}
+              <div className="border-t border-border/60 mt-2 pt-2">
+                {isLoading ? (
+                  <div className="px-3 py-2">
+                    <div className="w-24 h-6 bg-muted rounded animate-pulse" />
+                  </div>
+                ) : isAuthenticated ? (
+                  <>
+                    <Link
+                      to={getDashboardLink()}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground rounded flex items-center gap-2"
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      {t('لوحتي', 'My Dashboard')}
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        handleSignOut();
+                      }}
+                      className="w-full px-3 py-2 text-sm text-destructive hover:bg-secondary rounded flex items-center gap-2 text-start"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      {t('تسجيل الخروج', 'Sign Out')}
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground rounded flex items-center gap-2"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    {t('تسجيل الدخول', 'Sign In')}
+                  </Link>
+                )}
+              </div>
             </div>
           </nav>
         )}

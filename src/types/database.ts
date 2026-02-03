@@ -9,6 +9,7 @@ export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
 export type ResourceType = 'pdf' | 'link' | 'worksheet' | 'other';
 export type PlanScope = 'all' | 'level' | 'subject' | 'course';
 export type SubscriptionStatus = 'active' | 'inactive' | 'canceled' | 'expired' | 'pending';
+export type ContentItemType = 'video' | 'article' | 'image' | 'file' | 'link';
 
 // ============================================
 // ENTITIES
@@ -113,6 +114,23 @@ export interface LessonResource {
     title_en: string | null;
     url: string;
     created_at: string;
+}
+
+export interface ContentItem {
+    id: string;
+    subject_id: string;
+    type: ContentItemType;
+    title_ar: string;
+    title_en: string | null;
+    content_url: string | null;
+    content_text: string | null;
+    is_published: boolean;
+    is_free_preview: boolean;
+    order_index: number;
+    created_at: string;
+    updated_at: string;
+    // Joined
+    subject?: Course;
 }
 
 export interface Plan {
@@ -316,6 +334,11 @@ export interface Database {
                 Row: Rating;
                 Insert: Omit<Rating, 'id' | 'created_at'>;
                 Update: Partial<Omit<Rating, 'id' | 'created_at'>>;
+            };
+            content_items: {
+                Row: ContentItem;
+                Insert: Omit<ContentItem, 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<ContentItem, 'id' | 'subject_id'>>;
             };
         };
         Functions: {

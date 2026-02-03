@@ -13,7 +13,6 @@ import Stages from "./pages/Stages";
 import StageDetail from "./pages/StageDetail";
 import SubjectDetail from "./pages/SubjectDetail";
 import LessonPage from "./pages/LessonPage";
-import Instructors from "./pages/Instructors";
 import Plans from "./pages/Plans";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
@@ -21,6 +20,7 @@ import NotFound from "./pages/NotFound";
 // Auth pages
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import ResetPassword from "./pages/auth/ResetPassword";
 import AcceptInvite from "./pages/auth/AcceptInvite";
 import AccessDenied from "./pages/AccessDenied";
 
@@ -39,6 +39,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import TeachersManagement from "./pages/admin/TeachersManagement";
 import CoursesManagement from "./pages/admin/CoursesManagement";
 import TaxonomyManagement from "./pages/admin/TaxonomyManagement";
+import SubjectsManagement from "./pages/admin/SubjectsManagement";
+import LessonsManagement from "./pages/admin/LessonsManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
 
 // Teacher pages
@@ -66,12 +68,13 @@ const App = () => (
               <Route path="/stages/:stageId" element={<StageDetail />} />
               <Route path="/stages/:stageId/:subjectId" element={<SubjectDetail />} />
               <Route path="/lesson/:lessonId" element={<LessonPage />} />
-              <Route path="/instructors" element={<Instructors />} />
               <Route path="/plans" element={<Plans />} />
               <Route path="/account" element={<Account />} />
 
               {/* Auth routes */}
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/invite/:token" element={<AcceptInvite />} />
               <Route path="/access-denied" element={<AccessDenied />} />
 
@@ -85,6 +88,8 @@ const App = () => (
                 <Route path="teachers" element={<TeachersManagement />} />
                 <Route path="courses" element={<CoursesManagement />} />
                 <Route path="taxonomy" element={<TaxonomyManagement />} />
+                <Route path="taxonomy/:levelId/subjects" element={<SubjectsManagement />} />
+                <Route path="courses/:courseId/lessons" element={<LessonsManagement />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 
@@ -103,7 +108,6 @@ const App = () => (
               </Route>
 
               {/* Student Routes */}
-              <Route path="/register" element={<Register />} />
               <Route path="/student" element={
                 <ProtectedRoute allowedRoles={['student']}>
                   <StudentLayout />
