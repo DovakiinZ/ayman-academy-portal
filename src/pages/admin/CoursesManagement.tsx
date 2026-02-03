@@ -62,9 +62,10 @@ export default function CoursesManagement() {
     const [teachers, setTeachers] = useState<Pick<Profile, 'id' | 'full_name' | 'email'>[]>([]);
 
     // State
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDummy, setIsDummy] = useState(false);
+    const initialLoadDone = useRef(false);
 
     // Filters
     const [filterLevel, setFilterLevel] = useState<string>('');
@@ -96,7 +97,10 @@ export default function CoursesManagement() {
     const fetchData = useCallback(async () => {
         if (!mountedRef.current) return;
 
-        setLoading(true);
+        // Only show loading spinner on initial load, not when navigating back
+        if (!initialLoadDone.current) {
+            setLoading(true);
+        }
         setError(null);
 
         try {
@@ -152,6 +156,7 @@ export default function CoursesManagement() {
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
+                initialLoadDone.current = true;
             }
         }
     }, [filterLevel, filterTeacher, filterPublished]);

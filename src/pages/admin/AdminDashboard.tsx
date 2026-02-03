@@ -20,15 +20,19 @@ export default function AdminDashboard() {
     const { t } = useLanguage();
     const navigate = useNavigate();
     const [stats, setStats] = useState<AdminStats>(dummyStats);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDummy, setIsDummy] = useState(false);
     const mountedRef = useRef(true);
+    const initialLoadDone = useRef(false);
 
     const fetchStats = async () => {
         if (!mountedRef.current) return;
 
-        setLoading(true);
+        // Only show loading spinner on initial load, not when navigating back
+        if (!initialLoadDone.current) {
+            setLoading(true);
+        }
         setError(null);
 
         try {
@@ -81,6 +85,7 @@ export default function AdminDashboard() {
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
+                initialLoadDone.current = true;
             }
         }
     };
