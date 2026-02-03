@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getLevels, createLevel, updateLevel, deleteLevel, getSubjects } from '@/services/adminApi';
+import { supabase } from '@/lib/supabase';
+import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
+import { dummyLevels, getDummySubjectsForLevel } from '@/data/dummy';
 import type { Level, Subject } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +31,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, MoreVertical, Pencil, Trash2, BookOpen, GraduationCap, RefreshCw, AlertCircle, Layers } from 'lucide-react';
+import { Loader2, Plus, MoreVertical, Pencil, Trash2, BookOpen, GraduationCap, RefreshCw, AlertCircle, Layers, Beaker } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LevelWithSubjectCount extends Level {
@@ -39,11 +41,13 @@ interface LevelWithSubjectCount extends Level {
 export default function TaxonomyManagement() {
     const { t } = useLanguage();
     const navigate = useNavigate();
+    const mountedRef = useRef(true);
 
     // State
     const [levels, setLevels] = useState<LevelWithSubjectCount[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isDummy, setIsDummy] = useState(false);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -62,34 +66,77 @@ export default function TaxonomyManagement() {
 
     // Fetch levels with subject counts
     const fetchData = async () => {
+        if (!mountedRef.current) return;
+
         setLoading(true);
         setError(null);
 
-        const { data: levelsData, error: levelsError } = await getLevels();
+        try {
+            const { data: levelsData, source, error: levelsError } = await safeFetchSimple(
+                () => supabase.from('levels').select('*').order('sort_order', { ascending: true }),
+                dummyLevels,
+                'admin-levels'
+            );
 
-        if (levelsError) {
-            setError(levelsError);
-            setLoading(false);
-            return;
+            if (!mountedRef.current) return;
+
+            if (levelsError) {
+                setError(levelsError);
+            }
+
+            setIsDummy(source === 'dummy');
+
+            // Add subject counts
+            const levelsWithCounts: LevelWithSubjectCount[] = [];
+            for (const level of levelsData) {
+                if (source === 'dummy') {
+                    // Use dummy subject counts
+                    levelsWithCounts.push({
+                        ...level,
+                        subjectCount: getDummySubjectsForLevel(level.id).length,
+                    });
+                } else {
+                    // Fetch real subject count
+                    const { count } = await supabase
+                        .from('subjects')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('level_id', level.id);
+
+                    levelsWithCounts.push({
+                        ...level,
+                        subjectCount: count || 0,
+                    });
+                }
+            }
+
+            if (mountedRef.current) {
+                setLevels(levelsWithCounts);
+            }
+        } catch (err) {
+            if (!mountedRef.current) return;
+            setError(err instanceof Error ? err.message : 'Unknown error');
+            setLevels(dummyLevels.map(l => ({ ...l, subjectCount: getDummySubjectsForLevel(l.id).length })));
+            setIsDummy(true);
+        } finally {
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
-
-        // Fetch subject counts for each level
-        const levelsWithCounts: LevelWithSubjectCount[] = [];
-        for (const level of levelsData || []) {
-            const { data: subjects } = await getSubjects(level.id);
-            levelsWithCounts.push({
-                ...level,
-                subjectCount: subjects?.length || 0,
-            });
-        }
-
-        setLevels(levelsWithCounts);
-        setLoading(false);
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchData();
+
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
+
+    const handleRetry = () => {
+        clearCache('admin-levels');
+        fetchData();
+    };
 
     // Open add dialog
     const handleAdd = () => {
@@ -122,43 +169,49 @@ export default function TaxonomyManagement() {
         e.preventDefault();
         setSubmitting(true);
 
-        if (editingLevel) {
-            // Update
-            const { error } = await updateLevel(editingLevel.id, {
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                sort_order: form.sort_order,
-                is_active: form.is_active,
-            });
+        try {
+            if (editingLevel) {
+                // Update
+                const { error } = await supabase.from('levels').update({
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    sort_order: form.sort_order,
+                    is_active: form.is_active,
+                }).eq('id', editingLevel.id);
 
-            if (error) {
-                toast.error(t('فشل في تحديث المرحلة', 'Failed to update level'), { description: error });
+                if (error) {
+                    toast.error(t('فشل في تحديث المرحلة', 'Failed to update level'), { description: error.message });
+                } else {
+                    toast.success(t('تم تحديث المرحلة بنجاح', 'Level updated successfully'));
+                    setDialogOpen(false);
+                    clearCache('admin-levels');
+                    fetchData();
+                }
             } else {
-                toast.success(t('تم تحديث المرحلة بنجاح', 'Level updated successfully'));
-                setDialogOpen(false);
-                fetchData();
-            }
-        } else {
-            // Create
-            const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-            const { error } = await createLevel({
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                slug,
-                sort_order: form.sort_order,
-                is_active: form.is_active,
-            });
+                // Create
+                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
+                const { error } = await supabase.from('levels').insert({
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    slug,
+                    sort_order: form.sort_order,
+                    is_active: form.is_active,
+                });
 
-            if (error) {
-                toast.error(t('فشل في إضافة المرحلة', 'Failed to add level'), { description: error });
-            } else {
-                toast.success(t('تمت إضافة المرحلة بنجاح', 'Level added successfully'));
-                setDialogOpen(false);
-                fetchData();
+                if (error) {
+                    toast.error(t('فشل في إضافة المرحلة', 'Failed to add level'), { description: error.message });
+                } else {
+                    toast.success(t('تمت إضافة المرحلة بنجاح', 'Level added successfully'));
+                    setDialogOpen(false);
+                    clearCache('admin-levels');
+                    fetchData();
+                }
             }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setSubmitting(false);
         }
-
-        setSubmitting(false);
     };
 
     // Delete
@@ -166,17 +219,22 @@ export default function TaxonomyManagement() {
         if (!deleteTarget) return;
         setSubmitting(true);
 
-        const { error } = await deleteLevel(deleteTarget.id);
+        try {
+            const { error } = await supabase.from('levels').delete().eq('id', deleteTarget.id);
 
-        if (error) {
-            toast.error(t('فشل في حذف المرحلة', 'Failed to delete level'), { description: error });
-        } else {
-            toast.success(t('تم حذف المرحلة بنجاح', 'Level deleted successfully'));
-            fetchData();
+            if (error) {
+                toast.error(t('فشل في حذف المرحلة', 'Failed to delete level'), { description: error.message });
+            } else {
+                toast.success(t('تم حذف المرحلة بنجاح', 'Level deleted successfully'));
+                clearCache('admin-levels');
+                fetchData();
+            }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setDeleteTarget(null);
+            setSubmitting(false);
         }
-
-        setDeleteTarget(null);
-        setSubmitting(false);
     };
 
     // Navigate to subjects
@@ -203,10 +261,18 @@ export default function TaxonomyManagement() {
                         {t('إدارة المراحل والمواد الدراسية', 'Manage stages and subjects')}
                     </p>
                 </div>
-                <Button onClick={handleAdd}>
-                    <Plus className="w-4 h-4 me-2" />
-                    {t('إضافة مرحلة', 'Add Level')}
-                </Button>
+                <div className="flex items-center gap-3">
+                    {isDummy && !loading && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
+                            <Beaker className="w-3.5 h-3.5" />
+                            {t('بيانات تجريبية', 'Demo Data')}
+                        </div>
+                    )}
+                    <Button onClick={handleAdd}>
+                        <Plus className="w-4 h-4 me-2" />
+                        {t('إضافة مرحلة', 'Add Level')}
+                    </Button>
+                </div>
             </div>
 
             {/* Error State */}
@@ -218,7 +284,7 @@ export default function TaxonomyManagement() {
                             <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
                             <p className="text-xs text-destructive/80">{error}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={fetchData}>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
                             <RefreshCw className="w-4 h-4 me-2" />
                             {t('إعادة المحاولة', 'Retry')}
                         </Button>
@@ -243,25 +309,8 @@ export default function TaxonomyManagement() {
                 </div>
             )}
 
-            {/* Empty State */}
-            {!loading && !error && levels.length === 0 && (
-                <div className="bg-background rounded-lg border border-border p-12 text-center">
-                    <Layers className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-foreground mb-2">
-                        {t('لا توجد مراحل دراسية', 'No educational levels')}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        {t('ابدأ بإضافة أول مرحلة دراسية', 'Start by adding the first educational level')}
-                    </p>
-                    <Button onClick={handleAdd}>
-                        <Plus className="w-4 h-4 me-2" />
-                        {t('إضافة مرحلة', 'Add Level')}
-                    </Button>
-                </div>
-            )}
-
-            {/* Levels Grid */}
-            {!loading && !error && levels.length > 0 && (
+            {/* Levels Grid - always show data if available */}
+            {!loading && levels.length > 0 && (
                 <div className="grid gap-4 md:grid-cols-3">
                     {levels.map((level) => {
                         const iconConfig = levelIcons[level.slug] || { icon: GraduationCap, color: 'bg-gray-100 text-gray-600' };
@@ -328,6 +377,23 @@ export default function TaxonomyManagement() {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Empty State - only if not dummy and no data */}
+            {!loading && !isDummy && levels.length === 0 && (
+                <div className="bg-background rounded-lg border border-border p-12 text-center">
+                    <Layers className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                        {t('لا توجد مراحل دراسية', 'No educational levels')}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        {t('ابدأ بإضافة أول مرحلة دراسية', 'Start by adding the first educational level')}
+                    </p>
+                    <Button onClick={handleAdd}>
+                        <Plus className="w-4 h-4 me-2" />
+                        {t('إضافة مرحلة', 'Add Level')}
+                    </Button>
                 </div>
             )}
 

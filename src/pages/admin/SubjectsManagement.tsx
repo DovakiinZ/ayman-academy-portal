@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getLevels, getSubjects, createSubject, updateSubject, deleteSubject } from '@/services/adminApi';
+import { supabase } from '@/lib/supabase';
+import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
+import { dummyLevels, getDummySubjectsForLevel } from '@/data/dummy';
 import type { Level, Subject } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,19 +34,21 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, ArrowRight, RefreshCw, AlertCircle, BookOpen } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ArrowRight, RefreshCw, AlertCircle, BookOpen, Beaker } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SubjectsManagement() {
     const { t } = useLanguage();
     const { levelId } = useParams<{ levelId: string }>();
     const navigate = useNavigate();
+    const mountedRef = useRef(true);
 
     // State
     const [level, setLevel] = useState<Level | null>(null);
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isDummy, setIsDummy] = useState(false);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -63,42 +67,71 @@ export default function SubjectsManagement() {
 
     // Fetch data
     const fetchData = async () => {
-        if (!levelId) return;
+        if (!levelId || !mountedRef.current) return;
 
         setLoading(true);
         setError(null);
 
-        // Fetch level info
-        const { data: levels, error: levelsError } = await getLevels();
-        if (levelsError) {
-            setError(levelsError);
-            setLoading(false);
-            return;
-        }
+        try {
+            // Fetch level info
+            const { data: levelsData, source: levelsSource, error: levelsError } = await safeFetchSimple(
+                () => supabase.from('levels').select('*').eq('id', levelId).single(),
+                dummyLevels.find(l => l.id === levelId) || dummyLevels[0],
+                `admin-level-${levelId}`
+            );
 
-        const currentLevel = levels?.find(l => l.id === levelId);
-        if (!currentLevel) {
-            setError(t('المرحلة غير موجودة', 'Level not found'));
-            setLoading(false);
-            return;
-        }
-        setLevel(currentLevel);
+            if (!mountedRef.current) return;
 
-        // Fetch subjects
-        const { data: subjectsData, error: subjectsError } = await getSubjects(levelId);
-        if (subjectsError) {
-            setError(subjectsError);
-            setLoading(false);
-            return;
-        }
+            if (levelsError && levelsSource !== 'dummy') {
+                setError(levelsError);
+                setLoading(false);
+                return;
+            }
 
-        setSubjects(subjectsData || []);
-        setLoading(false);
+            setLevel(levelsData);
+
+            // Fetch subjects
+            const { data: subjectsData, source: subjectsSource, error: subjectsError } = await safeFetchSimple(
+                () => supabase.from('subjects').select('*').eq('level_id', levelId).order('sort_order'),
+                getDummySubjectsForLevel(levelId),
+                `admin-subjects-${levelId}`
+            );
+
+            if (!mountedRef.current) return;
+
+            setIsDummy(levelsSource === 'dummy' || subjectsSource === 'dummy');
+            setSubjects(subjectsData);
+
+            if (subjectsError) {
+                setError(subjectsError);
+            }
+        } catch (err) {
+            if (!mountedRef.current) return;
+            setError(err instanceof Error ? err.message : 'Unknown error');
+            setLevel(dummyLevels[0]);
+            setSubjects(getDummySubjectsForLevel(levelId));
+            setIsDummy(true);
+        } finally {
+            if (mountedRef.current) {
+                setLoading(false);
+            }
+        }
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchData();
+
+        return () => {
+            mountedRef.current = false;
+        };
     }, [levelId]);
+
+    const handleRetry = () => {
+        clearCache(`admin-level-${levelId}`);
+        clearCache(`admin-subjects-${levelId}`);
+        fetchData();
+    };
 
     // Open add dialog
     const handleAdd = () => {
@@ -133,44 +166,50 @@ export default function SubjectsManagement() {
 
         setSubmitting(true);
 
-        if (editingSubject) {
-            // Update
-            const { error } = await updateSubject(editingSubject.id, {
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                sort_order: form.sort_order,
-                is_active: form.is_active,
-            });
+        try {
+            if (editingSubject) {
+                // Update
+                const { error } = await supabase.from('subjects').update({
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    sort_order: form.sort_order,
+                    is_active: form.is_active,
+                }).eq('id', editingSubject.id);
 
-            if (error) {
-                toast.error(t('فشل في تحديث المادة', 'Failed to update subject'), { description: error });
+                if (error) {
+                    toast.error(t('فشل في تحديث المادة', 'Failed to update subject'), { description: error.message });
+                } else {
+                    toast.success(t('تم تحديث المادة بنجاح', 'Subject updated successfully'));
+                    setDialogOpen(false);
+                    clearCache(`admin-subjects-${levelId}`);
+                    fetchData();
+                }
             } else {
-                toast.success(t('تم تحديث المادة بنجاح', 'Subject updated successfully'));
-                setDialogOpen(false);
-                fetchData();
-            }
-        } else {
-            // Create
-            const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-            const { error } = await createSubject({
-                level_id: levelId,
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                slug,
-                sort_order: form.sort_order,
-                is_active: form.is_active,
-            });
+                // Create
+                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
+                const { error } = await supabase.from('subjects').insert({
+                    level_id: levelId,
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    slug,
+                    sort_order: form.sort_order,
+                    is_active: form.is_active,
+                });
 
-            if (error) {
-                toast.error(t('فشل في إضافة المادة', 'Failed to add subject'), { description: error });
-            } else {
-                toast.success(t('تمت إضافة المادة بنجاح', 'Subject added successfully'));
-                setDialogOpen(false);
-                fetchData();
+                if (error) {
+                    toast.error(t('فشل في إضافة المادة', 'Failed to add subject'), { description: error.message });
+                } else {
+                    toast.success(t('تمت إضافة المادة بنجاح', 'Subject added successfully'));
+                    setDialogOpen(false);
+                    clearCache(`admin-subjects-${levelId}`);
+                    fetchData();
+                }
             }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setSubmitting(false);
         }
-
-        setSubmitting(false);
     };
 
     // Delete
@@ -178,17 +217,22 @@ export default function SubjectsManagement() {
         if (!deleteTarget) return;
         setSubmitting(true);
 
-        const { error } = await deleteSubject(deleteTarget.id);
+        try {
+            const { error } = await supabase.from('subjects').delete().eq('id', deleteTarget.id);
 
-        if (error) {
-            toast.error(t('فشل في حذف المادة', 'Failed to delete subject'), { description: error });
-        } else {
-            toast.success(t('تم حذف المادة بنجاح', 'Subject deleted successfully'));
-            fetchData();
+            if (error) {
+                toast.error(t('فشل في حذف المادة', 'Failed to delete subject'), { description: error.message });
+            } else {
+                toast.success(t('تم حذف المادة بنجاح', 'Subject deleted successfully'));
+                clearCache(`admin-subjects-${levelId}`);
+                fetchData();
+            }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setDeleteTarget(null);
+            setSubmitting(false);
         }
-
-        setDeleteTarget(null);
-        setSubmitting(false);
     };
 
     return (
@@ -217,10 +261,18 @@ export default function SubjectsManagement() {
                         {level && t(`المواد في مرحلة ${level.title_ar}`, `Subjects in ${level.title_en || level.title_ar}`)}
                     </p>
                 </div>
-                <Button onClick={handleAdd}>
-                    <Plus className="w-4 h-4 me-2" />
-                    {t('إضافة مادة', 'Add Subject')}
-                </Button>
+                <div className="flex items-center gap-3">
+                    {isDummy && !loading && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
+                            <Beaker className="w-3.5 h-3.5" />
+                            {t('بيانات تجريبية', 'Demo Data')}
+                        </div>
+                    )}
+                    <Button onClick={handleAdd}>
+                        <Plus className="w-4 h-4 me-2" />
+                        {t('إضافة مادة', 'Add Subject')}
+                    </Button>
+                </div>
             </div>
 
             {/* Error State */}
@@ -232,7 +284,7 @@ export default function SubjectsManagement() {
                             <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
                             <p className="text-xs text-destructive/80">{error}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={fetchData}>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
                             <RefreshCw className="w-4 h-4 me-2" />
                             {t('إعادة المحاولة', 'Retry')}
                         </Button>
@@ -246,7 +298,7 @@ export default function SubjectsManagement() {
                     <div className="p-8 text-center">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                     </div>
-                ) : subjects.length === 0 ? (
+                ) : subjects.length === 0 && !isDummy ? (
                     <div className="p-12 text-center">
                         <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-foreground mb-2">

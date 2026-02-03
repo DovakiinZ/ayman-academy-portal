@@ -1,17 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import {
-    getCourses,
-    getLevels,
-    getSubjects,
-    getTeachersForSelect,
-    createCourse,
-    updateCourse,
-    deleteCourse,
-    type CourseWithRelations,
-} from '@/services/adminApi';
-import type { Level, Subject, Profile } from '@/types/database';
+import { supabase } from '@/lib/supabase';
+import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
+import { dummyCourses, dummyLevels, dummyTeachers } from '@/data/dummy';
+import type { Level, Subject, Profile, Course } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,12 +42,18 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, List, RefreshCw, AlertCircle, BookOpen, Filter } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, List, RefreshCw, AlertCircle, BookOpen, Filter, Beaker } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface CourseWithRelations extends Course {
+    teacher?: Pick<Profile, 'id' | 'full_name' | 'email'>;
+    level?: Pick<Level, 'id' | 'title_ar' | 'title_en'>;
+}
 
 export default function CoursesManagement() {
     const { t } = useLanguage();
     const navigate = useNavigate();
+    const mountedRef = useRef(true);
 
     // Data
     const [courses, setCourses] = useState<CourseWithRelations[]>([]);
@@ -65,10 +64,10 @@ export default function CoursesManagement() {
     // State
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isDummy, setIsDummy] = useState(false);
 
     // Filters
     const [filterLevel, setFilterLevel] = useState<string>('');
-    const [filterSubject, setFilterSubject] = useState<string>('');
     const [filterTeacher, setFilterTeacher] = useState<string>('');
     const [filterPublished, setFilterPublished] = useState<string>('');
 
@@ -94,42 +93,88 @@ export default function CoursesManagement() {
     });
 
     // Fetch data
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
+        if (!mountedRef.current) return;
+
         setLoading(true);
         setError(null);
 
-        const [coursesRes, levelsRes, teachersRes] = await Promise.all([
-            getCourses({
-                levelId: filterLevel || undefined,
-                subjectId: filterSubject || undefined,
-                teacherId: filterTeacher || undefined,
-                isPublished: filterPublished === 'true' ? true : filterPublished === 'false' ? false : undefined,
-            }),
-            getLevels(),
-            getTeachersForSelect(),
-        ]);
+        try {
+            // Build query
+            let query = supabase
+                .from('courses')
+                .select(`
+                    *,
+                    teacher:profiles!courses_teacher_id_fkey(id, full_name, email),
+                    level:levels!courses_level_id_fkey(id, title_ar, title_en)
+                `)
+                .order('created_at', { ascending: false });
 
-        if (coursesRes.error) {
-            setError(coursesRes.error);
-            setLoading(false);
-            return;
+            if (filterLevel) query = query.eq('level_id', filterLevel);
+            if (filterTeacher) query = query.eq('teacher_id', filterTeacher);
+            if (filterPublished === 'true') query = query.eq('is_published', true);
+            if (filterPublished === 'false') query = query.eq('is_published', false);
+
+            const [coursesRes, levelsRes, teachersRes] = await Promise.all([
+                safeFetchSimple(
+                    () => query,
+                    dummyCourses as CourseWithRelations[],
+                    'admin-courses'
+                ),
+                safeFetchSimple(
+                    () => supabase.from('levels').select('*').order('sort_order'),
+                    dummyLevels,
+                    'admin-levels'
+                ),
+                safeFetchSimple(
+                    () => supabase.from('profiles').select('id, full_name, email').eq('role', 'teacher'),
+                    dummyTeachers.map(t => ({ id: t.id!, full_name: t.full_name!, email: t.email! })),
+                    'admin-teachers-select'
+                ),
+            ]);
+
+            if (!mountedRef.current) return;
+
+            setIsDummy(coursesRes.source === 'dummy');
+            setCourses(coursesRes.data);
+            setLevels(levelsRes.data);
+            setTeachers(teachersRes.data);
+
+            if (coursesRes.error) {
+                setError(coursesRes.error);
+            }
+        } catch (err) {
+            if (!mountedRef.current) return;
+            setError(err instanceof Error ? err.message : 'Unknown error');
+            setCourses(dummyCourses as CourseWithRelations[]);
+            setLevels(dummyLevels);
+            setIsDummy(true);
+        } finally {
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
-
-        setCourses(coursesRes.data || []);
-        setLevels(levelsRes.data || []);
-        setTeachers(teachersRes.data || []);
-        setLoading(false);
-    };
+    }, [filterLevel, filterTeacher, filterPublished]);
 
     // Fetch subjects when level changes in form
     const fetchSubjectsForLevel = async (levelId: string) => {
-        const { data } = await getSubjects(levelId);
+        const { data } = await supabase.from('subjects').select('*').eq('level_id', levelId);
         setSubjects(data || []);
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchData();
-    }, [filterLevel, filterSubject, filterTeacher, filterPublished]);
+
+        return () => {
+            mountedRef.current = false;
+        };
+    }, [fetchData]);
+
+    const handleRetry = () => {
+        clearCache('admin-courses');
+        fetchData();
+    };
 
     // Open add dialog
     const handleAdd = () => {
@@ -178,60 +223,66 @@ export default function CoursesManagement() {
         e.preventDefault();
         setSubmitting(true);
 
-        if (editingCourse) {
-            // Update
-            const { error } = await updateCourse(editingCourse.id, {
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                description_ar: form.description_ar || undefined,
-                description_en: form.description_en || undefined,
-                level_id: form.level_id,
-                subject_id: form.subject_id || null,
-                is_published: form.is_published,
-                is_paid: form.is_paid,
-                price_amount: form.is_paid ? form.price_amount : undefined,
-            });
+        try {
+            if (editingCourse) {
+                // Update
+                const { error } = await supabase.from('courses').update({
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    description_ar: form.description_ar || null,
+                    description_en: form.description_en || null,
+                    level_id: form.level_id,
+                    subject_id: form.subject_id || null,
+                    is_published: form.is_published,
+                    is_paid: form.is_paid,
+                    price_amount: form.is_paid ? form.price_amount : null,
+                }).eq('id', editingCourse.id);
 
-            if (error) {
-                toast.error(t('فشل في تحديث الدورة', 'Failed to update course'), { description: error });
+                if (error) {
+                    toast.error(t('فشل في تحديث الدورة', 'Failed to update course'), { description: error.message });
+                } else {
+                    toast.success(t('تم تحديث الدورة بنجاح', 'Course updated successfully'));
+                    setDialogOpen(false);
+                    clearCache('admin-courses');
+                    fetchData();
+                }
             } else {
-                toast.success(t('تم تحديث الدورة بنجاح', 'Course updated successfully'));
-                setDialogOpen(false);
-                fetchData();
-            }
-        } else {
-            // Create
-            if (!form.teacher_id || !form.level_id) {
-                toast.error(t('يجب اختيار المعلم والمرحلة', 'Teacher and level are required'));
-                setSubmitting(false);
-                return;
-            }
+                // Create
+                if (!form.teacher_id || !form.level_id) {
+                    toast.error(t('يجب اختيار المعلم والمرحلة', 'Teacher and level are required'));
+                    setSubmitting(false);
+                    return;
+                }
 
-            const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-            const { error } = await createCourse({
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                slug,
-                description_ar: form.description_ar || undefined,
-                description_en: form.description_en || undefined,
-                teacher_id: form.teacher_id,
-                level_id: form.level_id,
-                subject_id: form.subject_id || undefined,
-                is_published: form.is_published,
-                is_paid: form.is_paid,
-                price_amount: form.is_paid ? form.price_amount : undefined,
-            });
+                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
+                const { error } = await supabase.from('courses').insert({
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    slug,
+                    description_ar: form.description_ar || null,
+                    description_en: form.description_en || null,
+                    teacher_id: form.teacher_id,
+                    level_id: form.level_id,
+                    subject_id: form.subject_id || null,
+                    is_published: form.is_published,
+                    is_paid: form.is_paid,
+                    price_amount: form.is_paid ? form.price_amount : null,
+                });
 
-            if (error) {
-                toast.error(t('فشل في إنشاء الدورة', 'Failed to create course'), { description: error });
-            } else {
-                toast.success(t('تم إنشاء الدورة بنجاح', 'Course created successfully'));
-                setDialogOpen(false);
-                fetchData();
+                if (error) {
+                    toast.error(t('فشل في إنشاء الدورة', 'Failed to create course'), { description: error.message });
+                } else {
+                    toast.success(t('تم إنشاء الدورة بنجاح', 'Course created successfully'));
+                    setDialogOpen(false);
+                    clearCache('admin-courses');
+                    fetchData();
+                }
             }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setSubmitting(false);
         }
-
-        setSubmitting(false);
     };
 
     // Delete
@@ -239,17 +290,22 @@ export default function CoursesManagement() {
         if (!deleteTarget) return;
         setSubmitting(true);
 
-        const { error } = await deleteCourse(deleteTarget.id);
+        try {
+            const { error } = await supabase.from('courses').delete().eq('id', deleteTarget.id);
 
-        if (error) {
-            toast.error(t('فشل في حذف الدورة', 'Failed to delete course'), { description: error });
-        } else {
-            toast.success(t('تم حذف الدورة بنجاح', 'Course deleted successfully'));
-            fetchData();
+            if (error) {
+                toast.error(t('فشل في حذف الدورة', 'Failed to delete course'), { description: error.message });
+            } else {
+                toast.success(t('تم حذف الدورة بنجاح', 'Course deleted successfully'));
+                clearCache('admin-courses');
+                fetchData();
+            }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setDeleteTarget(null);
+            setSubmitting(false);
         }
-
-        setDeleteTarget(null);
-        setSubmitting(false);
     };
 
     // Navigate to lessons
@@ -269,10 +325,18 @@ export default function CoursesManagement() {
                         {t('عرض وإدارة جميع الدورات في الأكاديمية', 'View and manage all courses in the academy')}
                     </p>
                 </div>
-                <Button onClick={handleAdd}>
-                    <Plus className="w-4 h-4 me-2" />
-                    {t('إضافة دورة', 'Add Course')}
-                </Button>
+                <div className="flex items-center gap-3">
+                    {isDummy && !loading && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
+                            <Beaker className="w-3.5 h-3.5" />
+                            {t('بيانات تجريبية', 'Demo Data')}
+                        </div>
+                    )}
+                    <Button onClick={handleAdd}>
+                        <Plus className="w-4 h-4 me-2" />
+                        {t('إضافة دورة', 'Add Course')}
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -323,7 +387,6 @@ export default function CoursesManagement() {
 
                     <Button variant="outline" onClick={() => {
                         setFilterLevel('');
-                        setFilterSubject('');
                         setFilterTeacher('');
                         setFilterPublished('');
                     }}>
@@ -342,7 +405,7 @@ export default function CoursesManagement() {
                             <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
                             <p className="text-xs text-destructive/80">{error}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={fetchData}>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
                             <RefreshCw className="w-4 h-4 me-2" />
                             {t('إعادة المحاولة', 'Retry')}
                         </Button>
@@ -356,7 +419,7 @@ export default function CoursesManagement() {
                     <div className="p-8 text-center">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                     </div>
-                ) : courses.length === 0 ? (
+                ) : courses.length === 0 && !isDummy ? (
                     <div className="p-12 text-center">
                         <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-foreground mb-2">

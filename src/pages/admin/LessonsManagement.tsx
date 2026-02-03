@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getCourses, getLessons, createLesson, updateLesson, deleteLesson } from '@/services/adminApi';
+import { supabase } from '@/lib/supabase';
+import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
+import { dummyCourses, dummyLessons } from '@/data/dummy';
 import type { Course, Lesson } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +42,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, ArrowRight, ArrowUp, ArrowDown, RefreshCw, AlertCircle, PlayCircle, FileText } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ArrowRight, ArrowUp, ArrowDown, RefreshCw, AlertCircle, PlayCircle, FileText, Beaker } from 'lucide-react';
 import { toast } from 'sonner';
 
 type LessonType = 'video' | 'article';
@@ -49,12 +51,14 @@ export default function LessonsManagement() {
     const { t } = useLanguage();
     const { courseId } = useParams<{ courseId: string }>();
     const navigate = useNavigate();
+    const mountedRef = useRef(true);
 
     // State
     const [course, setCourse] = useState<Course | null>(null);
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isDummy, setIsDummy] = useState(false);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -80,42 +84,71 @@ export default function LessonsManagement() {
 
     // Fetch data
     const fetchData = async () => {
-        if (!courseId) return;
+        if (!courseId || !mountedRef.current) return;
 
         setLoading(true);
         setError(null);
 
-        // Fetch course info
-        const { data: courses, error: coursesError } = await getCourses();
-        if (coursesError) {
-            setError(coursesError);
-            setLoading(false);
-            return;
-        }
+        try {
+            // Fetch course info
+            const { data: courseData, source: courseSource, error: courseError } = await safeFetchSimple(
+                () => supabase.from('courses').select('*').eq('id', courseId).single(),
+                dummyCourses.find(c => c.id === courseId) || dummyCourses[0],
+                `admin-course-${courseId}`
+            );
 
-        const currentCourse = courses?.find(c => c.id === courseId);
-        if (!currentCourse) {
-            setError(t('الدورة غير موجودة', 'Course not found'));
-            setLoading(false);
-            return;
-        }
-        setCourse(currentCourse);
+            if (!mountedRef.current) return;
 
-        // Fetch lessons
-        const { data: lessonsData, error: lessonsError } = await getLessons(courseId);
-        if (lessonsError) {
-            setError(lessonsError);
-            setLoading(false);
-            return;
-        }
+            if (courseError && courseSource !== 'dummy') {
+                setError(courseError);
+                setLoading(false);
+                return;
+            }
 
-        setLessons(lessonsData || []);
-        setLoading(false);
+            setCourse(courseData);
+
+            // Fetch lessons
+            const { data: lessonsData, source: lessonsSource, error: lessonsError } = await safeFetchSimple(
+                () => supabase.from('lessons').select('*').eq('course_id', courseId).order('order_index'),
+                dummyLessons.filter(l => l.course_id === courseId),
+                `admin-lessons-${courseId}`
+            );
+
+            if (!mountedRef.current) return;
+
+            setIsDummy(courseSource === 'dummy' || lessonsSource === 'dummy');
+            setLessons(lessonsData);
+
+            if (lessonsError) {
+                setError(lessonsError);
+            }
+        } catch (err) {
+            if (!mountedRef.current) return;
+            setError(err instanceof Error ? err.message : 'Unknown error');
+            setCourse(dummyCourses[0]);
+            setLessons(dummyLessons);
+            setIsDummy(true);
+        } finally {
+            if (mountedRef.current) {
+                setLoading(false);
+            }
+        }
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchData();
+
+        return () => {
+            mountedRef.current = false;
+        };
     }, [courseId]);
+
+    const handleRetry = () => {
+        clearCache(`admin-course-${courseId}`);
+        clearCache(`admin-lessons-${courseId}`);
+        fetchData();
+    };
 
     // Open add dialog
     const handleAdd = () => {
@@ -164,56 +197,62 @@ export default function LessonsManagement() {
 
         setSubmitting(true);
 
-        if (editingLesson) {
-            // Update
-            const { error } = await updateLesson(editingLesson.id, {
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                summary_ar: form.summary_ar || undefined,
-                summary_en: form.summary_en || undefined,
-                preview_video_url: form.preview_video_url || undefined,
-                full_video_url: form.full_video_url || undefined,
-                duration_seconds: form.duration_seconds || undefined,
-                order_index: form.order_index,
-                is_free_preview: form.is_free_preview,
-                is_published: form.is_published,
-            });
+        try {
+            if (editingLesson) {
+                // Update
+                const { error } = await supabase.from('lessons').update({
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    summary_ar: form.summary_ar || null,
+                    summary_en: form.summary_en || null,
+                    preview_video_url: form.preview_video_url || null,
+                    full_video_url: form.full_video_url || null,
+                    duration_seconds: form.duration_seconds || null,
+                    order_index: form.order_index,
+                    is_free_preview: form.is_free_preview,
+                    is_published: form.is_published,
+                }).eq('id', editingLesson.id);
 
-            if (error) {
-                toast.error(t('فشل في تحديث الدرس', 'Failed to update lesson'), { description: error });
+                if (error) {
+                    toast.error(t('فشل في تحديث الدرس', 'Failed to update lesson'), { description: error.message });
+                } else {
+                    toast.success(t('تم تحديث الدرس بنجاح', 'Lesson updated successfully'));
+                    setDialogOpen(false);
+                    clearCache(`admin-lessons-${courseId}`);
+                    fetchData();
+                }
             } else {
-                toast.success(t('تم تحديث الدرس بنجاح', 'Lesson updated successfully'));
-                setDialogOpen(false);
-                fetchData();
-            }
-        } else {
-            // Create
-            const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-            const { error } = await createLesson({
-                course_id: courseId,
-                title_ar: form.title_ar,
-                title_en: form.title_en || undefined,
-                slug,
-                summary_ar: form.summary_ar || undefined,
-                summary_en: form.summary_en || undefined,
-                preview_video_url: form.preview_video_url || undefined,
-                full_video_url: form.full_video_url || undefined,
-                duration_seconds: form.duration_seconds || undefined,
-                order_index: form.order_index,
-                is_free_preview: form.is_free_preview,
-                is_published: form.is_published,
-            });
+                // Create
+                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
+                const { error } = await supabase.from('lessons').insert({
+                    course_id: courseId,
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    slug,
+                    summary_ar: form.summary_ar || null,
+                    summary_en: form.summary_en || null,
+                    preview_video_url: form.preview_video_url || null,
+                    full_video_url: form.full_video_url || null,
+                    duration_seconds: form.duration_seconds || null,
+                    order_index: form.order_index,
+                    is_free_preview: form.is_free_preview,
+                    is_published: form.is_published,
+                });
 
-            if (error) {
-                toast.error(t('فشل في إضافة الدرس', 'Failed to add lesson'), { description: error });
-            } else {
-                toast.success(t('تمت إضافة الدرس بنجاح', 'Lesson added successfully'));
-                setDialogOpen(false);
-                fetchData();
+                if (error) {
+                    toast.error(t('فشل في إضافة الدرس', 'Failed to add lesson'), { description: error.message });
+                } else {
+                    toast.success(t('تمت إضافة الدرس بنجاح', 'Lesson added successfully'));
+                    setDialogOpen(false);
+                    clearCache(`admin-lessons-${courseId}`);
+                    fetchData();
+                }
             }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setSubmitting(false);
         }
-
-        setSubmitting(false);
     };
 
     // Delete
@@ -221,17 +260,22 @@ export default function LessonsManagement() {
         if (!deleteTarget) return;
         setSubmitting(true);
 
-        const { error } = await deleteLesson(deleteTarget.id);
+        try {
+            const { error } = await supabase.from('lessons').delete().eq('id', deleteTarget.id);
 
-        if (error) {
-            toast.error(t('فشل في حذف الدرس', 'Failed to delete lesson'), { description: error });
-        } else {
-            toast.success(t('تم حذف الدرس بنجاح', 'Lesson deleted successfully'));
-            fetchData();
+            if (error) {
+                toast.error(t('فشل في حذف الدرس', 'Failed to delete lesson'), { description: error.message });
+            } else {
+                toast.success(t('تم حذف الدرس بنجاح', 'Lesson deleted successfully'));
+                clearCache(`admin-lessons-${courseId}`);
+                fetchData();
+            }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setDeleteTarget(null);
+            setSubmitting(false);
         }
-
-        setDeleteTarget(null);
-        setSubmitting(false);
     };
 
     // Reorder
@@ -239,8 +283,9 @@ export default function LessonsManagement() {
         if (index === 0) return;
         const prevLesson = lessons[index - 1];
 
-        await updateLesson(lesson.id, { order_index: prevLesson.order_index });
-        await updateLesson(prevLesson.id, { order_index: lesson.order_index });
+        await supabase.from('lessons').update({ order_index: prevLesson.order_index }).eq('id', lesson.id);
+        await supabase.from('lessons').update({ order_index: lesson.order_index }).eq('id', prevLesson.id);
+        clearCache(`admin-lessons-${courseId}`);
         fetchData();
     };
 
@@ -248,8 +293,9 @@ export default function LessonsManagement() {
         if (index === lessons.length - 1) return;
         const nextLesson = lessons[index + 1];
 
-        await updateLesson(lesson.id, { order_index: nextLesson.order_index });
-        await updateLesson(nextLesson.id, { order_index: lesson.order_index });
+        await supabase.from('lessons').update({ order_index: nextLesson.order_index }).eq('id', lesson.id);
+        await supabase.from('lessons').update({ order_index: lesson.order_index }).eq('id', nextLesson.id);
+        clearCache(`admin-lessons-${courseId}`);
         fetchData();
     };
 
@@ -286,10 +332,18 @@ export default function LessonsManagement() {
                         {course && t(`دروس دورة: ${course.title_ar}`, `Lessons for: ${course.title_en || course.title_ar}`)}
                     </p>
                 </div>
-                <Button onClick={handleAdd}>
-                    <Plus className="w-4 h-4 me-2" />
-                    {t('إضافة درس', 'Add Lesson')}
-                </Button>
+                <div className="flex items-center gap-3">
+                    {isDummy && !loading && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
+                            <Beaker className="w-3.5 h-3.5" />
+                            {t('بيانات تجريبية', 'Demo Data')}
+                        </div>
+                    )}
+                    <Button onClick={handleAdd}>
+                        <Plus className="w-4 h-4 me-2" />
+                        {t('إضافة درس', 'Add Lesson')}
+                    </Button>
+                </div>
             </div>
 
             {/* Error State */}
@@ -301,7 +355,7 @@ export default function LessonsManagement() {
                             <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
                             <p className="text-xs text-destructive/80">{error}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={fetchData}>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
                             <RefreshCw className="w-4 h-4 me-2" />
                             {t('إعادة المحاولة', 'Retry')}
                         </Button>
@@ -315,7 +369,7 @@ export default function LessonsManagement() {
                     <div className="p-8 text-center">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                     </div>
-                ) : lessons.length === 0 ? (
+                ) : lessons.length === 0 && !isDummy ? (
                     <div className="p-12 text-center">
                         <PlayCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-foreground mb-2">

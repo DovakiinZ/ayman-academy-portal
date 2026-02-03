@@ -1,15 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-    getTeachers,
-    getTeacherInvites,
-    createTeacherInvite,
-    resendInvite,
-    deleteInvite,
-    toggleTeacherStatus,
-    deleteTeacher,
-} from '@/services/adminApi';
+import { supabase } from '@/lib/supabase';
+import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
+import { dummyTeachers, dummyTeacherInvites } from '@/data/dummy';
 import type { Profile, TeacherInvite } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +34,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users } from 'lucide-react';
+import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users, Beaker } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -56,41 +50,70 @@ export default function TeachersManagement() {
     const [invites, setInvites] = useState<TeacherInvite[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isDummy, setIsDummy] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [inviteForm, setInviteForm] = useState({ full_name: '', email: '' });
     const [submitting, setSubmitting] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<{ type: 'teacher' | 'invite'; item: Profile | TeacherInvite } | null>(null);
+    const mountedRef = useRef(true);
 
     const fetchData = async () => {
+        if (!mountedRef.current) return;
+
         setLoading(true);
         setError(null);
 
-        const [teachersRes, invitesRes] = await Promise.all([
-            getTeachers(),
-            getTeacherInvites(),
-        ]);
+        try {
+            const [teachersRes, invitesRes] = await Promise.all([
+                safeFetchSimple(
+                    () => supabase.from('profiles').select('*').eq('role', 'teacher').order('created_at', { ascending: false }),
+                    dummyTeachers as Profile[],
+                    'admin-teachers'
+                ),
+                safeFetchSimple(
+                    () => supabase.from('teacher_invites').select('*').order('created_at', { ascending: false }),
+                    dummyTeacherInvites as TeacherInvite[],
+                    'admin-invites'
+                ),
+            ]);
 
-        if (teachersRes.error) {
-            setError(teachersRes.error);
-            setLoading(false);
-            return;
+            if (!mountedRef.current) return;
+
+            setIsDummy(teachersRes.source === 'dummy' || invitesRes.source === 'dummy');
+            setTeachers(teachersRes.data);
+            setInvites(invitesRes.data);
+
+            // Show error only if both failed
+            if (teachersRes.error && invitesRes.error) {
+                setError(teachersRes.error);
+            }
+        } catch (err) {
+            if (!mountedRef.current) return;
+            setError(err instanceof Error ? err.message : 'Unknown error');
+            setTeachers(dummyTeachers as Profile[]);
+            setInvites(dummyTeacherInvites as TeacherInvite[]);
+            setIsDummy(true);
+        } finally {
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
-
-        if (invitesRes.error) {
-            setError(invitesRes.error);
-            setLoading(false);
-            return;
-        }
-
-        setTeachers(teachersRes.data || []);
-        setInvites(invitesRes.data || []);
-        setLoading(false);
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchData();
+
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
+
+    const handleRetry = () => {
+        clearCache('admin-');
+        fetchData();
+    };
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -101,27 +124,39 @@ export default function TeachersManagement() {
 
         setSubmitting(true);
 
-        const { data, error } = await createTeacherInvite({
-            full_name: inviteForm.full_name,
-            email: inviteForm.email,
-            created_by: user.id,
-        });
+        try {
+            // Generate token
+            const tokenHash = crypto.randomUUID();
+            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        if (error) {
-            toast.error(t('فشل في إرسال الدعوة', 'Failed to send invite'), { description: error });
-        } else {
-            toast.success(t('تم إرسال الدعوة بنجاح', 'Invite sent successfully'));
-            setDialogOpen(false);
-            setInviteForm({ full_name: '', email: '' });
-            fetchData();
+            const { data, error } = await supabase.from('teacher_invites').insert({
+                full_name: inviteForm.full_name,
+                email: inviteForm.email,
+                token_hash: tokenHash,
+                created_by: user.id,
+                status: 'pending',
+                expires_at: expiresAt,
+            }).select().single();
 
-            // Auto-copy invite link
-            if (data?.token_hash) {
-                copyInviteLink(data.token_hash);
+            if (error) {
+                toast.error(t('فشل في إرسال الدعوة', 'Failed to send invite'), { description: error.message });
+            } else {
+                toast.success(t('تم إرسال الدعوة بنجاح', 'Invite sent successfully'));
+                setDialogOpen(false);
+                setInviteForm({ full_name: '', email: '' });
+                clearCache('admin-invites');
+                fetchData();
+
+                // Auto-copy invite link
+                if (data?.token_hash) {
+                    copyInviteLink(data.token_hash);
+                }
             }
+        } catch (err) {
+            toast.error(t('فشل في إرسال الدعوة', 'Failed to send invite'));
+        } finally {
+            setSubmitting(false);
         }
-
-        setSubmitting(false);
     };
 
     const copyInviteLink = (tokenHash: string) => {
@@ -133,27 +168,36 @@ export default function TeachersManagement() {
     };
 
     const handleToggleStatus = async (teacher: Profile) => {
-        const { error } = await toggleTeacherStatus(teacher.id, !teacher.is_active);
+        const { error } = await supabase
+            .from('profiles')
+            .update({ is_active: !teacher.is_active })
+            .eq('id', teacher.id);
 
         if (error) {
-            toast.error(t('فشل في تغيير الحالة', 'Failed to change status'), { description: error });
+            toast.error(t('فشل في تغيير الحالة', 'Failed to change status'), { description: error.message });
         } else {
             toast.success(
                 teacher.is_active
                     ? t('تم تعطيل المعلم', 'Teacher disabled')
                     : t('تم تفعيل المعلم', 'Teacher enabled')
             );
+            clearCache('admin-teachers');
             fetchData();
         }
     };
 
     const handleResendInvite = async (invite: TeacherInvite) => {
-        const { error } = await resendInvite(invite.id);
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { error } = await supabase
+            .from('teacher_invites')
+            .update({ expires_at: expiresAt })
+            .eq('id', invite.id);
 
         if (error) {
-            toast.error(t('فشل في تجديد الدعوة', 'Failed to resend invite'), { description: error });
+            toast.error(t('فشل في تجديد الدعوة', 'Failed to resend invite'), { description: error.message });
         } else {
             toast.success(t('تم تجديد الدعوة بنجاح', 'Invite renewed successfully'));
+            clearCache('admin-invites');
             fetchData();
         }
     };
@@ -162,30 +206,36 @@ export default function TeachersManagement() {
         if (!deleteTarget) return;
         setSubmitting(true);
 
-        if (deleteTarget.type === 'invite') {
-            const invite = deleteTarget.item as TeacherInvite;
-            const { error } = await deleteInvite(invite.id);
+        try {
+            if (deleteTarget.type === 'invite') {
+                const invite = deleteTarget.item as TeacherInvite;
+                const { error } = await supabase.from('teacher_invites').delete().eq('id', invite.id);
 
-            if (error) {
-                toast.error(t('فشل في حذف الدعوة', 'Failed to delete invite'), { description: error });
+                if (error) {
+                    toast.error(t('فشل في حذف الدعوة', 'Failed to delete invite'), { description: error.message });
+                } else {
+                    toast.success(t('تم حذف الدعوة', 'Invite deleted'));
+                    clearCache('admin-invites');
+                    fetchData();
+                }
             } else {
-                toast.success(t('تم حذف الدعوة', 'Invite deleted'));
-                fetchData();
-            }
-        } else {
-            const teacher = deleteTarget.item as Profile;
-            const { error } = await deleteTeacher(teacher.id);
+                const teacher = deleteTarget.item as Profile;
+                const { error } = await supabase.from('profiles').delete().eq('id', teacher.id);
 
-            if (error) {
-                toast.error(t('فشل في حذف المعلم', 'Failed to delete teacher'), { description: error });
-            } else {
-                toast.success(t('تم حذف المعلم', 'Teacher deleted'));
-                fetchData();
+                if (error) {
+                    toast.error(t('فشل في حذف المعلم', 'Failed to delete teacher'), { description: error.message });
+                } else {
+                    toast.success(t('تم حذف المعلم', 'Teacher deleted'));
+                    clearCache('admin-teachers');
+                    fetchData();
+                }
             }
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } finally {
+            setDeleteTarget(null);
+            setSubmitting(false);
         }
-
-        setDeleteTarget(null);
-        setSubmitting(false);
     };
 
     const statusBadge = (status: string) => {
@@ -208,6 +258,8 @@ export default function TeachersManagement() {
         );
     };
 
+    const pendingInvites = invites.filter(i => i.status === 'pending');
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
@@ -220,43 +272,51 @@ export default function TeachersManagement() {
                     </p>
                 </div>
 
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <UserPlus className="w-4 h-4 me-2" />
-                            {t('دعوة معلم', 'Invite Teacher')}
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>{t('دعوة معلم جديد', 'Invite New Teacher')}</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={handleInvite} className="space-y-4 mt-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="full_name">{t('الاسم الكامل', 'Full Name')}</Label>
-                                <Input
-                                    id="full_name"
-                                    value={inviteForm.full_name}
-                                    onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email">{t('البريد الإلكتروني', 'Email')}</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={inviteForm.email}
-                                    onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <Button type="submit" className="w-full" disabled={submitting}>
-                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('إرسال الدعوة', 'Send Invite')}
+                <div className="flex items-center gap-3">
+                    {isDummy && !loading && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
+                            <Beaker className="w-3.5 h-3.5" />
+                            {t('بيانات تجريبية', 'Demo Data')}
+                        </div>
+                    )}
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <UserPlus className="w-4 h-4 me-2" />
+                                {t('دعوة معلم', 'Invite Teacher')}
                             </Button>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>{t('دعوة معلم جديد', 'Invite New Teacher')}</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleInvite} className="space-y-4 mt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="full_name">{t('الاسم الكامل', 'Full Name')}</Label>
+                                    <Input
+                                        id="full_name"
+                                        value={inviteForm.full_name}
+                                        onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">{t('البريد الإلكتروني', 'Email')}</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={inviteForm.email}
+                                        onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <Button type="submit" className="w-full" disabled={submitting}>
+                                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('إرسال الدعوة', 'Send Invite')}
+                                </Button>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
 
             {/* Error State */}
@@ -268,7 +328,7 @@ export default function TeachersManagement() {
                             <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
                             <p className="text-xs text-destructive/80">{error}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={fetchData}>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
                             <RefreshCw className="w-4 h-4 me-2" />
                             {t('إعادة المحاولة', 'Retry')}
                         </Button>
@@ -277,7 +337,7 @@ export default function TeachersManagement() {
             )}
 
             {/* Pending Invites */}
-            {invites.filter(i => i.status === 'pending').length > 0 && (
+            {pendingInvites.length > 0 && (
                 <div className="mb-8">
                     <h2 className="text-lg font-medium text-foreground mb-3">
                         {t('الدعوات المعلقة', 'Pending Invites')}
@@ -294,7 +354,7 @@ export default function TeachersManagement() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {invites.filter(i => i.status === 'pending').map((invite) => (
+                                {pendingInvites.map((invite) => (
                                     <TableRow key={invite.id}>
                                         <TableCell className="font-medium">{invite.full_name}</TableCell>
                                         <TableCell>{invite.email}</TableCell>
@@ -351,7 +411,7 @@ export default function TeachersManagement() {
                         <div className="p-8 text-center">
                             <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                         </div>
-                    ) : teachers.length === 0 ? (
+                    ) : teachers.length === 0 && !isDummy ? (
                         <div className="p-12 text-center">
                             <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                             <h3 className="text-lg font-medium text-foreground mb-2">
