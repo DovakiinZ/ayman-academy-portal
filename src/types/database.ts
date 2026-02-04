@@ -88,7 +88,8 @@ export interface Course {
 
 export interface Lesson {
     id: string;
-    course_id: string;
+    course_id: string | null; // Nullable for new subject-based lessons
+    subject_id: string | null; // New: lessons can belong directly to subjects
     slug: string;
     title_ar: string;
     title_en: string | null;
@@ -100,10 +101,13 @@ export interface Lesson {
     full_video_url: string | null;
     is_free_preview: boolean;
     is_published: boolean;
+    is_paid: boolean;
     created_at: string;
     updated_at: string;
     // Joined
     course?: Course;
+    subject?: Subject;
+    content_items?: LessonContentItem[];
 }
 
 export interface LessonResource {
@@ -114,6 +118,22 @@ export interface LessonResource {
     title_en: string | null;
     url: string;
     created_at: string;
+}
+
+export interface LessonContentItem {
+    id: string;
+    lesson_id: string;
+    content_type: ContentItemType;
+    title_ar: string;
+    title_en: string | null;
+    body_ar: string | null; // For articles
+    body_en: string | null;
+    url: string | null; // For video/file/link/image
+    metadata: Record<string, unknown>;
+    order_index: number;
+    is_published: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface ContentItem {

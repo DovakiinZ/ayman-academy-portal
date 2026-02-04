@@ -156,7 +156,7 @@ export default function StudentDashboard() {
                         <h2 className="text-lg font-semibold text-foreground">
                             {t('متابعة المشاهدة', 'Continue Watching')}
                         </h2>
-                        <Link to="/student/courses" className="text-sm text-primary hover:underline">
+                        <Link to="/student/stages" className="text-sm text-primary hover:underline">
                             {t('عرض الكل', 'View All')}
                         </Link>
                     </div>

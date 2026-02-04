@@ -27,7 +27,9 @@ import AccessDenied from "./pages/AccessDenied";
 // Student pages
 import StudentLayout from "./components/student/StudentLayout";
 import StudentDashboard from "./pages/student/StudentDashboard";
-import StudentCourses from "./pages/student/StudentCourses";
+import StudentStages from "./pages/student/StudentStages";
+import StudentSubjects from "./pages/student/StudentSubjects";
+import StudentLessons from "./pages/student/StudentLessons";
 import StudentTeachers from "./pages/student/StudentTeachers";
 import StudentProfile from "./pages/student/StudentProfile";
 import Messages from "./pages/student/Messages";
@@ -121,11 +123,12 @@ const App = () => (
                 </ProtectedRoute>
               }>
                 <Route index element={<StudentDashboard />} />
-                <Route path="courses" element={<StudentCourses />} />
+                <Route path="stages" element={<StudentStages />} />
+                <Route path="stages/:stageId" element={<StudentSubjects />} />
+                <Route path="subjects/:subjectId" element={<StudentLessons />} />
                 <Route path="teachers" element={<StudentTeachers />} />
                 <Route path="messages" element={<Messages />} />
                 <Route path="profile" element={<StudentProfile />} />
-                <Route path="course/:id" element={<StudentCourses />} />
                 <Route path="lesson/:id" element={<LessonPlayer />} />
                 <Route path="quiz/:quizId" element={<QuizPlayer />} />
                 <Route path="quiz/:quizId/results/:attemptId" element={<QuizResults />} />
