@@ -46,7 +46,7 @@ import SubjectsManagement from "./pages/admin/SubjectsManagement";
 import LessonsManagement from "./pages/admin/LessonsManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
 
-// Teacher pages
+// Teacher pages (also used by admin)
 import TeacherLayout from "./components/teacher/TeacherLayout";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import MyCourses from "./pages/teacher/MyCourses";
@@ -99,9 +99,9 @@ const App = () => (
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 
-              {/* Teacher routes */}
+              {/* Teacher routes (accessible by teacher and super_admin) */}
               <Route path="/teacher" element={
-                <ProtectedRoute allowedRoles={['teacher']}>
+                <ProtectedRoute allowedRoles={['teacher', 'super_admin']}>
                   <TeacherLayout />
                 </ProtectedRoute>
               }>
