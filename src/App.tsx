@@ -48,15 +48,10 @@ import HomepageManagement from "./pages/admin/HomepageManagement";
 import TemplatesManagement from "./pages/admin/TemplatesManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
 
-// Teacher pages (also used by admin)
 import TeacherLayout from "./components/teacher/TeacherLayout";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
-import MyCourses from "./pages/teacher/MyCourses";
-import CourseEditor from "./pages/teacher/CourseEditor";
 import LessonEditor from "./pages/teacher/LessonEditor";
 import TeacherProfile from "./pages/teacher/TeacherProfile";
-import TeacherQuizzes from "./pages/teacher/TeacherQuizzes";
-import QuizBuilder from "./pages/teacher/QuizBuilder";
 
 const queryClient = new QueryClient();
 
@@ -113,13 +108,7 @@ const App = () => (
                   </ProtectedRoute>
                 }>
                   <Route index element={<TeacherDashboard />} />
-                  <Route path="courses" element={<MyCourses />} />
-                  <Route path="courses/new" element={<CourseEditor />} />
-                  <Route path="courses/:courseId" element={<CourseEditor />} />
-                  <Route path="courses/:courseId/lessons" element={<LessonEditor />} />
-                  <Route path="quizzes" element={<TeacherQuizzes />} />
-                  <Route path="quizzes/new" element={<QuizBuilder />} />
-                  <Route path="quizzes/:quizId/edit" element={<QuizBuilder />} />
+                  <Route path="lessons" element={<LessonEditor />} />
                   <Route path="profile" element={<TeacherProfile />} />
                 </Route>
 

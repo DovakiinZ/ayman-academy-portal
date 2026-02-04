@@ -28,8 +28,6 @@ const navItems = [
     { path: '/admin/stages', icon: GraduationCap, label: { ar: 'المراحل', en: 'Stages' } },
     { path: '/admin/subjects', icon: BookMarked, label: { ar: 'المواد', en: 'Subjects' } },
     { path: '/admin/lessons', icon: FileText, label: { ar: 'الدروس', en: 'Lessons' } },
-    { path: '/teacher/quizzes', icon: ClipboardList, label: { ar: 'الاختبارات', en: 'Quizzes' } },
-    { path: '/teacher/courses', icon: BookOpen, label: { ar: 'الدورات', en: 'Courses' } },
     { path: '/admin/settings', icon: Settings, label: { ar: 'الإعدادات', en: 'Settings' } },
 ];
 

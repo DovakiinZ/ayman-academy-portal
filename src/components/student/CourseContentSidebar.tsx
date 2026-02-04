@@ -7,7 +7,7 @@ import { CheckCircle, Circle, Lock, Play, ChevronDown, ChevronUp } from 'lucide-
 import { cn } from '@/lib/utils';
 
 interface CourseContentSidebarProps {
-    courseId: string;
+    subjectId: string;
     currentLessonId: string;
     userId: string;
 }
@@ -17,24 +17,23 @@ interface LessonItem extends Lesson {
     isLocked: boolean;
 }
 
-export default function CourseContentSidebar({ courseId, currentLessonId, userId }: CourseContentSidebarProps) {
+export default function CourseContentSidebar({ subjectId, currentLessonId, userId }: CourseContentSidebarProps) {
     const { t } = useLanguage();
     const [lessons, setLessons] = useState<LessonItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isOpen, setIsOpen] = useState(true); // collapsible on mobile
 
     useEffect(() => {
-        fetchCourseContent();
-    }, [courseId, userId]);
+        if (subjectId) fetchContent();
+    }, [subjectId, userId]);
 
-    const fetchCourseContent = async () => {
-        // 1. Fetch all lessons for the course
+    const fetchContent = async () => {
+        // 1. Fetch all lessons for the subject
         const { data: lessonsData } = await supabase
             .from('lessons')
             .select('*')
-            .eq('course_id', courseId)
+            .eq('subject_id', subjectId)
             .eq('is_published', true)
-            .order('sort_order', { ascending: true })
+            .order('order_index', { ascending: true }) // Changed sort_order to order_index
             .returns<Lesson[]>();
 
         if (!lessonsData) return;
@@ -46,15 +45,10 @@ export default function CourseContentSidebar({ courseId, currentLessonId, userId
             .eq('user_id', userId)
             .in('lesson_id', lessonsData.map(l => l.id));
 
-        // 3. Determine lock status (simplification: strict sequence or accessible)
-        // For now, assuming if course is accessible, all lessons are unlocked EXCEPT if we strictly enforce flow.
-        // Let's assume unlocked for MVP if course is accessible.
-        // We can add "locked if previous not complete" logic later.
-
         const merged: LessonItem[] = lessonsData.map(l => ({
             ...l,
             progress: progressData?.find(p => p.lesson_id === l.id),
-            isLocked: false // Todo: Implement lock logic if needed
+            isLocked: false
         }));
 
         setLessons(merged);
@@ -126,9 +120,7 @@ export default function CourseContentSidebar({ courseId, currentLessonId, userId
                                     {index + 1}. {t(lesson.title_ar, lesson.title_en || lesson.title_ar)}
                                 </p>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    {lesson.duration_seconds && (
-                                        <span>{Math.floor(lesson.duration_seconds / 60)} {t('دقيقة', 'min')}</span>
-                                    )}
+                                    {/* Duration removed until content_items logic is added */}
                                 </div>
                             </div>
                         </Link>

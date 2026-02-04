@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { Level, Subject, Lesson } from '@/types/database';
-import { BookOpen, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Loader2, AlertCircle, Play } from 'lucide-react';
+import { Stage, Subject } from '@/types/database';
+import { BookOpen, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { dummyLevels, getDummySubjectsForLevel } from '@/data/dummy';
 
 interface SubjectWithLessons extends Subject {
     lessons_count?: number;
@@ -16,11 +15,10 @@ export default function StudentSubjects() {
     const navigate = useNavigate();
     const { t, direction } = useLanguage();
 
-    const [stage, setStage] = useState<Level | null>(null);
+    const [stage, setStage] = useState<Stage | null>(null);
     const [subjects, setSubjects] = useState<SubjectWithLessons[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
 
     useEffect(() => {
         if (stageId) {
@@ -37,21 +35,14 @@ export default function StudentSubjects() {
 
             // Fetch stage
             const { data: stageData, error: stageError } = await supabase
-                .from('levels')
+                .from('stages')
                 .select('*')
                 .eq('id', stageId)
                 .single();
 
             if (stageError || !stageData) {
-                // Use dummy data
-                const dummyStage = dummyLevels.find(l => l.id === stageId);
-                if (dummyStage) {
-                    setStage(dummyStage);
-                    setSubjects(getDummySubjectsForLevel(stageId) as SubjectWithLessons[]);
-                    setIsDummy(true);
-                } else {
-                    setError('Stage not found');
-                }
+                console.error('Stage fetch error', stageError);
+                setError('Stage not found');
             } else {
                 setStage(stageData);
 
@@ -62,25 +53,22 @@ export default function StudentSubjects() {
                         *,
                         lessons(id)
                     `)
-                    .eq('level_id', stageId)
+                    .eq('stage_id', stageId)
                     .eq('is_active', true)
                     .order('sort_order', { ascending: true });
 
                 if (subjectsError) {
-                    setSubjects(getDummySubjectsForLevel(stageId) as SubjectWithLessons[]);
-                    setIsDummy(true);
+                    console.error('Subjects fetch error', subjectsError);
                 } else {
                     setSubjects((subjectsData || []).map(s => ({
                         ...s,
                         lessons_count: s.lessons?.length || 0
                     })) as SubjectWithLessons[]);
-                    setIsDummy(false);
                 }
             }
         } catch (err) {
             console.error('[StudentSubjects] Error:', err);
             setError(err instanceof Error ? err.message : 'Unknown error');
-            setIsDummy(true);
         } finally {
             setLoading(false);
         }
@@ -113,7 +101,8 @@ export default function StudentSubjects() {
             'pe': '⚽',
             'التربية البدنية': '⚽',
         };
-        return icons[subject.slug] || icons[subject.title_ar] || '📖';
+        // Use regex to match parts of strings if needed, or just titles
+        return icons[subject.title_en?.toLowerCase() || ''] || icons[subject.title_ar] || '📖';
     };
 
     if (loading) {
@@ -161,14 +150,6 @@ export default function StudentSubjects() {
                     </p>
                 </div>
             </div>
-
-            {/* Demo Data Badge */}
-            {isDummy && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-                    <AlertCircle className="w-4 h-4" />
-                    {t('يتم عرض بيانات تجريبية', 'Showing demo data')}
-                </div>
-            )}
 
             {/* Subjects Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
