@@ -306,11 +306,11 @@ export default function QuizResults() {
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">
                     <Button
                         variant="outline"
-                        onClick={() => navigate('/student/courses')}
+                        onClick={() => navigate('/student/stages')}
                         className="flex-1"
                     >
                         <Home className="w-4 h-4 me-2" />
-                        {t('العودة للدورات', 'Back to Courses')}
+                        {t('العودة للمراحل', 'Back to Stages')}
                     </Button>
 
                     {isFailed && (

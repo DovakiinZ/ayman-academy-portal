@@ -171,8 +171,8 @@ export default function LessonPlayer() {
         return (
             <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
                 <h1 className="text-2xl font-bold mb-2">{t('عفواً، لا يمكنك الوصول لهذا الدرس', 'Access Denied')}</h1>
-                <p className="text-muted-foreground mb-6">{t('يجب الاشتراك في الدورة لمشاهدة هذا الدرس', 'You must subscribe to access this lesson')}</p>
-                <Link to="/student/courses"><Button>{t('العودة للدورات', 'Back to Courses')}</Button></Link>
+                <p className="text-muted-foreground mb-6">{t('يجب الاشتراك للوصول لهذا الدرس', 'You must subscribe to access this lesson')}</p>
+                <Link to="/student/stages"><Button>{t('العودة للمراحل', 'Back to Stages')}</Button></Link>
             </div>
         );
     }
@@ -187,7 +187,7 @@ export default function LessonPlayer() {
             {/* Top Bar */}
             <div className="bg-background border-b border-border sticky top-0 z-20 px-4 h-16 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4">
-                    <Link to={`/student/courses`}>
+                    <Link to={`/student/stages`}>
                         <Button variant="ghost" size="icon">
                             <BackIcon className="w-5 h-5" />
                         </Button>

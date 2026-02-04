@@ -128,9 +128,9 @@ export default function StudentTeachers() {
                                         {t('مراسلة', 'Message')}
                                     </Button>
                                 </Link>
-                                <Link to={`/student/courses?teacher=${teacher.id}`}>
+                                <Link to={`/student/stages`}>
                                     <Button variant="ghost" size="sm">
-                                        {t('الدورات', 'Courses')}
+                                        {t('المراحل', 'Stages')}
                                         <ChevronIcon className="w-4 h-4 ms-1" />
                                     </Button>
                                 </Link>
