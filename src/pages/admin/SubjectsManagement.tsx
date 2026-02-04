@@ -39,7 +39,9 @@ import { toast } from 'sonner';
 
 export default function SubjectsManagement() {
     const { t } = useLanguage();
-    const { levelId } = useParams<{ levelId: string }>();
+    // Accept both stageId (new) and levelId (old) for backward compatibility
+    const params = useParams<{ stageId?: string; levelId?: string }>();
+    const levelId = params.stageId || params.levelId;
     const navigate = useNavigate();
     const mountedRef = useRef(true);
 
@@ -240,10 +242,10 @@ export default function SubjectsManagement() {
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                 <button
-                    onClick={() => navigate('/admin/taxonomy')}
+                    onClick={() => navigate('/admin/stages')}
                     className="hover:text-foreground transition-colors"
                 >
-                    {t('التصنيفات', 'Taxonomy')}
+                    {t('المراحل', 'Stages')}
                 </button>
                 <ArrowRight className="w-4 h-4" />
                 <span className="text-foreground">

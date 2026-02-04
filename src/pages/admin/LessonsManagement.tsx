@@ -49,12 +49,15 @@ type LessonType = 'video' | 'article';
 
 export default function LessonsManagement() {
     const { t } = useLanguage();
-    const { courseId } = useParams<{ courseId: string }>();
+    // Accept both subjectId (new) and courseId (old) for backward compatibility
+    const params = useParams<{ subjectId?: string; courseId?: string }>();
+    const entityId = params.subjectId || params.courseId;
+    const isSubjectMode = !!params.subjectId;
     const navigate = useNavigate();
     const mountedRef = useRef(true);
 
-    // State
-    const [course, setCourse] = useState<Course | null>(null);
+    // State - supports both course and subject based lessons
+    const [entity, setEntity] = useState<any>(null); // Course or Subject
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -84,48 +87,79 @@ export default function LessonsManagement() {
 
     // Fetch data
     const fetchData = async () => {
-        if (!courseId || !mountedRef.current) return;
+        if (!entityId || !mountedRef.current) return;
 
         setLoading(true);
         setError(null);
 
         try {
-            // Fetch course info
-            const { data: courseData, source: courseSource, error: courseError } = await safeFetchSimple(
-                () => supabase.from('courses').select('*').eq('id', courseId).single(),
-                dummyCourses.find(c => c.id === courseId) || dummyCourses[0],
-                `admin-course-${courseId}`
-            );
+            if (isSubjectMode) {
+                // Fetch subject info
+                const { data: subjectData, error: subjectError } = await supabase
+                    .from('subjects')
+                    .select('*, level:levels(*)')
+                    .eq('id', entityId)
+                    .single();
 
-            if (!mountedRef.current) return;
+                if (subjectError) {
+                    setError(subjectError.message);
+                    setLoading(false);
+                    return;
+                }
 
-            if (courseError && courseSource !== 'dummy') {
-                setError(courseError);
-                setLoading(false);
-                return;
-            }
+                setEntity(subjectData);
 
-            setCourse(courseData);
+                // Fetch lessons by subject_id
+                const { data: lessonsData, error: lessonsError } = await supabase
+                    .from('lessons')
+                    .select('*')
+                    .eq('subject_id', entityId)
+                    .order('order_index');
 
-            // Fetch lessons
-            const { data: lessonsData, source: lessonsSource, error: lessonsError } = await safeFetchSimple(
-                () => supabase.from('lessons').select('*').eq('course_id', courseId).order('order_index'),
-                dummyLessons.filter(l => l.course_id === courseId),
-                `admin-lessons-${courseId}`
-            );
+                if (lessonsError) {
+                    setError(lessonsError.message);
+                } else {
+                    setLessons(lessonsData || []);
+                }
+                setIsDummy(false);
+            } else {
+                // Legacy: Fetch course info
+                const { data: courseData, source: courseSource, error: courseError } = await safeFetchSimple(
+                    () => supabase.from('courses').select('*').eq('id', entityId).single(),
+                    dummyCourses.find(c => c.id === entityId) || dummyCourses[0],
+                    `admin-course-${entityId}`
+                );
 
-            if (!mountedRef.current) return;
+                if (!mountedRef.current) return;
 
-            setIsDummy(courseSource === 'dummy' || lessonsSource === 'dummy');
-            setLessons(lessonsData);
+                if (courseError && courseSource !== 'dummy') {
+                    setError(courseError);
+                    setLoading(false);
+                    return;
+                }
 
-            if (lessonsError) {
-                setError(lessonsError);
+                setEntity(courseData);
+
+                // Fetch lessons by course_id
+                const { data: lessonsData, source: lessonsSource, error: lessonsError } = await safeFetchSimple(
+                    () => supabase.from('lessons').select('*').eq('course_id', entityId).order('order_index'),
+                    dummyLessons.filter(l => l.course_id === entityId),
+                    `admin-lessons-${entityId}`
+                );
+
+                if (!mountedRef.current) return;
+
+                setIsDummy(courseSource === 'dummy' || lessonsSource === 'dummy');
+                setLessons(lessonsData);
+
+                if (lessonsError) {
+                    setError(lessonsError);
+                }
             }
         } catch (err) {
             if (!mountedRef.current) return;
             setError(err instanceof Error ? err.message : 'Unknown error');
-            setCourse(dummyCourses[0]);
+            setEntity(dummyCourses[0]);
             setLessons(dummyLessons);
             setIsDummy(true);
         } finally {
@@ -142,11 +176,11 @@ export default function LessonsManagement() {
         return () => {
             mountedRef.current = false;
         };
-    }, [courseId]);
+    }, [entityId]);
 
     const handleRetry = () => {
-        clearCache(`admin-course-${courseId}`);
-        clearCache(`admin-lessons-${courseId}`);
+        clearCache(`admin-course-${entityId}`);
+        clearCache(`admin-lessons-${entityId}`);
         fetchData();
     };
 
@@ -193,7 +227,7 @@ export default function LessonsManagement() {
     // Save (create or update)
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!courseId) return;
+        if (!entityId) return;
 
         setSubmitting(true);
 
@@ -218,14 +252,13 @@ export default function LessonsManagement() {
                 } else {
                     toast.success(t('تم تحديث الدرس بنجاح', 'Lesson updated successfully'));
                     setDialogOpen(false);
-                    clearCache(`admin-lessons-${courseId}`);
+                    clearCache(`admin-lessons-${entityId}`);
                     fetchData();
                 }
             } else {
                 // Create
                 const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-                const { error } = await supabase.from('lessons').insert({
-                    course_id: courseId,
+                const insertData: any = {
                     title_ar: form.title_ar,
                     title_en: form.title_en || null,
                     slug,
@@ -237,14 +270,23 @@ export default function LessonsManagement() {
                     order_index: form.order_index,
                     is_free_preview: form.is_free_preview,
                     is_published: form.is_published,
-                });
+                };
+
+                // Set subject_id or course_id based on mode
+                if (isSubjectMode) {
+                    insertData.subject_id = entityId;
+                } else {
+                    insertData.course_id = entityId;
+                }
+
+                const { error } = await supabase.from('lessons').insert(insertData);
 
                 if (error) {
                     toast.error(t('فشل في إضافة الدرس', 'Failed to add lesson'), { description: error.message });
                 } else {
                     toast.success(t('تمت إضافة الدرس بنجاح', 'Lesson added successfully'));
                     setDialogOpen(false);
-                    clearCache(`admin-lessons-${courseId}`);
+                    clearCache(`admin-lessons-${entityId}`);
                     fetchData();
                 }
             }
@@ -267,7 +309,7 @@ export default function LessonsManagement() {
                 toast.error(t('فشل في حذف الدرس', 'Failed to delete lesson'), { description: error.message });
             } else {
                 toast.success(t('تم حذف الدرس بنجاح', 'Lesson deleted successfully'));
-                clearCache(`admin-lessons-${courseId}`);
+                clearCache(`admin-lessons-${entityId}`);
                 fetchData();
             }
         } catch (err) {
@@ -285,7 +327,7 @@ export default function LessonsManagement() {
 
         await supabase.from('lessons').update({ order_index: prevLesson.order_index }).eq('id', lesson.id);
         await supabase.from('lessons').update({ order_index: lesson.order_index }).eq('id', prevLesson.id);
-        clearCache(`admin-lessons-${courseId}`);
+        clearCache(`admin-lessons-${entityId}`);
         fetchData();
     };
 
@@ -295,7 +337,7 @@ export default function LessonsManagement() {
 
         await supabase.from('lessons').update({ order_index: nextLesson.order_index }).eq('id', lesson.id);
         await supabase.from('lessons').update({ order_index: lesson.order_index }).eq('id', nextLesson.id);
-        clearCache(`admin-lessons-${courseId}`);
+        clearCache(`admin-lessons-${entityId}`);
         fetchData();
     };
 
@@ -311,14 +353,14 @@ export default function LessonsManagement() {
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                 <button
-                    onClick={() => navigate('/admin/courses')}
+                    onClick={() => navigate(isSubjectMode ? '/admin/subjects' : '/admin/lessons')}
                     className="hover:text-foreground transition-colors"
                 >
-                    {t('الدورات', 'Courses')}
+                    {t(isSubjectMode ? 'المواد' : 'الدروس', isSubjectMode ? 'Subjects' : 'Lessons')}
                 </button>
                 <ArrowRight className="w-4 h-4" />
                 <span className="text-foreground">
-                    {course ? course.title_ar : '...'}
+                    {entity ? (entity.title_ar || '') : '...'}
                 </span>
             </div>
 
@@ -329,7 +371,7 @@ export default function LessonsManagement() {
                         {t('إدارة الدروس', 'Manage Lessons')}
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        {course && t(`دروس دورة: ${course.title_ar}`, `Lessons for: ${course.title_en || course.title_ar}`)}
+                        {entity && t(`دروس: ${entity.title_ar}`, `Lessons for: ${entity.title_en || entity.title_ar}`)}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">

@@ -5,8 +5,9 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import {
     LayoutDashboard,
     Users,
-    BookOpen,
-    Layers,
+    GraduationCap,
+    BookMarked,
+    FileText,
     Settings,
     LogOut,
     Menu,
@@ -19,8 +20,9 @@ import logo from '@/assets/logo.png';
 const navItems = [
     { path: '/admin', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
     { path: '/admin/teachers', icon: Users, label: { ar: 'المعلمون', en: 'Teachers' } },
-    { path: '/admin/courses', icon: BookOpen, label: { ar: 'الدورات', en: 'Courses' } },
-    { path: '/admin/taxonomy', icon: Layers, label: { ar: 'التصنيفات', en: 'Taxonomy' } },
+    { path: '/admin/stages', icon: GraduationCap, label: { ar: 'المراحل', en: 'Stages' } },
+    { path: '/admin/subjects', icon: BookMarked, label: { ar: 'المواد', en: 'Subjects' } },
+    { path: '/admin/lessons', icon: FileText, label: { ar: 'الدروس', en: 'Lessons' } },
     { path: '/admin/settings', icon: Settings, label: { ar: 'الإعدادات', en: 'Settings' } },
 ];
 
