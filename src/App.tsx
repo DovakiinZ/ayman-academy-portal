@@ -32,6 +32,8 @@ import StudentTeachers from "./pages/student/StudentTeachers";
 import StudentProfile from "./pages/student/StudentProfile";
 import Messages from "./pages/student/Messages";
 import LessonPlayer from "./pages/student/LessonPlayer";
+import QuizPlayer from "./pages/student/QuizPlayer";
+import QuizResults from "./pages/student/QuizResults";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -50,6 +52,8 @@ import MyCourses from "./pages/teacher/MyCourses";
 import CourseEditor from "./pages/teacher/CourseEditor";
 import LessonEditor from "./pages/teacher/LessonEditor";
 import TeacherProfile from "./pages/teacher/TeacherProfile";
+import TeacherQuizzes from "./pages/teacher/TeacherQuizzes";
+import QuizBuilder from "./pages/teacher/QuizBuilder";
 
 const queryClient = new QueryClient();
 
@@ -104,6 +108,9 @@ const App = () => (
                 <Route path="courses/new" element={<CourseEditor />} />
                 <Route path="courses/:courseId" element={<CourseEditor />} />
                 <Route path="courses/:courseId/lessons" element={<LessonEditor />} />
+                <Route path="quizzes" element={<TeacherQuizzes />} />
+                <Route path="quizzes/new" element={<QuizBuilder />} />
+                <Route path="quizzes/:quizId/edit" element={<QuizBuilder />} />
                 <Route path="profile" element={<TeacherProfile />} />
               </Route>
 
@@ -120,6 +127,8 @@ const App = () => (
                 <Route path="profile" element={<StudentProfile />} />
                 <Route path="course/:id" element={<StudentCourses />} />
                 <Route path="lesson/:id" element={<LessonPlayer />} />
+                <Route path="quiz/:quizId" element={<QuizPlayer />} />
+                <Route path="quiz/:quizId/results/:attemptId" element={<QuizResults />} />
               </Route>
 
               {/* Catch-all */}

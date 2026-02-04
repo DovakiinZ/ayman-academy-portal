@@ -1,6 +1,7 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import {
     LayoutDashboard,
     Users,
@@ -115,10 +116,11 @@ export default function AdminLayout() {
                     />
                 )}
 
-                {/* Main content */}
                 <main className="flex-1 min-h-screen lg:min-h-[calc(100vh)]">
                     <div className="p-4 lg:p-6">
-                        <Outlet />
+                        <ErrorBoundary>
+                            <Outlet />
+                        </ErrorBoundary>
                     </div>
                 </main>
             </div>

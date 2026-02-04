@@ -249,6 +249,89 @@ export interface Rating {
 }
 
 // ============================================
+// QUIZ SYSTEM
+// ============================================
+
+export type QuizAttachmentType = 'lesson' | 'course';
+export type QuestionType = 'mcq' | 'true_false' | 'multi_select' | 'image_choice';
+
+export interface Quiz {
+    id: string;
+    created_by: string;
+    attachment_type: QuizAttachmentType;
+    lesson_id: string | null;
+    course_id: string | null;
+    title_ar: string;
+    title_en: string | null;
+    is_enabled: boolean;
+    is_required: boolean;
+    is_published: boolean;
+    attempts_allowed: number; // 0 = unlimited
+    show_answers_after_submit: boolean;
+    passing_score_percent: number | null;
+    randomize_questions: boolean;
+    time_limit_minutes: number | null;
+    created_at: string;
+    updated_at: string;
+    // Joined
+    questions?: QuizQuestion[];
+    lesson?: Lesson;
+    course?: Course;
+    creator?: Profile;
+    questions_count?: number;
+    attempts_count?: number;
+}
+
+export interface QuizQuestion {
+    id: string;
+    quiz_id: string;
+    question_type: QuestionType;
+    question_text_ar: string;
+    question_text_en: string | null;
+    image_url: string | null;
+    explanation_ar: string | null;
+    explanation_en: string | null;
+    points: number;
+    order_index: number;
+    created_at: string;
+    // Joined
+    options?: QuizOption[];
+}
+
+export interface QuizOption {
+    id: string;
+    question_id: string;
+    option_text_ar: string;
+    option_text_en: string | null;
+    image_url: string | null;
+    is_correct: boolean;
+    order_index: number;
+}
+
+export interface QuizAttempt {
+    id: string;
+    quiz_id: string;
+    student_id: string;
+    score_percent: number;
+    total_points: number;
+    earned_points: number;
+    answers: QuizAnswer[];
+    passed: boolean | null;
+    started_at: string;
+    submitted_at: string;
+    time_spent_seconds: number | null;
+    // Joined
+    quiz?: Quiz;
+    student?: Profile;
+}
+
+export interface QuizAnswer {
+    question_id: string;
+    selected_options: string[];
+    is_correct: boolean;
+}
+
+// ============================================
 // DATABASE SCHEMA TYPE
 // ============================================
 
@@ -339,6 +422,26 @@ export interface Database {
                 Row: ContentItem;
                 Insert: Omit<ContentItem, 'id' | 'created_at' | 'updated_at'>;
                 Update: Partial<Omit<ContentItem, 'id' | 'subject_id'>>;
+            };
+            quizzes: {
+                Row: Quiz;
+                Insert: Omit<Quiz, 'id' | 'created_at' | 'updated_at' | 'questions' | 'lesson' | 'course' | 'creator' | 'questions_count' | 'attempts_count'>;
+                Update: Partial<Omit<Quiz, 'id' | 'created_by'>>;
+            };
+            quiz_questions: {
+                Row: QuizQuestion;
+                Insert: Omit<QuizQuestion, 'id' | 'created_at' | 'options'>;
+                Update: Partial<Omit<QuizQuestion, 'id' | 'quiz_id'>>;
+            };
+            quiz_options: {
+                Row: QuizOption;
+                Insert: Omit<QuizOption, 'id'>;
+                Update: Partial<Omit<QuizOption, 'id' | 'question_id'>>;
+            };
+            quiz_attempts: {
+                Row: QuizAttempt;
+                Insert: Omit<QuizAttempt, 'id' | 'started_at' | 'quiz' | 'student'>;
+                Update: Partial<Omit<QuizAttempt, 'id' | 'quiz_id' | 'student_id'>>;
             };
         };
         Functions: {

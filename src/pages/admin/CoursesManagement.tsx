@@ -97,6 +97,11 @@ export default function CoursesManagement() {
     const fetchData = useCallback(async () => {
         if (!mountedRef.current) return;
 
+        // Dev diagnostics
+        if (import.meta.env.DEV) {
+            console.log('[CoursesManagement] fetch start');
+        }
+
         // Only show loading spinner on initial load, not when navigating back
         if (!initialLoadDone.current) {
             setLoading(true);
@@ -144,6 +149,11 @@ export default function CoursesManagement() {
             setLevels(levelsRes.data);
             setTeachers(teachersRes.data);
 
+            // Dev diagnostics
+            if (import.meta.env.DEV) {
+                console.log('[CoursesManagement] fetch success, courses:', coursesRes.data.length, 'source:', coursesRes.source);
+            }
+
             if (coursesRes.error) {
                 setError(coursesRes.error);
             }
@@ -157,6 +167,10 @@ export default function CoursesManagement() {
             if (mountedRef.current) {
                 setLoading(false);
                 initialLoadDone.current = true;
+            }
+            // Dev diagnostics
+            if (import.meta.env.DEV) {
+                console.log('[CoursesManagement] fetch end (finally)');
             }
         }
     }, [filterLevel, filterTeacher, filterPublished]);

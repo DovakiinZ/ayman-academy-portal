@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import LessonNotes from '@/components/student/LessonNotes';
 import LessonComments from '@/components/student/LessonComments';
 import RatingWidget from '@/components/student/RatingWidget';
+import LessonQuizSection from '@/components/student/LessonQuizSection';
 
 // Helper to extract YouTube ID
 const getYoutubeId = (url: string) => {
@@ -283,6 +284,11 @@ export default function LessonPlayer() {
                             </div>
                         </div>
                     )}
+
+                    {/* Quiz Section */}
+                    <div className="mt-8">
+                        <LessonQuizSection lessonId={lesson.id} />
+                    </div>
 
                     {/* Comments */}
                     <div className="pt-6 border-t border-border mt-8">
