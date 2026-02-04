@@ -44,6 +44,8 @@ import TeachersManagement from "./pages/admin/TeachersManagement";
 import StagesManagement from "./pages/admin/TaxonomyManagement"; // Reusing as StagesManagement
 import SubjectsManagement from "./pages/admin/SubjectsManagement";
 import LessonsManagement from "./pages/admin/LessonsManagement";
+import HomepageManagement from "./pages/admin/HomepageManagement";
+import TemplatesManagement from "./pages/admin/TemplatesManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
 
 // Teacher pages (also used by admin)
@@ -58,87 +60,93 @@ import QuizBuilder from "./pages/teacher/QuizBuilder";
 
 const queryClient = new QueryClient();
 
+import { TemplateProvider } from "./contexts/TemplateContext";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <LanguageProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<Index />} />
-              <Route path="/stages" element={<Stages />} />
-              <Route path="/stages/:stageId" element={<StageDetail />} />
-              <Route path="/stages/:stageId/:subjectId" element={<SubjectDetail />} />
-              <Route path="/lesson/:lessonId" element={<LessonPage />} />
-              <Route path="/plans" element={<Plans />} />
-              <Route path="/account" element={<Account />} />
+        <TemplateProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Index />} />
+                <Route path="/stages" element={<Stages />} />
+                <Route path="/stages/:stageId" element={<StageDetail />} />
+                <Route path="/stages/:stageId/:subjectId" element={<SubjectDetail />} />
+                <Route path="/lesson/:lessonId" element={<LessonPage />} />
+                <Route path="/plans" element={<Plans />} />
+                <Route path="/account" element={<Account />} />
 
-              {/* Auth routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/invite/:token" element={<AcceptInvite />} />
-              <Route path="/access-denied" element={<AccessDenied />} />
+                {/* Auth routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/invite/:token" element={<AcceptInvite />} />
+                <Route path="/access-denied" element={<AccessDenied />} />
 
-              {/* Admin routes (Super Admin only) */}
-              <Route path="/admin" element={
-                <ProtectedRoute allowedRoles={['super_admin']}>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<AdminDashboard />} />
-                <Route path="teachers" element={<TeachersManagement />} />
-                <Route path="stages" element={<StagesManagement />} />
-                <Route path="stages/:stageId/subjects" element={<SubjectsManagement />} />
-                <Route path="subjects" element={<SubjectsManagement />} />
-                <Route path="subjects/:subjectId/lessons" element={<LessonsManagement />} />
-                <Route path="lessons" element={<LessonsManagement />} />
-                <Route path="settings" element={<AdminSettings />} />
-              </Route>
+                {/* Admin routes (Super Admin only) */}
+                <Route path="/admin" element={
+                  <ProtectedRoute allowedRoles={['super_admin']}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="teachers" element={<TeachersManagement />} />
+                  <Route path="stages" element={<StagesManagement />} />
+                  <Route path="stages/:stageId/subjects" element={<SubjectsManagement />} />
+                  <Route path="subjects" element={<SubjectsManagement />} />
+                  <Route path="subjects/:subjectId/lessons" element={<LessonsManagement />} />
+                  <Route path="lessons" element={<LessonsManagement />} />
+                  <Route path="homepage" element={<HomepageManagement />} />
+                  <Route path="templates" element={<TemplatesManagement />} />
+                  <Route path="settings" element={<AdminSettings />} />
+                </Route>
 
-              {/* Teacher routes (accessible by teacher and super_admin) */}
-              <Route path="/teacher" element={
-                <ProtectedRoute allowedRoles={['teacher', 'super_admin']}>
-                  <TeacherLayout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<TeacherDashboard />} />
-                <Route path="courses" element={<MyCourses />} />
-                <Route path="courses/new" element={<CourseEditor />} />
-                <Route path="courses/:courseId" element={<CourseEditor />} />
-                <Route path="courses/:courseId/lessons" element={<LessonEditor />} />
-                <Route path="quizzes" element={<TeacherQuizzes />} />
-                <Route path="quizzes/new" element={<QuizBuilder />} />
-                <Route path="quizzes/:quizId/edit" element={<QuizBuilder />} />
-                <Route path="profile" element={<TeacherProfile />} />
-              </Route>
+                {/* Teacher routes (accessible by teacher and super_admin) */}
+                <Route path="/teacher" element={
+                  <ProtectedRoute allowedRoles={['teacher', 'super_admin']}>
+                    <TeacherLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<TeacherDashboard />} />
+                  <Route path="courses" element={<MyCourses />} />
+                  <Route path="courses/new" element={<CourseEditor />} />
+                  <Route path="courses/:courseId" element={<CourseEditor />} />
+                  <Route path="courses/:courseId/lessons" element={<LessonEditor />} />
+                  <Route path="quizzes" element={<TeacherQuizzes />} />
+                  <Route path="quizzes/new" element={<QuizBuilder />} />
+                  <Route path="quizzes/:quizId/edit" element={<QuizBuilder />} />
+                  <Route path="profile" element={<TeacherProfile />} />
+                </Route>
 
-              {/* Student Routes */}
-              <Route path="/student" element={
-                <ProtectedRoute allowedRoles={['student']}>
-                  <StudentLayout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<StudentDashboard />} />
-                <Route path="stages" element={<StudentStages />} />
-                <Route path="stages/:stageId" element={<StudentSubjects />} />
-                <Route path="subjects/:subjectId" element={<StudentLessons />} />
-                <Route path="teachers" element={<StudentTeachers />} />
-                <Route path="messages" element={<Messages />} />
-                <Route path="profile" element={<StudentProfile />} />
-                <Route path="lesson/:id" element={<LessonPlayer />} />
-                <Route path="quiz/:quizId" element={<QuizPlayer />} />
-                <Route path="quiz/:quizId/results/:attemptId" element={<QuizResults />} />
-              </Route>
+                {/* Student Routes */}
+                <Route path="/student" element={
+                  <ProtectedRoute allowedRoles={['student']}>
+                    <StudentLayout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<StudentDashboard />} />
+                  <Route path="stages" element={<StudentStages />} />
+                  <Route path="stages/:stageId" element={<StudentSubjects />} />
+                  <Route path="subjects/:subjectId" element={<StudentLessons />} />
+                  <Route path="teachers" element={<StudentTeachers />} />
+                  <Route path="messages" element={<Messages />} />
+                  <Route path="profile" element={<StudentProfile />} />
+                  <Route path="lesson/:id" element={<LessonPlayer />} />
+                  <Route path="quiz/:quizId" element={<QuizPlayer />} />
+                  <Route path="quiz/:quizId/results/:attemptId" element={<QuizResults />} />
+                </Route>
 
-              {/* Catch-all */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+                {/* Catch-all */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </TemplateProvider>
       </LanguageProvider>
     </AuthProvider>
   </QueryClientProvider>

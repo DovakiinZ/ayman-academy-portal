@@ -59,6 +59,8 @@ export default function TaxonomyManagement() {
     const [form, setForm] = useState({
         title_ar: '',
         title_en: '',
+        description_ar: '',
+        description_en: '',
         slug: '',
         sort_order: 0,
         is_active: true,
@@ -144,6 +146,8 @@ export default function TaxonomyManagement() {
         setForm({
             title_ar: '',
             title_en: '',
+            description_ar: '',
+            description_en: '',
             slug: '',
             sort_order: levels.length + 1,
             is_active: true,
@@ -157,6 +161,8 @@ export default function TaxonomyManagement() {
         setForm({
             title_ar: level.title_ar,
             title_en: level.title_en || '',
+            description_ar: level.description_ar || '',
+            description_en: level.description_en || '',
             slug: level.slug,
             sort_order: level.sort_order,
             is_active: level.is_active,
@@ -175,6 +181,8 @@ export default function TaxonomyManagement() {
                 const { error } = await supabase.from('levels').update({
                     title_ar: form.title_ar,
                     title_en: form.title_en || null,
+                    description_ar: form.description_ar || null,
+                    description_en: form.description_en || null,
                     sort_order: form.sort_order,
                     is_active: form.is_active,
                 }).eq('id', editingLevel.id);
@@ -193,6 +201,8 @@ export default function TaxonomyManagement() {
                 const { error } = await supabase.from('levels').insert({
                     title_ar: form.title_ar,
                     title_en: form.title_en || null,
+                    description_ar: form.description_ar || null,
+                    description_en: form.description_en || null,
                     slug,
                     sort_order: form.sort_order,
                     is_active: form.is_active,

@@ -13,7 +13,8 @@ import {
     Settings,
     LogOut,
     Menu,
-    X
+    X,
+    Type
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -21,6 +22,8 @@ import logo from '@/assets/logo.png';
 
 const navItems = [
     { path: '/admin', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
+    { path: '/admin/homepage', icon: LayoutDashboard, label: { ar: 'الصفحة الرئيسية', en: 'Homepage' } },
+    { path: '/admin/templates', icon: Type, label: { ar: 'القوالب والنصوص', en: 'Templates' } },
     { path: '/admin/teachers', icon: Users, label: { ar: 'المعلمون', en: 'Teachers' } },
     { path: '/admin/stages', icon: GraduationCap, label: { ar: 'المراحل', en: 'Stages' } },
     { path: '/admin/subjects', icon: BookMarked, label: { ar: 'المواد', en: 'Subjects' } },

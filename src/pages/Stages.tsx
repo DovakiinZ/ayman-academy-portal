@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTemplate } from '@/hooks/useTemplate';
 import Layout from '@/components/layout/Layout';
 import { GraduationCap, BookOpen, School, ArrowLeft, ArrowRight } from 'lucide-react';
 
@@ -44,6 +45,21 @@ const stages = [
 
 const Stages = () => {
   const { t, direction } = useLanguage();
+  const { getTemplate } = useTemplates(); // Using direct getTemplate or hook? useTemplate hook is better
+
+  // Dynamic text
+  const pageTitle = useTemplate(
+    'stages.page.title',
+    'المراحل الدراسية',
+    'Educational Stages'
+  );
+
+  const pageSubtitle = useTemplate(
+    'stages.page.subtitle',
+    'اختر المرحلة الدراسية المناسبة للوصول إلى المواد والدروس التعليمية',
+    'Select the appropriate educational stage to access subjects and lessons'
+  );
+
   const ArrowIcon = direction === 'rtl' ? ArrowLeft : ArrowRight;
 
   return (
@@ -52,13 +68,10 @@ const Stages = () => {
       <section className="bg-secondary/30 py-12 md:py-16 border-b border-border">
         <div className="container-academic">
           <h1 className="text-foreground mb-4">
-            {t('المراحل الدراسية', 'Educational Stages')}
+            {pageTitle}
           </h1>
           <p className="text-muted-foreground max-w-2xl">
-            {t(
-              'اختر المرحلة الدراسية المناسبة للوصول إلى المواد والدروس التعليمية',
-              'Select the appropriate educational stage to access subjects and lessons'
-            )}
+            {pageSubtitle}
           </p>
         </div>
       </section>

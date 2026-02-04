@@ -62,6 +62,8 @@ export default function SubjectsManagement() {
     const [form, setForm] = useState({
         title_ar: '',
         title_en: '',
+        description_ar: '',
+        description_en: '',
         slug: '',
         sort_order: 0,
         is_active: true,
@@ -141,6 +143,8 @@ export default function SubjectsManagement() {
         setForm({
             title_ar: '',
             title_en: '',
+            description_ar: '',
+            description_en: '',
             slug: '',
             sort_order: subjects.length + 1,
             is_active: true,
@@ -154,6 +158,8 @@ export default function SubjectsManagement() {
         setForm({
             title_ar: subject.title_ar,
             title_en: subject.title_en || '',
+            description_ar: subject.description_ar || '',
+            description_en: subject.description_en || '',
             slug: subject.slug,
             sort_order: subject.sort_order,
             is_active: subject.is_active,
@@ -174,6 +180,8 @@ export default function SubjectsManagement() {
                 const { error } = await supabase.from('subjects').update({
                     title_ar: form.title_ar,
                     title_en: form.title_en || null,
+                    description_ar: form.description_ar || null,
+                    description_en: form.description_en || null,
                     sort_order: form.sort_order,
                     is_active: form.is_active,
                 }).eq('id', editingSubject.id);
@@ -193,6 +201,8 @@ export default function SubjectsManagement() {
                     level_id: levelId,
                     title_ar: form.title_ar,
                     title_en: form.title_en || null,
+                    description_ar: form.description_ar || null,
+                    description_en: form.description_en || null,
                     slug,
                     sort_order: form.sort_order,
                     is_active: form.is_active,
@@ -395,6 +405,24 @@ export default function SubjectsManagement() {
                                 value={form.title_en}
                                 onChange={(e) => setForm({ ...form, title_en: e.target.value })}
                                 placeholder="Example: Mathematics"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="description_ar">{t('الوصف بالعربية', 'Arabic Description')}</Label>
+                            <Input
+                                id="description_ar"
+                                value={form.description_ar}
+                                onChange={(e) => setForm({ ...form, description_ar: e.target.value })}
+                                placeholder={t('وصف المادة...', 'Subject description...')}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="description_en">{t('الوصف بالإنجليزية', 'English Description')}</Label>
+                            <Input
+                                id="description_en"
+                                value={form.description_en}
+                                onChange={(e) => setForm({ ...form, description_en: e.target.value })}
+                                placeholder="Subject description..."
                             />
                         </div>
                         {!editingSubject && (

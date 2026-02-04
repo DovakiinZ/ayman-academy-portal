@@ -1,0 +1,318 @@
+/**
+ * TemplatesManagement - Admin page to edit dynamic text templates
+ * Admins can modify text content for pages like Home, Stages, Paywall etc.
+ */
+
+import { useState, useEffect } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/lib/supabase';
+import { ContentTemplate } from '@/types/database';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { useTemplates } from '@/contexts/TemplateContext';
+import {
+    Loader2,
+    Save,
+    RotateCcw,
+    Type,
+    LayoutTemplate,
+    Search,
+    Info
+} from 'lucide-react';
+
+const CATEGORIES = [
+    { id: 'all', label: { ar: 'الكل', en: 'All' } },
+    { id: 'home', label: { ar: 'الصفحة الرئيسية', en: 'Home Page' } },
+    { id: 'stages', label: { ar: 'المراحل', en: 'Stages' } },
+    { id: 'subjects', label: { ar: 'المواد', en: 'Subjects' } },
+    { id: 'lesson', label: { ar: 'الدروس', en: 'Lessons' } },
+    { id: 'paywall', label: { ar: 'الاشتراكات', en: 'Paywall & Subscriptions' } },
+];
+
+export default function TemplatesManagement() {
+    const { t, direction } = useLanguage();
+    const { refreshTemplates } = useTemplates();
+    const [loading, setLoading] = useState(true);
+    const [templates, setTemplates] = useState<ContentTemplate[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTemplate, setSelectedTemplate] = useState<ContentTemplate | null>(null);
+    const [editForm, setEditForm] = useState<{ ar: string; en: string }>({ ar: '', en: '' });
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        fetchTemplates();
+    }, []);
+
+    const fetchTemplates = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('content_templates')
+            .select('*')
+            .order('category')
+            .order('key');
+
+        if (error) {
+            toast.error(t('فشل تحميل القوالب', 'Failed to load templates'));
+        } else {
+            setTemplates(data as ContentTemplate[]);
+        }
+        setLoading(false);
+    };
+
+    const filteredTemplates = templates.filter(template => {
+        const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
+        const matchesSearch = template.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            template.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+    });
+
+    const handleSelectTemplate = (template: ContentTemplate) => {
+        setSelectedTemplate(template);
+        setEditForm({
+            ar: template.content_ar || '',
+            en: template.content_en || ''
+        });
+    };
+
+    const handleSave = async () => {
+        if (!selectedTemplate) return;
+
+        setSaving(true);
+        const { error } = await supabase
+            .from('content_templates')
+            .update({
+                content_ar: editForm.ar,
+                content_en: editForm.en,
+                updated_at: new Date().toISOString()
+            } as any)
+            .eq('id', selectedTemplate.id);
+
+        if (error) {
+            toast.error(t('حدث خطأ أثناء الحفظ', 'Error saving template'));
+        } else {
+            toast.success(t('تم الحفظ بنجاح', 'Saved successfully'));
+
+            // Update local state
+            setTemplates(templates.map(t =>
+                t.id === selectedTemplate.id
+                    ? { ...t, content_ar: editForm.ar, content_en: editForm.en }
+                    : t
+            ));
+
+            // Refresh global context cache
+            await refreshTemplates();
+        }
+        setSaving(false);
+    };
+
+    const extractVariables = (text: string) => {
+        // Find all {{variable}} patterns
+        const regex = /{{([^}]+)}}/g;
+        const vars = new Set<string>();
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            vars.add(match[1]);
+        }
+        return Array.from(vars);
+    };
+
+    return (
+        <div className="h-[calc(100vh-100px)] flex flex-col gap-6">
+            <div>
+                <h1 className="text-2xl font-semibold text-foreground">
+                    {t('إدارة النصوص والقوالب', 'Templates Management')}
+                </h1>
+                <p className="text-muted-foreground mt-1">
+                    {t('تعديل نصوص الموقع والقوالب الديناميكية', 'Edit website text and dynamic templates')}
+                </p>
+            </div>
+
+            <div className="flex-1 flex gap-6 overflow-hidden">
+                {/* Sidebar - Template List */}
+                <div className="w-1/3 flex flex-col bg-background border border-border rounded-lg overflow-hidden">
+                    {/* Filters */}
+                    <div className="p-4 border-b border-border space-y-3">
+                        <div className="relative">
+                            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                                placeholder={t('بحث عن قالب...', 'Search templates...')}
+                                className="ps-9"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                            {CATEGORIES.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setSelectedCategory(cat.id)}
+                                    className={`
+                                        px-3 py-1 text-xs rounded-full whitespace-nowrap transition-colors
+                                        ${selectedCategory === cat.id
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}
+                                    `}
+                                >
+                                    {t(cat.label.ar, cat.label.en)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* List */}
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                        {loading ? (
+                            <div className="flex justify-center p-8">
+                                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                            </div>
+                        ) : filteredTemplates.length === 0 ? (
+                            <div className="text-center p-8 text-muted-foreground text-sm">
+                                {t('لا توجد قوالب', 'No templates found')}
+                            </div>
+                        ) : (
+                            filteredTemplates.map(template => (
+                                <button
+                                    key={template.id}
+                                    onClick={() => handleSelectTemplate(template)}
+                                    className={`
+                                        w-full text-start p-3 rounded-md transition-colors border
+                                        ${selectedTemplate?.id === template.id
+                                            ? 'bg-primary/5 border-primary'
+                                            : 'bg-transparent border-transparent hover:bg-secondary'}
+                                    `}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-medium text-sm truncate" dir="ltr">
+                                            {template.key}
+                                        </span>
+                                        <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">
+                                            {template.category}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                        {template.description || t('لا يوجد وصف', 'No description')}
+                                    </p>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* Main Editor */}
+                <div className="flex-1 bg-background border border-border rounded-lg overflow-hidden flex flex-col">
+                    {selectedTemplate ? (
+                        <>
+                            <div className="p-4 border-b border-border bg-secondary/10 flex justify-between items-start">
+                                <div>
+                                    <h2 className="font-semibold text-lg flex items-center gap-2" dir="ltr">
+                                        <LayoutTemplate className="w-5 h-5 text-primary" />
+                                        {selectedTemplate.key}
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {selectedTemplate.description}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleSelectTemplate(selectedTemplate)} // Reset
+                                        disabled={saving}
+                                    >
+                                        <RotateCcw className="w-4 h-4 me-2" />
+                                        {t('إعادة تعيين', 'Reset')}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                    >
+                                        {saving ? (
+                                            <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                                        ) : (
+                                            <Save className="w-4 h-4 me-2" />
+                                        )}
+                                        {t('حفظ التغييرات', 'Save Changes')}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                                {/* Arabic Editor */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <span className="text-primary">AR</span>
+                                        {t('النص العربي', 'Arabic Content')}
+                                    </label>
+                                    <Textarea
+                                        value={editForm.ar}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, ar: e.target.value }))}
+                                        className="min-h-[120px] font-sans"
+                                        dir="rtl"
+                                        placeholder="أدخل النص العربي..."
+                                    />
+                                    <div className="text-xs text-muted-foreground flex gap-2">
+                                        {extractVariables(editForm.ar).map(v => (
+                                            <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                {`{{${v}}}`}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* English Editor */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <span className="text-primary">EN</span>
+                                        {t('النص الإنجليزي', 'English Content')}
+                                    </label>
+                                    <Textarea
+                                        value={editForm.en}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, en: e.target.value }))}
+                                        className="min-h-[120px] font-sans"
+                                        dir="ltr"
+                                        placeholder="Enter English content..."
+                                    />
+                                    <div className="text-xs text-muted-foreground flex gap-2">
+                                        {extractVariables(editForm.en).map(v => (
+                                            <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                {`{{${v}}}`}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Preview Info */}
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md border border-blue-200 dark:border-blue-800">
+                                    <div className="flex items-start gap-3">
+                                        <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                                        <div className="text-sm">
+                                            <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">
+                                                {t('كيفية استخدام المتغيرات', 'How to use variables')}
+                                            </p>
+                                            <p className="text-blue-700 dark:text-blue-400 leading-relaxed">
+                                                {t(
+                                                    'يمكنك استخدام المتغيرات بوضعها بين قوسين، مثال: {{name}}. سيتم استبدال هذه القيم تلقائياً عند عرض الصفحة.',
+                                                    'You can use variables by placing them in braces, e.g. {{name}}. These values will be replaced automatically when the page is rendered.'
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+                            <Type className="w-12 h-12 mb-4 opacity-20" />
+                            <p>{t('اختر قالباً للتعديل', 'Select a template to edit')}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}

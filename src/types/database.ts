@@ -10,6 +10,7 @@ export type ResourceType = 'pdf' | 'link' | 'worksheet' | 'other';
 export type PlanScope = 'all' | 'level' | 'subject' | 'course';
 export type SubscriptionStatus = 'active' | 'inactive' | 'canceled' | 'expired' | 'pending';
 export type ContentItemType = 'video' | 'article' | 'image' | 'file' | 'link';
+export type TemplateContentType = 'plain' | 'rich' | 'json';
 
 // ============================================
 // ENTITIES
@@ -25,6 +26,12 @@ export interface Profile {
     is_active: boolean;
     created_at: string;
     updated_at: string;
+    // Homepage featured teacher fields
+    bio_ar?: string | null;
+    bio_en?: string | null;
+    expertise_tags_ar?: string[] | null;
+    show_on_home?: boolean;
+    home_order?: number;
 }
 
 export interface TeacherInvite {
@@ -44,6 +51,8 @@ export interface Level {
     slug: string;
     title_ar: string;
     title_en: string | null;
+    description_ar: string | null;
+    description_en: string | null;
     sort_order: number;
     is_active: boolean;
     created_at: string;
@@ -55,6 +64,8 @@ export interface Subject {
     slug: string;
     title_ar: string;
     title_en: string | null;
+    description_ar: string | null;
+    description_en: string | null;
     sort_order: number;
     is_active: boolean;
     created_at: string;
@@ -151,6 +162,30 @@ export interface ContentItem {
     updated_at: string;
     // Joined
     subject?: Course;
+}
+
+export interface HomeFeaturedSubject {
+    id: string;
+    subject_id: string;
+    teaser_ar: string | null;
+    teaser_en: string | null;
+    is_visible: boolean;
+    home_order: number;
+    created_at: string;
+    // Joined
+    subject?: Subject;
+}
+
+export interface HomeFeaturedLesson {
+    id: string;
+    lesson_id: string;
+    teaser_ar: string | null;
+    teaser_en: string | null;
+    is_visible: boolean;
+    home_order: number;
+    created_at: string;
+    // Joined
+    lesson?: Lesson;
 }
 
 export interface Plan {
@@ -250,23 +285,26 @@ export interface LessonComment {
     lesson_id: string;
     parent_id: string | null;
     content: string;
+    is_pinned: boolean; // Added field
     created_at: string;
+    updated_at: string;
     // Joined
     user?: Profile;
     replies?: LessonComment[];
 }
 
-export type RatingEntityType = 'course' | 'lesson';
-
-export interface Rating {
+export interface LessonRating {
     id: string;
     user_id: string;
-    entity_type: RatingEntityType;
-    entity_id: string;
-    stars: number;
-    feedback: string | null;
+    lesson_id: string;
+    rating: number;
+    comment: string | null;
     created_at: string;
+    updated_at: string;
+    // Joined
+    user?: Profile;
 }
+
 
 // ============================================
 // QUIZ SYSTEM
@@ -351,6 +389,20 @@ export interface QuizAnswer {
     is_correct: boolean;
 }
 
+export interface ContentTemplate {
+    id: string;
+    key: string;
+    type: TemplateContentType;
+    description: string | null;
+    category: string | null;
+    content_ar: string | null;
+    content_en: string | null;
+    is_public: boolean;
+    created_at: string;
+    updated_at: string;
+    updated_by: string | null;
+}
+
 // ============================================
 // DATABASE SCHEMA TYPE
 // ============================================
@@ -433,10 +485,10 @@ export interface Database {
                 Insert: Omit<LessonComment, 'id' | 'created_at'>;
                 Update: Partial<Omit<LessonComment, 'id' | 'created_at'>>;
             };
-            ratings: {
-                Row: Rating;
-                Insert: Omit<Rating, 'id' | 'created_at'>;
-                Update: Partial<Omit<Rating, 'id' | 'created_at'>>;
+            lesson_ratings: {
+                Row: LessonRating;
+                Insert: Omit<LessonRating, 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<LessonRating, 'id' | 'created_at'>>;
             };
             content_items: {
                 Row: ContentItem;
@@ -447,6 +499,11 @@ export interface Database {
                 Row: Quiz;
                 Insert: Omit<Quiz, 'id' | 'created_at' | 'updated_at' | 'questions' | 'lesson' | 'course' | 'creator' | 'questions_count' | 'attempts_count'>;
                 Update: Partial<Omit<Quiz, 'id' | 'created_by'>>;
+            };
+            content_templates: {
+                Row: ContentTemplate;
+                Insert: Omit<ContentTemplate, 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<ContentTemplate, 'id' | 'created_at'>>;
             };
             quiz_questions: {
                 Row: QuizQuestion;
@@ -462,6 +519,16 @@ export interface Database {
                 Row: QuizAttempt;
                 Insert: Omit<QuizAttempt, 'id' | 'started_at' | 'quiz' | 'student'>;
                 Update: Partial<Omit<QuizAttempt, 'id' | 'quiz_id' | 'student_id'>>;
+            };
+            home_featured_subjects: {
+                Row: HomeFeaturedSubject;
+                Insert: Omit<HomeFeaturedSubject, 'id' | 'created_at' | 'subject'>;
+                Update: Partial<Omit<HomeFeaturedSubject, 'id' | 'subject_id'>>;
+            };
+            home_featured_lessons: {
+                Row: HomeFeaturedLesson;
+                Insert: Omit<HomeFeaturedLesson, 'id' | 'created_at' | 'lesson'>;
+                Update: Partial<Omit<HomeFeaturedLesson, 'id' | 'lesson_id'>>;
             };
         };
         Functions: {

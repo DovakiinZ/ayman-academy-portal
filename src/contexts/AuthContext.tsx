@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 destination = '/teacher';
                 break;
             case 'student':
-                destination = '/student/dashboard';
+                destination = '/student';
                 break;
             default:
                 destination = '/';
@@ -323,7 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             options: {
                 data: {
                     full_name: fullName,
-                    role: 'student', // Students only via registration
+                    // role: 'student', // Let DB default handle this to avoid trigger casting errors
                 },
             },
         });
