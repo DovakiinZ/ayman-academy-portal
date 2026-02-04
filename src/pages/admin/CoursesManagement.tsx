@@ -109,13 +109,13 @@ export default function CoursesManagement() {
         setError(null);
 
         try {
-            // Build query
+            // Build query - use simple relation names (Supabase infers FK)
             let query = supabase
                 .from('courses')
                 .select(`
                     *,
-                    teacher:profiles!courses_teacher_id_fkey(id, full_name, email),
-                    level:levels!courses_level_id_fkey(id, title_ar, title_en)
+                    teacher:profiles(id, full_name, email),
+                    level:levels(id, title_ar, title_en)
                 `)
                 .order('created_at', { ascending: false });
 

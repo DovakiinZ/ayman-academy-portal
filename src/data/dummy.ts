@@ -89,8 +89,8 @@ export const dummyCourses: Array<Partial<Course> & { teacher?: Partial<Profile>;
         is_paid: true,
         price_amount: 99,
         created_at: new Date().toISOString(),
-        teacher: { full_name: 'أحمد المعلم', email: 'ahmed.teacher@example.com' },
-        level: { title_ar: 'ابتدائي' },
+        teacher: { id: 'dummy-teacher-1', full_name: 'أحمد المعلم', email: 'ahmed.teacher@example.com' },
+        level: { id: 'dummy-level-2', title_ar: 'ابتدائي', title_en: 'Primary' },
     },
     {
         id: 'dummy-course-2',
@@ -103,8 +103,8 @@ export const dummyCourses: Array<Partial<Course> & { teacher?: Partial<Profile>;
         is_published: true,
         is_paid: false,
         created_at: new Date().toISOString(),
-        teacher: { full_name: 'فاطمة المعلمة', email: 'fatima.teacher@example.com' },
-        level: { title_ar: 'متوسط' },
+        teacher: { id: 'dummy-teacher-2', full_name: 'فاطمة المعلمة', email: 'fatima.teacher@example.com' },
+        level: { id: 'dummy-level-3', title_ar: 'متوسط', title_en: 'Middle School' },
     },
     {
         id: 'dummy-course-3',
@@ -118,8 +118,8 @@ export const dummyCourses: Array<Partial<Course> & { teacher?: Partial<Profile>;
         is_paid: true,
         price_amount: 149,
         created_at: new Date().toISOString(),
-        teacher: { full_name: 'أحمد المعلم', email: 'ahmed.teacher@example.com' },
-        level: { title_ar: 'متوسط' },
+        teacher: { id: 'dummy-teacher-1', full_name: 'أحمد المعلم', email: 'ahmed.teacher@example.com' },
+        level: { id: 'dummy-level-3', title_ar: 'متوسط', title_en: 'Middle School' },
     },
 ];
 
