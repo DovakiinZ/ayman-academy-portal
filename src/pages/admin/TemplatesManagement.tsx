@@ -22,9 +22,9 @@ import {
     Search,
     Info,
     RefreshCw,
-    AlertCircle,
-    Beaker
+    AlertCircle
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const CATEGORIES = [
     { id: 'all', label: { ar: 'الكل', en: 'All' } },
@@ -35,12 +35,6 @@ const CATEGORIES = [
     { id: 'paywall', label: { ar: 'الاشتراكات', en: 'Paywall & Subscriptions' } },
 ];
 
-// Dummy templates for fallback
-const dummyTemplates: ContentTemplate[] = [
-    { id: '1', key: 'home.hero.title', category: 'home', description: 'Main hero title on home page', content_ar: 'مرحباً بك', content_en: 'Welcome' },
-    { id: '2', key: 'home.hero.subtitle', category: 'home', description: 'Hero subtitle', content_ar: 'ابدأ رحلتك التعليمية', content_en: 'Start your learning journey' },
-];
-
 export default function TemplatesManagement() {
     const { t } = useLanguage();
     const { refreshTemplates } = useTemplates();
@@ -49,7 +43,6 @@ export default function TemplatesManagement() {
     // State
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
     const [templates, setTemplates] = useState<ContentTemplate[]>([]);
 
     // Filters
@@ -61,6 +54,7 @@ export default function TemplatesManagement() {
     const [editForm, setEditForm] = useState<{ ar: string; en: string }>({ ar: '', en: '' });
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+    const [activeTab, setActiveTab] = useState('ar');
 
     useEffect(() => {
         mountedRef.current = true;
@@ -100,11 +94,10 @@ export default function TemplatesManagement() {
             if (fetchError) {
                 devLog('Templates fetch error', fetchError);
                 setError(fetchError.message);
-                setTemplates(dummyTemplates);
-                setIsDummy(true);
+                toast.error('فشل تحميل القوالب', { description: fetchError.message });
+                setTemplates([]);
             } else {
                 setTemplates((data as ContentTemplate[]) || []);
-                setIsDummy(false);
             }
 
             const duration = Date.now() - startTime;
@@ -114,8 +107,8 @@ export default function TemplatesManagement() {
             const message = err instanceof Error ? err.message : 'Unknown error';
             devLog('Fetch exception', err);
             setError(message);
-            setTemplates(dummyTemplates);
-            setIsDummy(true);
+            toast.error('حدث خطأ', { description: message });
+            setTemplates([]);
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
@@ -374,49 +367,58 @@ export default function TemplatesManagement() {
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                                {/* Arabic Editor */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium flex items-center gap-2">
-                                        <span className="text-primary">AR</span>
-                                        {t('النص العربي', 'Arabic Content')}
-                                    </label>
-                                    <Textarea
-                                        value={editForm.ar}
-                                        onChange={(e) => setEditForm(prev => ({ ...prev, ar: e.target.value }))}
-                                        className="min-h-[120px] font-sans"
-                                        dir="rtl"
-                                        placeholder="أدخل النص العربي..."
-                                    />
-                                    <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
-                                        {extractVariables(editForm.ar).map(v => (
-                                            <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                                {`{{${v}}}`}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
+                                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                                    <TabsList className="w-full grid grid-cols-2 mb-4">
+                                        <TabsTrigger value="ar">{t('العربية', 'Arabic')}</TabsTrigger>
+                                        <TabsTrigger value="en">{t('الإنجليزية', 'English')}</TabsTrigger>
+                                    </TabsList>
 
-                                {/* English Editor */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium flex items-center gap-2">
-                                        <span className="text-primary">EN</span>
-                                        {t('النص الإنجليزي', 'English Content')}
-                                    </label>
-                                    <Textarea
-                                        value={editForm.en}
-                                        onChange={(e) => setEditForm(prev => ({ ...prev, en: e.target.value }))}
-                                        className="min-h-[120px] font-sans"
-                                        dir="ltr"
-                                        placeholder="Enter English content..."
-                                    />
-                                    <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
-                                        {extractVariables(editForm.en).map(v => (
-                                            <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                                {`{{${v}}}`}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
+                                    <TabsContent value="ar" className="mt-0">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium flex items-center gap-2">
+                                                <span className="text-primary">AR</span>
+                                                {t('النص العربي', 'Arabic Content')}
+                                            </label>
+                                            <Textarea
+                                                value={editForm.ar}
+                                                onChange={(e) => setEditForm(prev => ({ ...prev, ar: e.target.value }))}
+                                                className="min-h-[300px] font-sans text-lg leading-relaxed"
+                                                dir="rtl"
+                                                placeholder="أدخل النص العربي..."
+                                            />
+                                            <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
+                                                {extractVariables(editForm.ar).map(v => (
+                                                    <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                        {`{{${v}}}`}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="en" className="mt-0">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium flex items-center gap-2">
+                                                <span className="text-primary">EN</span>
+                                                {t('النص الإنجليزي', 'English Content')}
+                                            </label>
+                                            <Textarea
+                                                value={editForm.en}
+                                                onChange={(e) => setEditForm(prev => ({ ...prev, en: e.target.value }))}
+                                                className="min-h-[300px] font-sans text-lg leading-relaxed"
+                                                dir="ltr"
+                                                placeholder="Enter English content..."
+                                            />
+                                            <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
+                                                {extractVariables(editForm.en).map(v => (
+                                                    <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                        {`{{${v}}}`}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
 
                                 {/* Preview Info */}
                                 <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md border border-blue-200 dark:border-blue-800">

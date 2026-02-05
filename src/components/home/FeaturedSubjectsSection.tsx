@@ -1,66 +1,18 @@
 /**
  * FeaturedSubjectsSection - Displays featured subjects on homepage
- * Admin-controlled via home_featured_subjects table
+ * Admin-controlled via subjects.show_on_home
  */
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import type { HomeFeaturedSubject, Subject, Level } from '@/types/database';
 import { BookOpen, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-interface FeaturedSubjectWithDetails extends HomeFeaturedSubject {
-    subject: Subject & { level?: Level; lessons_count?: number };
-}
-
-// Fallback dummy data
-const dummySubjects = [
-    {
-        id: '1',
-        title_ar: 'الرياضيات',
-        title_en: 'Mathematics',
-        teaser_ar: 'أساسيات الجمع والطرح والضرب والقسمة',
-        teaser_en: 'Fundamentals of addition, subtraction, multiplication, and division',
-        stage_ar: 'الابتدائي',
-        stage_en: 'Primary',
-        lessons_count: 24,
-    },
-    {
-        id: '2',
-        title_ar: 'اللغة العربية',
-        title_en: 'Arabic Language',
-        teaser_ar: 'النحو والصرف والبلاغة والقراءة',
-        teaser_en: 'Grammar, morphology, rhetoric, and reading',
-        stage_ar: 'المتوسط',
-        stage_en: 'Middle School',
-        lessons_count: 32,
-    },
-    {
-        id: '3',
-        title_ar: 'العلوم',
-        title_en: 'Science',
-        teaser_ar: 'الفيزياء والكيمياء والأحياء',
-        teaser_en: 'Physics, Chemistry, and Biology',
-        stage_ar: 'الثانوي',
-        stage_en: 'High School',
-        lessons_count: 48,
-    },
-    {
-        id: '4',
-        title_ar: 'اللغة الإنجليزية',
-        title_en: 'English Language',
-        teaser_ar: 'القواعد والمفردات والمحادثة',
-        teaser_en: 'Grammar, vocabulary, and conversation',
-        stage_ar: 'الابتدائي',
-        stage_en: 'Primary',
-        lessons_count: 28,
-    },
-];
-
 export default function FeaturedSubjectsSection() {
     const { t, direction } = useLanguage();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [subjects, setSubjects] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -70,33 +22,33 @@ export default function FeaturedSubjectsSection() {
 
     const fetchFeaturedSubjects = async () => {
         const { data, error } = await supabase
-            .from('home_featured_subjects')
+            .from('subjects')
             .select(`
-                *,
-                subject:subjects(
-                    id,
-                    title_ar,
-                    title_en,
-                    stage:stages(id, title_ar, title_en)
-                )
+                id,
+                title_ar,
+                title_en,
+                teaser_ar,
+                teaser_en,
+                stage:stages(id, title_ar, title_en)
             `)
-            .eq('is_visible', true)
+            .eq('show_on_home', true)
             .order('home_order', { ascending: true })
             .limit(4);
 
-        if (error || !data || data.length === 0) {
-            setSubjects(dummySubjects);
+        if (error || !data) {
+            setSubjects([]);
         } else {
             // Transform data
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const transformed = data.map((item: any) => ({
-                id: item.subject?.id || item.id,
-                title_ar: item.subject?.title_ar || '',
-                title_en: item.subject?.title_en || '',
-                teaser_ar: item.teaser_ar || '',
-                teaser_en: item.teaser_en || '',
-                stage_ar: item.subject?.stage?.title_ar || '',
-                stage_en: item.subject?.stage?.title_en || '',
-                lessons_count: 0, // Would need a separate count query
+                id: item.id,
+                title_ar: item.title_ar,
+                title_en: item.title_en,
+                teaser_ar: item.teaser_ar,
+                teaser_en: item.teaser_en,
+                stage_ar: item.stage?.title_ar,
+                stage_en: item.stage?.title_en,
+                lessons_count: 0, // Placeholder
             }));
             setSubjects(transformed);
         }

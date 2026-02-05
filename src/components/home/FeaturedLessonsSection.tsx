@@ -1,6 +1,6 @@
 /**
  * FeaturedLessonsSection - Displays featured lessons on homepage
- * Admin-controlled via home_featured_lessons table
+ * Admin-controlled via lessons.show_on_home
  */
 
 import { useState, useEffect } from 'react';
@@ -9,68 +9,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { Play, Lock, Clock, User } from 'lucide-react';
 
-// Fallback dummy data
-const dummyLessons = [
-    {
-        id: '1',
-        title_ar: 'مقدمة في الجمع والطرح',
-        title_en: 'Introduction to Addition and Subtraction',
-        teaser_ar: 'تعلم أساسيات العمليات الحسابية',
-        subject_ar: 'الرياضيات',
-        subject_en: 'Mathematics',
-        stage_ar: 'الابتدائي',
-        stage_en: 'Primary',
-        instructor: 'د. أحمد الفاروق',
-        duration: '12:30',
-        is_preview: true,
-        thumbnail: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&h=225&fit=crop',
-    },
-    {
-        id: '2',
-        title_ar: 'الحروف الأبجدية العربية',
-        title_en: 'Arabic Alphabet',
-        teaser_ar: 'تعلم الحروف العربية بطريقة ممتعة',
-        subject_ar: 'اللغة العربية',
-        subject_en: 'Arabic Language',
-        stage_ar: 'التمهيدي',
-        stage_en: 'Kindergarten',
-        instructor: 'أ. فاطمة السعيد',
-        duration: '08:45',
-        is_preview: true,
-        thumbnail: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=225&fit=crop',
-    },
-    {
-        id: '3',
-        title_ar: 'دورة الماء في الطبيعة',
-        title_en: 'The Water Cycle',
-        teaser_ar: 'اكتشف كيف تتحول المياه في الطبيعة',
-        subject_ar: 'العلوم',
-        subject_en: 'Science',
-        stage_ar: 'المتوسط',
-        stage_en: 'Middle School',
-        instructor: 'د. سارة الأحمد',
-        duration: '15:20',
-        is_preview: false,
-        thumbnail: 'https://images.unsplash.com/photo-1559825481-12a05cc00344?w=400&h=225&fit=crop',
-    },
-    {
-        id: '4',
-        title_ar: 'أساسيات اللغة الإنجليزية',
-        title_en: 'English Basics',
-        teaser_ar: 'ابدأ رحلتك في تعلم الإنجليزية',
-        subject_ar: 'اللغة الإنجليزية',
-        subject_en: 'English Language',
-        stage_ar: 'الابتدائي',
-        stage_en: 'Primary',
-        instructor: 'أ. محمد العلي',
-        duration: '10:15',
-        is_preview: false,
-        thumbnail: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=225&fit=crop',
-    },
-];
-
 export default function FeaturedLessonsSection() {
     const { t } = useLanguage();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [lessons, setLessons] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -80,50 +21,51 @@ export default function FeaturedLessonsSection() {
 
     const fetchFeaturedLessons = async () => {
         const { data, error } = await supabase
-            .from('home_featured_lessons')
+            .from('lessons')
             .select(`
-                *,
-                lesson:lessons(
-                    id,
+                id,
+                title_ar,
+                title_en,
+                teaser_ar,
+                teaser_en,
+                preview_video_url,
+                duration_seconds,
+                course:courses(
+                    teacher:profiles(full_name)
+                ),
+                subject:subjects(
                     title_ar,
                     title_en,
-                    preview_video_url,
-                    duration_seconds,
-                    creator:profiles!lessons_created_by_fkey(full_name),
-                    subject:subjects(
-                        title_ar,
-                        title_en,
-                        stage:stages(title_ar, title_en)
-                    )
+                    stage:stages(title_ar, title_en)
                 )
             `)
-            .eq('is_visible', true)
+            .eq('show_on_home', true)
             .order('home_order', { ascending: true })
             .limit(4);
 
-        if (error || !data || data.length === 0) {
-            setLessons(dummyLessons);
+        if (error || !data) {
+            setLessons([]);
         } else {
             // Transform data
-            const transformed = data.map((item: any) => {
-                const lesson = item.lesson;
-                const duration = lesson?.duration_seconds
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const transformed = data.map((lesson: any) => {
+                const duration = lesson.duration_seconds
                     ? `${Math.floor(lesson.duration_seconds / 60)}:${(lesson.duration_seconds % 60).toString().padStart(2, '0')}`
                     : '10:00';
 
                 return {
-                    id: lesson?.id || item.id,
-                    title_ar: lesson?.title_ar || '',
-                    title_en: lesson?.title_en || '',
-                    teaser_ar: item.teaser_ar || '',
-                    teaser_en: item.teaser_en || '',
-                    subject_ar: lesson?.subject?.title_ar || '',
-                    subject_en: lesson?.subject?.title_en || '',
-                    stage_ar: lesson?.subject?.stage?.title_ar || '',
-                    stage_en: lesson?.subject?.stage?.title_en || '',
-                    instructor: lesson?.creator?.full_name || '',
+                    id: lesson.id,
+                    title_ar: lesson.title_ar,
+                    title_en: lesson.title_en,
+                    teaser_ar: lesson.teaser_ar,
+                    teaser_en: lesson.teaser_en,
+                    subject_ar: lesson.subject?.title_ar,
+                    subject_en: lesson.subject?.title_en,
+                    stage_ar: lesson.subject?.stage?.title_ar,
+                    stage_en: lesson.subject?.stage?.title_en,
+                    instructor: lesson.course?.teacher?.full_name,
                     duration,
-                    is_preview: !!lesson?.preview_video_url,
+                    is_preview: !!lesson.preview_video_url,
                     thumbnail: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=225&fit=crop',
                 };
             });

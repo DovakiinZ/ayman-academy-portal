@@ -11,33 +11,6 @@ import type { Profile } from '@/types/database';
 import { User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Fallback dummy data when no teachers are configured
-const dummyTeachers = [
-    {
-        id: '1',
-        full_name: 'د. أحمد الفاروق',
-        bio_ar: 'خبير في الرياضيات والعلوم مع خبرة تزيد عن 15 عاماً في التدريس',
-        bio_en: 'Expert in Mathematics and Science with over 15 years of teaching experience',
-        expertise_tags_ar: ['الرياضيات', 'العلوم'],
-        avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
-    },
-    {
-        id: '2',
-        full_name: 'أ. فاطمة السعيد',
-        bio_ar: 'متخصصة في اللغة العربية والنحو والبلاغة',
-        bio_en: 'Specialized in Arabic Language, Grammar, and Rhetoric',
-        expertise_tags_ar: ['اللغة العربية', 'النحو'],
-        avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&crop=face',
-    },
-    {
-        id: '3',
-        full_name: 'أ. محمد العلي',
-        bio_ar: 'مدرس اللغة الإنجليزية للمراحل الابتدائية والمتوسطة',
-        bio_en: 'English Language teacher for Primary and Middle School',
-        expertise_tags_ar: ['اللغة الإنجليزية'],
-        avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face',
-    },
-];
 
 export default function FeaturedTeachersSection() {
     const { t, direction } = useLanguage();
@@ -51,16 +24,15 @@ export default function FeaturedTeachersSection() {
     const fetchFeaturedTeachers = async () => {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, full_name, avatar_url, bio_ar, bio_en, expertise_tags_ar')
+            .select('id, full_name, avatar_url, bio_ar, bio_en')
             .eq('role', 'teacher')
             .eq('is_active', true)
             .eq('show_on_home', true)
             .order('home_order', { ascending: true })
             .limit(6);
 
-        if (error || !data || data.length === 0) {
-            // Use fallback dummy data
-            setTeachers(dummyTeachers);
+        if (error || !data) {
+            setTeachers([]);
         } else {
             setTeachers(data);
         }
@@ -123,19 +95,6 @@ export default function FeaturedTeachersSection() {
                                     <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                                         {t(teacher.bio_ar || '', teacher.bio_en || teacher.bio_ar || '')}
                                     </p>
-                                    {/* Expertise Tags */}
-                                    {teacher.expertise_tags_ar && teacher.expertise_tags_ar.length > 0 && (
-                                        <div className="flex flex-wrap gap-1">
-                                            {teacher.expertise_tags_ar.slice(0, 3).map((tag, idx) => (
-                                                <span
-                                                    key={idx}
-                                                    className="inline-block px-2 py-0.5 bg-primary/10 text-primary text-[10px] rounded-full"
-                                                >
-                                                    {tag}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 

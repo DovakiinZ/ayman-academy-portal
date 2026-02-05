@@ -42,8 +42,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, RefreshCw, AlertCircle, PlayCircle, Beaker, ChevronRight, BookOpen } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, RefreshCw, AlertCircle, PlayCircle, Beaker, ChevronRight, BookOpen, BrainCircuit } from 'lucide-react';
 import { toast } from 'sonner';
+import QuizEditor from '@/components/admin/QuizEditor';
 
 export default function LessonsManagement() {
     const { t } = useLanguage();
@@ -64,6 +65,7 @@ export default function LessonsManagement() {
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Lesson | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
 
     // Form state
     const [form, setForm] = useState({
@@ -77,6 +79,10 @@ export default function LessonsManagement() {
         order_index: 0,
         is_published: false,
         is_paid: true,
+        show_on_home: false,
+        home_order: 0,
+        teaser_ar: '',
+        teaser_en: '',
     });
 
     // Fetch data
@@ -192,6 +198,10 @@ export default function LessonsManagement() {
             order_index: lessons.length + 1,
             is_published: false,
             is_paid: true,
+            show_on_home: false,
+            home_order: 0,
+            teaser_ar: '',
+            teaser_en: '',
         });
         setDialogOpen(true);
     };
@@ -210,6 +220,10 @@ export default function LessonsManagement() {
             order_index: lesson.order_index,
             is_published: lesson.is_published,
             is_paid: lesson.is_paid,
+            show_on_home: lesson.show_on_home || false,
+            home_order: lesson.home_order || 0,
+            teaser_ar: lesson.teaser_ar || '',
+            teaser_en: lesson.teaser_en || '',
         });
         setDialogOpen(true);
     };
@@ -247,6 +261,10 @@ export default function LessonsManagement() {
                         order_index: form.order_index,
                         is_published: form.is_published,
                         is_paid: form.is_paid,
+                        show_on_home: form.show_on_home,
+                        home_order: form.home_order,
+                        teaser_ar: form.teaser_ar || null,
+                        teaser_en: form.teaser_en || null,
                     },
                     {
                         successMessage: { ar: 'تم تحديث الدرس بنجاح', en: 'Lesson updated successfully' },
@@ -275,6 +293,10 @@ export default function LessonsManagement() {
                         order_index: form.order_index,
                         is_published: form.is_published,
                         is_paid: form.is_paid,
+                        show_on_home: form.show_on_home,
+                        home_order: form.home_order,
+                        teaser_ar: form.teaser_ar || null,
+                        teaser_en: form.teaser_en || null,
                     },
                     {
                         successMessage: { ar: 'تمت إضافة الدرس بنجاح', en: 'Lesson added successfully' },
@@ -504,6 +526,14 @@ export default function LessonsManagement() {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
+                                                onClick={() => setQuizLessonId(lesson.id)}
+                                                title={t('إدارة الاختبار', 'Manage Quiz')}
+                                            >
+                                                <BrainCircuit className="w-4 h-4 text-purple-600" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => setDeleteTarget(lesson)}
                                                 className="text-destructive hover:text-destructive"
                                             >
@@ -653,6 +683,50 @@ export default function LessonsManagement() {
                                 onCheckedChange={(checked) => setForm({ ...form, is_published: checked })}
                             />
                         </div>
+
+                        <div className="border-t pt-4 mt-4">
+                            <h3 className="font-medium mb-3">{t('إعدادات الصفحة الرئيسية', 'Homepage Settings')}</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="show_on_home">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>
+                                    <Switch
+                                        id="show_on_home"
+                                        checked={form.show_on_home}
+                                        onCheckedChange={(checked) => setForm({ ...form, show_on_home: checked })}
+                                    />
+                                </div>
+
+                                {form.show_on_home && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="home_order">{t('ترتيب الظهور', 'Display Order')}</Label>
+                                            <Input
+                                                id="home_order"
+                                                type="number"
+                                                value={form.home_order}
+                                                onChange={(e) => setForm({ ...form, home_order: parseInt(e.target.value) || 0 })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="teaser_ar">{t('نص ترويجي (عربي)', 'Teaser Text (Arabic)')}</Label>
+                                            <Input
+                                                id="teaser_ar"
+                                                value={form.teaser_ar}
+                                                onChange={(e) => setForm({ ...form, teaser_ar: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="teaser_en">{t('نص ترويجي (إنجليزي)', 'Teaser Text (English)')}</Label>
+                                            <Input
+                                                id="teaser_en"
+                                                value={form.teaser_en}
+                                                onChange={(e) => setForm({ ...form, teaser_en: e.target.value })}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                         <div className="flex gap-2 pt-4">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
                                 {t('إلغاء', 'Cancel')}
@@ -664,6 +738,15 @@ export default function LessonsManagement() {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Quiz Editor */}
+            {quizLessonId && (
+                <QuizEditor
+                    lessonId={quizLessonId}
+                    isOpen={!!quizLessonId}
+                    onClose={() => setQuizLessonId(null)}
+                />
+            )}
 
             {/* Delete Confirmation */}
             <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>

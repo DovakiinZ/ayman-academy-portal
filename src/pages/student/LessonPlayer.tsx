@@ -2,15 +2,16 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useTemplate } from '@/hooks/useTemplate';
 import { supabase } from '@/lib/supabase';
-import { Lesson, Subject, LessonContentItem, LessonProgress } from '@/types/database';
-import { Loader2, ChevronRight, ChevronLeft, FileText, Download, CheckCircle } from 'lucide-react';
+import { useLessonProgress } from '@/hooks/useLessonProgress';
+import { Lesson, Subject, LessonContentItem } from '@/types/database';
+import { Loader2, ChevronRight, ChevronLeft, FileText, Download, CheckCircle, BrainCircuit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LessonNotes from '@/components/student/LessonNotes';
 import LessonComments from '@/components/student/LessonComments';
 import RatingWidget from '@/components/student/RatingWidget';
 import CourseContentSidebar from '@/components/student/CourseContentSidebar';
+import QuizPlayer from './QuizPlayer';
 
 // Helper to extract YouTube ID
 const getYoutubeId = (url: string) => {
@@ -32,30 +33,34 @@ export default function LessonPlayer() {
     const navigate = useNavigate();
 
     const [lesson, setLesson] = useState<LessonWithDetails | null>(null);
-    const [progress, setProgress] = useState<LessonProgress | null>(null);
     const [loading, setLoading] = useState(true);
-    const [accessDenied, setAccessDenied] = useState(false);
     const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
     const [activeTab, setActiveTab] = useState('overview');
+    const [quizId, setQuizId] = useState<string | null>(null);
+
+    // Use the custom hook for progress
+    const { progress, updateProgress, isCompleted } = useLessonProgress(id || '');
 
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (id && profile?.id) {
-            checkAccessAndFetch();
+            fetchLesson();
         }
         return () => stopTracking();
     }, [id, profile?.id]);
 
-    const checkAccessAndFetch = async () => {
+    // Restore last position when progress loads
+    useEffect(() => {
+        if (progress?.last_position_seconds && currentTime === 0) {
+            setCurrentTime(progress.last_position_seconds);
+        }
+    }, [progress]);
+
+    const fetchLesson = async () => {
         setLoading(true);
-        setAccessDenied(false);
 
-        // 1. Check access (using new schema, likely just is_active check or direct fetch)
-        // Access logic: Public for now based on Plan Part 3 "Student: SELECT only published"
-
-        // 2. Fetch lesson details
         const { data: lessonData, error } = await supabase
             .from('lessons')
             .select(`
@@ -77,23 +82,24 @@ export default function LessonPlayer() {
         setLesson(typedLesson);
 
         // Find video content
-        const videoItem = typedLesson.content_items?.find(item => item.type === 'video');
-        if (videoItem?.url) {
-            setCurrentVideoUrl(videoItem.url);
+        // For now, assume video is in content_items or video_url field
+        if (typedLesson.video_url) {
+            setCurrentVideoUrl(typedLesson.video_url);
+        } else if (typedLesson.full_video_url) {
+            setCurrentVideoUrl(typedLesson.full_video_url);
+        } else if (typedLesson.preview_video_url) {
+            setCurrentVideoUrl(typedLesson.preview_video_url);
         }
 
-        // 3. Fetch progress
-        const { data: progressData } = await supabase
-            .from('lesson_progress')
-            .select('*')
+        // Check for quiz
+        const { data: quizData } = await supabase
+            .from('lesson_quizzes')
+            .select('id')
             .eq('lesson_id', id!)
-            .eq('user_id', profile!.id)
             .single();
 
-        setProgress(progressData);
-
-        if (progressData?.last_position_seconds) {
-            setCurrentTime(progressData.last_position_seconds);
+        if (quizData) {
+            setQuizId(quizData.id);
         }
 
         startTracking();
@@ -102,7 +108,7 @@ export default function LessonPlayer() {
 
     const startTracking = () => {
         stopTracking();
-        progressIntervalRef.current = setInterval(saveProgress, 10000);
+        progressIntervalRef.current = setInterval(handleProgressTick, 5000); // Update every 5s
     };
 
     const stopTracking = () => {
@@ -111,38 +117,19 @@ export default function LessonPlayer() {
         }
     };
 
-    // Simplified Timer for V1
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentTime(prev => prev + 1);
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
+    const handleProgressTick = () => {
+        if (!lesson) return;
 
-    const saveProgress = async () => {
-        if (!lesson || !profile?.id) return;
+        // Mock duration logic (assume 10 mins if unknown)
+        const duration = lesson.duration_seconds || 600;
 
-        // Mock duration logic (10 mins)
-        const duration = 600;
-        const percent = Math.min(100, Math.round((currentTime / duration) * 100));
-        const isComplete = percent >= 90;
-
-        const payload = {
-            user_id: profile.id,
-            lesson_id: lesson.id,
-            progress_percent: percent,
-            last_position_seconds: Math.floor(currentTime),
-            updated_at: new Date().toISOString(),
-            ...(isComplete && !progress?.completed_at ? { completed_at: new Date().toISOString() } : {})
-        };
-
-        const { data } = await supabase
-            .from('lesson_progress')
-            .upsert(payload as any, { onConflict: 'user_id,lesson_id' })
-            .select()
-            .single();
-
-        if (data) setProgress(data);
+        // Advance time in UI
+        setCurrentTime(prev => {
+            const nextTime = prev + 5;
+            const percent = Math.min(100, Math.round((nextTime / duration) * 100));
+            updateProgress(percent, nextTime);
+            return nextTime;
+        });
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -207,21 +194,30 @@ export default function LessonPlayer() {
                     {/* Tabs */}
                     <div className="border-b border-border sticky top-0 bg-background z-10 px-4">
                         <div className="flex gap-6 overflow-x-auto">
-                            {['overview', 'qa', 'notes', 'reviews'].map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab
-                                        ? 'border-primary text-primary'
-                                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                                        }`}
-                                >
-                                    {tab === 'overview' && t('نظرة عامة', 'Overview')}
-                                    {tab === 'qa' && t('الأسئلة والنقاش', 'Q&A')}
-                                    {tab === 'notes' && t('ملاحظاتي', 'Notes')}
-                                    {tab === 'reviews' && t('التقييمات', 'Reviews')}
-                                </button>
-                            ))}
+                            {['overview', 'quiz', 'qa', 'notes', 'reviews'].map((tab) => {
+                                if (tab === 'quiz' && !quizId) return null;
+                                return (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab
+                                            ? 'border-primary text-primary'
+                                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                                            }`}
+                                    >
+                                        {tab === 'overview' && t('نظرة عامة', 'Overview')}
+                                        {tab === 'quiz' && (
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{t('الاختبار', 'Quiz')}</span>
+                                                {!isCompleted && <span className="text-[10px] bg-secondary px-1.5 rounded text-muted-foreground">{t('مغلق', 'Locked')}</span>}
+                                            </div>
+                                        )}
+                                        {tab === 'qa' && t('الأسئلة والنقاش', 'Q&A')}
+                                        {tab === 'notes' && t('ملاحظاتي', 'Notes')}
+                                        {tab === 'reviews' && t('التقييمات', 'Reviews')}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -237,6 +233,31 @@ export default function LessonPlayer() {
                                         </p>
                                     </div>
                                 </div>
+
+                                {quizId && (
+                                    <div className="bg-secondary/20 border border-border rounded-lg p-6">
+                                        <div className="flex items-start gap-4">
+                                            <div className={`p-3 rounded-full ${isCompleted ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                                <BrainCircuit className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-lg mb-1">{t('اختبار الدرس', 'Lesson Quiz')}</h3>
+                                                <p className="text-sm text-muted-foreground mb-4">
+                                                    {isCompleted
+                                                        ? t('يمكنك الآن إجراء الاختبار لتقييم فهمك للدرس.', 'You can now take the quiz to assess your understanding.')
+                                                        : t('أكمل مشاهدة الدرس لفتح الاختبار.', 'Complete watching the lesson to unlock the quiz.')}
+                                                </p>
+                                                <Button
+                                                    onClick={() => setActiveTab('quiz')}
+                                                    disabled={!isCompleted}
+                                                    variant={isCompleted ? 'default' : 'outline'}
+                                                >
+                                                    {t('بدء الاختبار', 'Start Quiz')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Resources */}
                                 {resources.length > 0 && (
@@ -259,6 +280,20 @@ export default function LessonPlayer() {
                                                 </a>
                                             ))}
                                         </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'quiz' && quizId && (
+                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                {isCompleted ? (
+                                    <QuizPlayer quizId={quizId} lessonId={lesson.id} />
+                                ) : (
+                                    <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
+                                        <BrainCircuit className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                                        <h3 className="text-lg font-medium mb-2">{t('الاختبار مغلق', 'Quiz Locked')}</h3>
+                                        <p className="text-muted-foreground">{t('يجب إكمال 90% من الدرس لفتح الاختبار', 'You must complete 90% of the lesson to unlock the quiz')}</p>
                                     </div>
                                 )}
                             </div>

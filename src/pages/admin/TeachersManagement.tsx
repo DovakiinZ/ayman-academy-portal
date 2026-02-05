@@ -647,21 +647,34 @@ export default function TeachersManagement() {
                                 onCheckedChange={(checked) => setEditForm({ ...editForm, show_on_home: checked })}
                             />
                         </div>
-                        {editForm.show_on_home && (
-                            <div className="space-y-2">
-                                <Label htmlFor="home_order">{t('ترتيب الظهور', 'Display Order')}</Label>
-                                <Input
-                                    id="home_order"
-                                    type="number"
-                                    value={editForm.home_order}
-                                    onChange={(e) => setEditForm({ ...editForm, home_order: parseInt(e.target.value) || 0 })}
-                                    min={0}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    {t('الأرقام الأصغر تظهر أولاً', 'Lower numbers appear first')}
-                                </p>
+                        <div className="border-t pt-4 mt-4">
+                            <h3 className="font-medium mb-3">{t('إعدادات الصفحة الرئيسية', 'Homepage Settings')}</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="show_on_home">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>
+                                    <Switch
+                                        id="show_on_home"
+                                        checked={editForm.show_on_home}
+                                        onCheckedChange={(checked) => setEditForm({ ...editForm, show_on_home: checked })}
+                                    />
+                                </div>
+                                {editForm.show_on_home && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="home_order">{t('ترتيب الظهور', 'Display Order')}</Label>
+                                        <Input
+                                            id="home_order"
+                                            type="number"
+                                            value={editForm.home_order}
+                                            onChange={(e) => setEditForm({ ...editForm, home_order: parseInt(e.target.value) || 0 })}
+                                            min={0}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            {t('الأرقام الأصغر تظهر أولاً', 'Lower numbers appear first')}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                         <div className="flex gap-2 pt-4">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>
                                 {t('إلغاء', 'Cancel')}

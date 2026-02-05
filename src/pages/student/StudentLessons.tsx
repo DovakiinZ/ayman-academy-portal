@@ -6,7 +6,6 @@ import { Subject, Lesson } from '@/types/database';
 import { Play, FileText, Lock, Clock, ArrowLeft, ArrowRight, Loader2, AlertCircle, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { dummyLessons } from '@/data/dummy';
 
 export default function StudentLessons() {
     const { subjectId } = useParams<{ subjectId: string }>();
@@ -60,17 +59,13 @@ export default function StudentLessons() {
 
             if (lessonsError) {
                 console.error('[StudentLessons] Error fetching lessons:', lessonsError);
-                // Fallback to dummy data
-                setLessons(dummyLessons as unknown as Lesson[]);
-                setIsDummy(true);
+                setLessons([]);
             } else {
                 setLessons(lessonsData as Lesson[] || []);
-                setIsDummy(false);
             }
         } catch (err) {
             console.error('[StudentLessons] Error:', err);
             setError(err instanceof Error ? err.message : 'Unknown error');
-            setIsDummy(true);
         } finally {
             setLoading(false);
         }

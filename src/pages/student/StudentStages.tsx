@@ -5,7 +5,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { Stage, Subject } from '@/types/database';
 import { GraduationCap, BookMarked, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
-import { dummyStages } from '@/data/dummy';
 
 interface StageWithSubjects extends Stage {
     subjects?: Subject[];
@@ -40,24 +39,20 @@ export default function StudentStages() {
 
             if (fetchError) {
                 console.error('[StudentStages] Fetch error:', fetchError);
-                setStages(dummyStages as StageWithSubjects[]);
-                setIsDummy(true);
+                setStages([]);
                 setError(fetchError.message);
             } else if (data && data.length > 0) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setStages((data as any[]).map(s => ({
                     ...s,
                     subjects_count: s.subjects?.length || 0
                 })) as StageWithSubjects[]);
-                setIsDummy(false);
             } else {
-                // No data, use dummy
-                setStages(dummyStages as StageWithSubjects[]);
-                setIsDummy(true);
+                setStages([]);
             }
         } catch (err) {
             console.error('[StudentStages] Exception:', err);
-            setStages(dummyStages as StageWithSubjects[]);
-            setIsDummy(true);
+            setStages([]);
             setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setLoading(false);

@@ -4,8 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
-import { dummyStats } from '@/data/dummy';
-import { GraduationCap, BookOpen, PlayCircle, UserPlus, AlertCircle, RefreshCw, Beaker, BookMarked } from 'lucide-react';
+import { GraduationCap, BookOpen, PlayCircle, UserPlus, AlertCircle, RefreshCw, BookMarked } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AdminStats {
@@ -52,7 +51,7 @@ export default function AdminDashboard() {
                         const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'teacher');
                         return { data: { count: count ?? 0 }, error };
                     },
-                    { count: dummyStats.teachers },
+                    { count: 0 },
                     'admin-teachers-count'
                 ),
                 safeFetchSimple(
@@ -76,7 +75,7 @@ export default function AdminDashboard() {
                         const { count, error } = await supabase.from('lessons').select('*', { count: 'exact', head: true });
                         return { data: { count: count ?? 0 }, error };
                     },
-                    { count: dummyStats.lessons },
+                    { count: 0 },
                     'admin-lessons-count'
                 ),
                 safeFetchSimple(
@@ -84,15 +83,12 @@ export default function AdminDashboard() {
                         const { count, error } = await supabase.from('teacher_invites').select('*', { count: 'exact', head: true }).eq('status', 'pending');
                         return { data: { count: count ?? 0 }, error };
                     },
-                    { count: dummyStats.pendingInvites },
+                    { count: 0 },
                     'admin-invites-count'
                 ),
             ]);
 
             if (!mountedRef.current) return;
-
-            const isAnyDummy = [teachersResult, stagesResult, subjectsResult, lessonsResult, invitesResult].some(r => r.source === 'dummy');
-            setIsDummy(isAnyDummy);
 
             setStats({
                 teachers: (teachersResult.data as { count?: number }).count ?? 0,
@@ -176,12 +172,6 @@ export default function AdminDashboard() {
                         {t(`مرحباً، ${user?.email?.split('@')[0] || 'مدير'}!`, `Welcome, ${user?.email?.split('@')[0] || 'Admin'}!`)}
                     </p>
                 </div>
-                {isDummy && !loading && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
-                        <Beaker className="w-3.5 h-3.5" />
-                        {t('بيانات تجريبية', 'Demo Data')}
-                    </div>
-                )}
             </div>
 
             {/* Error State */}
