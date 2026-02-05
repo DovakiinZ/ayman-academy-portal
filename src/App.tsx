@@ -35,7 +35,6 @@ import StudentProfile from "./pages/student/StudentProfile";
 import Messages from "./pages/student/Messages";
 import LessonPlayer from "./pages/student/LessonPlayer";
 import QuizPlayer from "./pages/student/QuizPlayer";
-import QuizResults from "./pages/student/QuizResults";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -127,7 +126,6 @@ const App = () => (
                   <Route path="profile" element={<StudentProfile />} />
                   <Route path="lesson/:id" element={<LessonPlayer />} />
                   <Route path="quiz/:quizId" element={<QuizPlayer />} />
-                  <Route path="quiz/:quizId/results/:attemptId" element={<QuizResults />} />
                 </Route>
 
                 {/* Catch-all */}
