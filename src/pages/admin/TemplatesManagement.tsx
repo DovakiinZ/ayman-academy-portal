@@ -3,15 +3,15 @@
  * Admins can modify text content for pages like Home, Stages, Paywall etc.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
+import { verifiedUpdate, devLog } from '@/lib/adminDb';
 import { ContentTemplate } from '@/types/database';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { useTemplates } from '@/contexts/TemplateContext';
 import {
     Loader2,
@@ -20,7 +20,10 @@ import {
     Type,
     LayoutTemplate,
     Search,
-    Info
+    Info,
+    RefreshCw,
+    AlertCircle,
+    Beaker
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -32,35 +35,96 @@ const CATEGORIES = [
     { id: 'paywall', label: { ar: 'الاشتراكات', en: 'Paywall & Subscriptions' } },
 ];
 
+// Dummy templates for fallback
+const dummyTemplates: ContentTemplate[] = [
+    { id: '1', key: 'home.hero.title', category: 'home', description: 'Main hero title on home page', content_ar: 'مرحباً بك', content_en: 'Welcome' },
+    { id: '2', key: 'home.hero.subtitle', category: 'home', description: 'Hero subtitle', content_ar: 'ابدأ رحلتك التعليمية', content_en: 'Start your learning journey' },
+];
+
 export default function TemplatesManagement() {
-    const { t, direction } = useLanguage();
+    const { t } = useLanguage();
     const { refreshTemplates } = useTemplates();
+    const mountedRef = useRef(true);
+
+    // State
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isDummy, setIsDummy] = useState(false);
     const [templates, setTemplates] = useState<ContentTemplate[]>([]);
+
+    // Filters
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Editor state
     const [selectedTemplate, setSelectedTemplate] = useState<ContentTemplate | null>(null);
     const [editForm, setEditForm] = useState<{ ar: string; en: string }>({ ar: '', en: '' });
     const [saving, setSaving] = useState(false);
+    const [hasChanges, setHasChanges] = useState(false);
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchTemplates();
+
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
+
+    // Track changes
+    useEffect(() => {
+        if (selectedTemplate) {
+            const arChanged = editForm.ar !== (selectedTemplate.content_ar || '');
+            const enChanged = editForm.en !== (selectedTemplate.content_en || '');
+            setHasChanges(arChanged || enChanged);
+        } else {
+            setHasChanges(false);
+        }
+    }, [editForm, selectedTemplate]);
 
     const fetchTemplates = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('content_templates')
-            .select('*')
-            .order('category')
-            .order('key');
+        setError(null);
+        const startTime = Date.now();
+        devLog('Fetching templates...');
 
-        if (error) {
-            toast.error(t('فشل تحميل القوالب', 'Failed to load templates'));
-        } else {
-            setTemplates(data as ContentTemplate[]);
+        try {
+            const { data, error: fetchError } = await supabase
+                .from('content_templates')
+                .select('*')
+                .order('category')
+                .order('key');
+
+            if (!mountedRef.current) return;
+
+            if (fetchError) {
+                devLog('Templates fetch error', fetchError);
+                setError(fetchError.message);
+                setTemplates(dummyTemplates);
+                setIsDummy(true);
+            } else {
+                setTemplates((data as ContentTemplate[]) || []);
+                setIsDummy(false);
+            }
+
+            const duration = Date.now() - startTime;
+            devLog(`Templates loaded in ${duration}ms`, { count: data?.length || 0 });
+        } catch (err) {
+            if (!mountedRef.current) return;
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            devLog('Fetch exception', err);
+            setError(message);
+            setTemplates(dummyTemplates);
+            setIsDummy(true);
+        } finally {
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
-        setLoading(false);
+    };
+
+    const handleRetry = () => {
+        fetchTemplates();
     };
 
     const filteredTemplates = templates.filter(template => {
@@ -71,42 +135,77 @@ export default function TemplatesManagement() {
     });
 
     const handleSelectTemplate = (template: ContentTemplate) => {
+        // Check for unsaved changes
+        if (hasChanges && selectedTemplate) {
+            if (!confirm(t('لديك تغييرات غير محفوظة. هل تريد المتابعة؟', 'You have unsaved changes. Do you want to continue?'))) {
+                return;
+            }
+        }
+
         setSelectedTemplate(template);
         setEditForm({
             ar: template.content_ar || '',
             en: template.content_en || ''
         });
+        setHasChanges(false);
     };
 
     const handleSave = async () => {
         if (!selectedTemplate) return;
 
         setSaving(true);
-        const { error } = await supabase
-            .from('content_templates')
-            .update({
-                content_ar: editForm.ar,
-                content_en: editForm.en,
-                updated_at: new Date().toISOString()
-            } as any)
-            .eq('id', selectedTemplate.id);
 
-        if (error) {
-            toast.error(t('حدث خطأ أثناء الحفظ', 'Error saving template'));
-        } else {
-            toast.success(t('تم الحفظ بنجاح', 'Saved successfully'));
+        try {
+            const result = await verifiedUpdate(
+                'content_templates',
+                selectedTemplate.id,
+                {
+                    content_ar: editForm.ar,
+                    content_en: editForm.en,
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    successMessage: { ar: 'تم الحفظ بنجاح', en: 'Saved successfully' },
+                    errorMessage: { ar: 'حدث خطأ أثناء الحفظ', en: 'Error saving template' },
+                }
+            );
 
-            // Update local state
-            setTemplates(templates.map(t =>
-                t.id === selectedTemplate.id
-                    ? { ...t, content_ar: editForm.ar, content_en: editForm.en }
-                    : t
-            ));
+            if (result.success) {
+                // Update local state
+                setTemplates(templates.map(t =>
+                    t.id === selectedTemplate.id
+                        ? { ...t, content_ar: editForm.ar, content_en: editForm.en }
+                        : t
+                ));
 
-            // Refresh global context cache
-            await refreshTemplates();
+                // Update selected template
+                setSelectedTemplate({
+                    ...selectedTemplate,
+                    content_ar: editForm.ar,
+                    content_en: editForm.en
+                });
+
+                setHasChanges(false);
+
+                // Refresh global context cache
+                await refreshTemplates();
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
+    };
+
+    const handleReset = () => {
+        if (selectedTemplate) {
+            setEditForm({
+                ar: selectedTemplate.content_ar || '',
+                en: selectedTemplate.content_en || ''
+            });
+            setHasChanges(false);
+        }
     };
 
     const extractVariables = (text: string) => {
@@ -122,14 +221,42 @@ export default function TemplatesManagement() {
 
     return (
         <div className="h-[calc(100vh-100px)] flex flex-col gap-6">
-            <div>
-                <h1 className="text-2xl font-semibold text-foreground">
-                    {t('إدارة النصوص والقوالب', 'Templates Management')}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                    {t('تعديل نصوص الموقع والقوالب الديناميكية', 'Edit website text and dynamic templates')}
-                </p>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-semibold text-foreground">
+                        {t('إدارة النصوص والقوالب', 'Templates Management')}
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        {t('تعديل نصوص الموقع والقوالب الديناميكية', 'Edit website text and dynamic templates')}
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    {isDummy && !loading && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
+                            <Beaker className="w-3.5 h-3.5" />
+                            {t('بيانات تجريبية', 'Demo Data')}
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* Error State */}
+            {error && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5 text-destructive" />
+                        <div className="flex-1">
+                            <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
+                            <p className="text-xs text-destructive/80">{error}</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                            <RefreshCw className="w-4 h-4 me-2" />
+                            {t('إعادة المحاولة', 'Retry')}
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <div className="flex-1 flex gap-6 overflow-hidden">
                 {/* Sidebar - Template List */}
@@ -217,11 +344,16 @@ export default function TemplatesManagement() {
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {hasChanges && (
+                                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                            {t('تغييرات غير محفوظة', 'Unsaved changes')}
+                                        </span>
+                                    )}
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handleSelectTemplate(selectedTemplate)} // Reset
-                                        disabled={saving}
+                                        onClick={handleReset}
+                                        disabled={saving || !hasChanges}
                                     >
                                         <RotateCcw className="w-4 h-4 me-2" />
                                         {t('إعادة تعيين', 'Reset')}
@@ -229,7 +361,7 @@ export default function TemplatesManagement() {
                                     <Button
                                         size="sm"
                                         onClick={handleSave}
-                                        disabled={saving}
+                                        disabled={saving || !hasChanges}
                                     >
                                         {saving ? (
                                             <Loader2 className="w-4 h-4 me-2 animate-spin" />
@@ -255,7 +387,7 @@ export default function TemplatesManagement() {
                                         dir="rtl"
                                         placeholder="أدخل النص العربي..."
                                     />
-                                    <div className="text-xs text-muted-foreground flex gap-2">
+                                    <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
                                         {extractVariables(editForm.ar).map(v => (
                                             <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                                                 {`{{${v}}}`}
@@ -277,7 +409,7 @@ export default function TemplatesManagement() {
                                         dir="ltr"
                                         placeholder="Enter English content..."
                                     />
-                                    <div className="text-xs text-muted-foreground flex gap-2">
+                                    <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
                                         {extractVariables(editForm.en).map(v => (
                                             <span key={v} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                                                 {`{{${v}}}`}

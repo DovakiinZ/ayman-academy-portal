@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
-import { dummyCourses, dummyLessons } from '@/data/dummy';
-import type { Course, Lesson } from '@/types/database';
+import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
+import { TranslationButton } from '@/components/admin/TranslationButton';
+import { dummyLessons } from '@/data/dummy';
+import type { Subject, Lesson } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,13 +26,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -41,23 +35,27 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, ArrowRight, ArrowUp, ArrowDown, RefreshCw, AlertCircle, PlayCircle, FileText, Beaker } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ArrowUp, ArrowDown, RefreshCw, AlertCircle, PlayCircle, Beaker, ChevronRight, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-
-type LessonType = 'video' | 'article';
 
 export default function LessonsManagement() {
     const { t } = useLanguage();
-    // Accept both subjectId (new) and courseId (old) for backward compatibility
-    const params = useParams<{ subjectId?: string; courseId?: string }>();
-    const entityId = params.subjectId || params.courseId;
-    const isSubjectMode = !!params.subjectId;
+    const params = useParams<{ subjectId?: string }>();
+    const subjectId = params.subjectId;
     const navigate = useNavigate();
     const mountedRef = useRef(true);
 
-    // State - supports both course and subject based lessons
-    const [entity, setEntity] = useState<any>(null); // Course or Subject
+    // State
+    const [subject, setSubject] = useState<Subject | null>(null);
+    const [allSubjects, setAllSubjects] = useState<Subject[]>([]); // For dropdown
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -71,97 +69,98 @@ export default function LessonsManagement() {
 
     // Form state
     const [form, setForm] = useState({
+        subject_id: '',
         title_ar: '',
         title_en: '',
         slug: '',
+        video_url: '',
         summary_ar: '',
         summary_en: '',
-        type: 'video' as LessonType,
-        preview_video_url: '',
-        full_video_url: '',
-        duration_seconds: 0,
         order_index: 0,
-        is_free_preview: false,
         is_published: false,
+        is_paid: true,
     });
 
     // Fetch data
     const fetchData = async () => {
-        if (!entityId || !mountedRef.current) return;
+        if (!mountedRef.current) return;
+
+
 
         setLoading(true);
         setError(null);
 
         try {
-            if (isSubjectMode) {
-                // Fetch subject info
-                const { data: subjectData, error: subjectError } = await supabase
-                    .from('subjects')
-                    .select('*, level:levels(*)')
-                    .eq('id', entityId)
-                    .single();
+            // Fetch all subjects for dropdown
+            const { data: subjectsData } = await supabase
+                .from('subjects')
+                .select('id, title_ar')
+                .order('sort_order');
 
-                if (subjectError) {
-                    setError(subjectError.message);
-                    setLoading(false);
-                    return;
-                }
-
-                setEntity(subjectData);
-
-                // Fetch lessons by subject_id
-                const { data: lessonsData, error: lessonsError } = await supabase
-                    .from('lessons')
-                    .select('*')
-                    .eq('subject_id', entityId)
-                    .order('order_index');
-
-                if (lessonsError) {
-                    setError(lessonsError.message);
-                } else {
-                    setLessons(lessonsData || []);
-                }
-                setIsDummy(false);
-            } else {
-                // Legacy: Fetch course info
-                const { data: courseData, source: courseSource, error: courseError } = await safeFetchSimple(
-                    () => supabase.from('courses').select('*').eq('id', entityId).single(),
-                    dummyCourses.find(c => c.id === entityId) || dummyCourses[0],
-                    `admin-course-${entityId}`
-                );
-
-                if (!mountedRef.current) return;
-
-                if (courseError && courseSource !== 'dummy') {
-                    setError(courseError);
-                    setLoading(false);
-                    return;
-                }
-
-                setEntity(courseData);
-
-                // Fetch lessons by course_id
-                const { data: lessonsData, source: lessonsSource, error: lessonsError } = await safeFetchSimple(
-                    () => supabase.from('lessons').select('*').eq('course_id', entityId).order('order_index'),
-                    dummyLessons.filter(l => l.course_id === entityId),
-                    `admin-lessons-${entityId}`
-                );
-
-                if (!mountedRef.current) return;
-
-                setIsDummy(courseSource === 'dummy' || lessonsSource === 'dummy');
-                setLessons(lessonsData);
-
-                if (lessonsError) {
-                    setError(lessonsError);
-                }
+            if (mountedRef.current && subjectsData) {
+                setAllSubjects(subjectsData as Subject[]);
             }
-        } catch (err) {
+
+            if (!subjectId) {
+                setLoading(false);
+                return;
+            }
+
+            const startTime = Date.now();
+            // ... (rest of logic)
+            devLog(`Fetching subject ${subjectId} and lessons...`);
+
+            // Fetch subject info with stage
+            const { data: subjectData, error: subjectError } = await supabase
+                .from('subjects')
+                .select('*, stage:stages(*)')
+                .eq('id', subjectId)
+                .single();
+
             if (!mountedRef.current) return;
-            setError(err instanceof Error ? err.message : 'Unknown error');
-            setEntity(dummyCourses[0]);
-            setLessons(dummyLessons);
-            setIsDummy(true);
+
+            if (subjectError) {
+                devLog('Subject fetch error', subjectError);
+                setError(subjectError.message);
+                setLessons(dummyLessons.filter(l => l.subject_id === subjectId) as Lesson[]);
+                setIsDummy(true);
+                setLoading(false);
+                return;
+            }
+
+            setSubject(subjectData as Subject);
+
+            // Fetch lessons for this subject
+            const { data: lessonsData, error: lessonsError } = await supabase
+                .from('lessons')
+                .select('*')
+                .eq('subject_id', subjectId)
+                .order('order_index', { ascending: true });
+
+            if (!mountedRef.current) return;
+
+            if (lessonsError) {
+                devLog('Lessons fetch error', lessonsError);
+                setError(lessonsError.message);
+                setLessons(dummyLessons.filter(l => l.subject_id === subjectId) as Lesson[]);
+                setIsDummy(true);
+            } else {
+                setLessons((lessonsData as Lesson[]) || []);
+                setIsDummy(false);
+            }
+
+            const duration = Date.now() - startTime;
+            devLog(`Data loaded in ${duration}ms`, { lessonsCount: lessonsData?.length || 0 });
+        } catch (err) {
+            if (mountedRef.current) {
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                devLog('Fetch exception', err);
+                setError(message);
+                // STRICT PERSISTENCE: Do not fall back to dummy data
+                // setLessons(dummyLessons as Lesson[]);
+                // setIsDummy(true);
+                setLessons([]); // Clear list on error
+            }
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
@@ -176,30 +175,28 @@ export default function LessonsManagement() {
         return () => {
             mountedRef.current = false;
         };
-    }, [entityId]);
+    }, [subjectId]);
 
     const handleRetry = () => {
-        clearCache(`admin-course-${entityId}`);
-        clearCache(`admin-lessons-${entityId}`);
         fetchData();
     };
 
     // Open add dialog
+    // Open add dialog
     const handleAdd = () => {
+        // ALLOW even if !subjectId
         setEditingLesson(null);
         setForm({
+            subject_id: subjectId || '',
             title_ar: '',
             title_en: '',
             slug: '',
+            video_url: '',
             summary_ar: '',
             summary_en: '',
-            type: 'video',
-            preview_video_url: '',
-            full_video_url: '',
-            duration_seconds: 0,
             order_index: lessons.length + 1,
-            is_free_preview: false,
             is_published: false,
+            is_paid: true,
         });
         setDialogOpen(true);
     };
@@ -208,126 +205,140 @@ export default function LessonsManagement() {
     const handleEdit = (lesson: Lesson) => {
         setEditingLesson(lesson);
         setForm({
+            subject_id: lesson.subject_id || '',
             title_ar: lesson.title_ar,
             title_en: lesson.title_en || '',
-            slug: lesson.slug,
+            slug: lesson.slug || '',
+            video_url: lesson.video_url || lesson.full_video_url || '',
             summary_ar: lesson.summary_ar || '',
             summary_en: lesson.summary_en || '',
-            type: lesson.full_video_url ? 'video' : 'article',
-            preview_video_url: lesson.preview_video_url || '',
-            full_video_url: lesson.full_video_url || '',
-            duration_seconds: lesson.duration_seconds || 0,
             order_index: lesson.order_index,
-            is_free_preview: lesson.is_free_preview,
             is_published: lesson.is_published,
+            is_paid: lesson.is_paid,
         });
         setDialogOpen(true);
     };
 
-    // Save (create or update)
+    // Save (create or update) with verification
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!entityId) return;
+
+        const targetSubjectId = form.subject_id || subjectId;
+        if (!targetSubjectId) {
+            toast.error(t('الرجاء اختيار مادة', 'Please select a subject'));
+            return;
+        }
+
+        if (!form.title_ar.trim()) {
+            toast.error(t('الرجاء إدخال عنوان الدرس', 'Please enter lesson title'));
+            return;
+        }
 
         setSubmitting(true);
 
         try {
             if (editingLesson) {
-                // Update
-                const { error } = await supabase.from('lessons').update({
-                    title_ar: form.title_ar,
-                    title_en: form.title_en || null,
-                    summary_ar: form.summary_ar || null,
-                    summary_en: form.summary_en || null,
-                    preview_video_url: form.preview_video_url || null,
-                    full_video_url: form.full_video_url || null,
-                    duration_seconds: form.duration_seconds || null,
-                    order_index: form.order_index,
-                    is_free_preview: form.is_free_preview,
-                    is_published: form.is_published,
-                }).eq('id', editingLesson.id);
+                // Update with verification
+                const result = await verifiedUpdate(
+                    'lessons',
+                    editingLesson.id,
+                    {
+                        subject_id: targetSubjectId,
+                        title_ar: form.title_ar,
+                        title_en: form.title_en || null,
+                        video_url: form.video_url || null,
+                        summary_ar: form.summary_ar || null,
+                        summary_en: form.summary_en || null,
+                        order_index: form.order_index,
+                        is_published: form.is_published,
+                        is_paid: form.is_paid,
+                    },
+                    {
+                        successMessage: { ar: 'تم تحديث الدرس بنجاح', en: 'Lesson updated successfully' },
+                        errorMessage: { ar: 'فشل في تحديث الدرس', en: 'Failed to update lesson' },
+                    }
+                );
 
-                if (error) {
-                    toast.error(t('فشل في تحديث الدرس', 'Failed to update lesson'), { description: error.message });
-                } else {
-                    toast.success(t('تم تحديث الدرس بنجاح', 'Lesson updated successfully'));
+                if (result.success) {
                     setDialogOpen(false);
-                    clearCache(`admin-lessons-${entityId}`);
                     fetchData();
                 }
             } else {
-                // Create
-                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-                const insertData: any = {
-                    title_ar: form.title_ar,
-                    title_en: form.title_en || null,
-                    slug,
-                    summary_ar: form.summary_ar || null,
-                    summary_en: form.summary_en || null,
-                    preview_video_url: form.preview_video_url || null,
-                    full_video_url: form.full_video_url || null,
-                    duration_seconds: form.duration_seconds || null,
-                    order_index: form.order_index,
-                    is_free_preview: form.is_free_preview,
-                    is_published: form.is_published,
-                };
+                // Create with verification
+                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0621-\u064A-]/g, '');
 
-                // Set subject_id or course_id based on mode
-                if (isSubjectMode) {
-                    insertData.subject_id = entityId;
-                } else {
-                    insertData.course_id = entityId;
-                }
+                const result = await verifiedInsert(
+                    'lessons',
+                    {
+                        subject_id: targetSubjectId,
+                        title_ar: form.title_ar,
+                        title_en: form.title_en || null,
+                        slug,
+                        video_url: form.video_url || null,
+                        summary_ar: form.summary_ar || null,
+                        summary_en: form.summary_en || null,
+                        order_index: form.order_index,
+                        is_published: form.is_published,
+                        is_paid: form.is_paid,
+                    },
+                    {
+                        successMessage: { ar: 'تمت إضافة الدرس بنجاح', en: 'Lesson added successfully' },
+                        errorMessage: { ar: 'فشل في إضافة الدرس', en: 'Failed to add lesson' },
+                    }
+                );
 
-                const { error } = await supabase.from('lessons').insert(insertData);
-
-                if (error) {
-                    toast.error(t('فشل في إضافة الدرس', 'Failed to add lesson'), { description: error.message });
-                } else {
-                    toast.success(t('تمت إضافة الدرس بنجاح', 'Lesson added successfully'));
+                if (result.success) {
                     setDialogOpen(false);
-                    clearCache(`admin-lessons-${entityId}`);
-                    fetchData();
+                    if (!subjectId) {
+                        navigate(`/admin/subjects/${targetSubjectId}/lessons`);
+                    } else {
+                        fetchData();
+                    }
                 }
             }
         } catch (err) {
-            toast.error(t('حدث خطأ', 'An error occurred'));
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Delete
+    // Delete with verification
     const handleDelete = async () => {
         if (!deleteTarget) return;
         setSubmitting(true);
 
         try {
-            const { error } = await supabase.from('lessons').delete().eq('id', deleteTarget.id);
+            const result = await verifiedDelete(
+                'lessons',
+                deleteTarget.id,
+                {
+                    successMessage: { ar: 'تم حذف الدرس بنجاح', en: 'Lesson deleted successfully' },
+                    errorMessage: { ar: 'فشل في حذف الدرس', en: 'Failed to delete lesson' },
+                }
+            );
 
-            if (error) {
-                toast.error(t('فشل في حذف الدرس', 'Failed to delete lesson'), { description: error.message });
-            } else {
-                toast.success(t('تم حذف الدرس بنجاح', 'Lesson deleted successfully'));
-                clearCache(`admin-lessons-${entityId}`);
+            if (result.success) {
                 fetchData();
             }
         } catch (err) {
-            toast.error(t('حدث خطأ', 'An error occurred'));
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
         } finally {
             setDeleteTarget(null);
             setSubmitting(false);
         }
     };
 
-    // Reorder
+    // Reorder with verification
     const handleMoveUp = async (lesson: Lesson, index: number) => {
         if (index === 0) return;
         const prevLesson = lessons[index - 1];
 
-        await supabase.from('lessons').update({ order_index: prevLesson.order_index }).eq('id', lesson.id);
-        await supabase.from('lessons').update({ order_index: lesson.order_index }).eq('id', prevLesson.id);
-        clearCache(`admin-lessons-${entityId}`);
+        // Swap order indices
+        await verifiedUpdate('lessons', lesson.id, { order_index: prevLesson.order_index }, { showErrorToast: false });
+        await verifiedUpdate('lessons', prevLesson.id, { order_index: lesson.order_index }, { showErrorToast: false });
         fetchData();
     };
 
@@ -335,17 +346,19 @@ export default function LessonsManagement() {
         if (index === lessons.length - 1) return;
         const nextLesson = lessons[index + 1];
 
-        await supabase.from('lessons').update({ order_index: nextLesson.order_index }).eq('id', lesson.id);
-        await supabase.from('lessons').update({ order_index: lesson.order_index }).eq('id', nextLesson.id);
-        clearCache(`admin-lessons-${entityId}`);
+        // Swap order indices
+        await verifiedUpdate('lessons', lesson.id, { order_index: nextLesson.order_index }, { showErrorToast: false });
+        await verifiedUpdate('lessons', nextLesson.id, { order_index: lesson.order_index }, { showErrorToast: false });
         fetchData();
     };
 
-    const formatDuration = (seconds: number | null) => {
-        if (!seconds) return '-';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    // Navigate back
+    const handleBackToSubject = () => {
+        if (subject?.stage_id) {
+            navigate(`/admin/stages/${subject.stage_id}/subjects`);
+        } else {
+            navigate('/admin/stages');
+        }
     };
 
     return (
@@ -353,14 +366,21 @@ export default function LessonsManagement() {
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                 <button
-                    onClick={() => navigate(isSubjectMode ? '/admin/subjects' : '/admin/lessons')}
+                    onClick={() => navigate('/admin/stages')}
                     className="hover:text-foreground transition-colors"
                 >
-                    {t(isSubjectMode ? 'المواد' : 'الدروس', isSubjectMode ? 'Subjects' : 'Lessons')}
+                    {t('المراحل', 'Stages')}
                 </button>
-                <ArrowRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4" />
+                <button
+                    onClick={handleBackToSubject}
+                    className="hover:text-foreground transition-colors"
+                >
+                    {subject?.stage?.title_ar || t('المواد', 'Subjects')}
+                </button>
+                <ChevronRight className="w-4 h-4" />
                 <span className="text-foreground">
-                    {entity ? (entity.title_ar || '') : '...'}
+                    {subject ? t(subject.title_ar, subject.title_en || subject.title_ar) : '...'}
                 </span>
             </div>
 
@@ -371,7 +391,7 @@ export default function LessonsManagement() {
                         {t('إدارة الدروس', 'Manage Lessons')}
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        {entity && t(`دروس: ${entity.title_ar}`, `Lessons for: ${entity.title_en || entity.title_ar}`)}
+                        {subject && t(`دروس مادة: ${subject.title_ar}`, `Lessons for: ${subject.title_en || subject.title_ar}`)}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -407,7 +427,17 @@ export default function LessonsManagement() {
 
             {/* Table */}
             <div className="bg-background rounded-lg border border-border overflow-hidden">
-                {loading ? (
+                {!subjectId ? (
+                    <div className="p-12 text-center">
+                        <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-foreground mb-2">
+                            {t('يرجى اختيار مادة لعرض الدروس', 'Please select a subject to view lessons')}
+                        </h3>
+                        <Button variant="outline" onClick={() => navigate('/admin/subjects')}>
+                            {t('الذهاب للمواد', 'Go to Subjects')}
+                        </Button>
+                    </div>
+                ) : loading ? (
                     <div className="p-8 text-center">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                     </div>
@@ -431,11 +461,9 @@ export default function LessonsManagement() {
                             <TableRow>
                                 <TableHead className="w-12">#</TableHead>
                                 <TableHead>{t('عنوان الدرس', 'Lesson Title')}</TableHead>
-                                <TableHead>{t('النوع', 'Type')}</TableHead>
-                                <TableHead>{t('المدة', 'Duration')}</TableHead>
-                                <TableHead>{t('معاينة مجانية', 'Free Preview')}</TableHead>
+                                <TableHead>{t('مدفوع', 'Paid')}</TableHead>
                                 <TableHead>{t('الحالة', 'Status')}</TableHead>
-                                <TableHead className="w-[150px]"></TableHead>
+                                <TableHead className="w-[180px]">{t('الإجراءات', 'Actions')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -448,32 +476,15 @@ export default function LessonsManagement() {
                                             {lesson.title_en && (
                                                 <p className="text-sm text-muted-foreground">{lesson.title_en}</p>
                                             )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            {lesson.full_video_url ? (
-                                                <>
-                                                    <PlayCircle className="w-4 h-4 text-blue-500" />
-                                                    <span className="text-sm">{t('فيديو', 'Video')}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <FileText className="w-4 h-4 text-green-500" />
-                                                    <span className="text-sm">{t('مقال', 'Article')}</span>
-                                                </>
+                                            {lesson.summary_ar && (
+                                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{lesson.summary_ar}</p>
                                             )}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
-                                        {formatDuration(lesson.duration_seconds)}
-                                    </TableCell>
                                     <TableCell>
-                                        {lesson.is_free_preview && (
-                                            <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                                {t('مجاني', 'Free')}
-                                            </Badge>
-                                        )}
+                                        <Badge variant={lesson.is_paid ? 'default' : 'outline'} className={lesson.is_paid ? '' : 'text-green-600 border-green-200 bg-green-50'}>
+                                            {lesson.is_paid ? t('مدفوع', 'Paid') : t('مجاني', 'Free')}
+                                        </Badge>
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant={lesson.is_published ? 'default' : 'secondary'}>
@@ -520,7 +531,7 @@ export default function LessonsManagement() {
 
             {/* Add/Edit Dialog */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>
                             {editingLesson
@@ -529,6 +540,26 @@ export default function LessonsManagement() {
                         </DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSave} className="space-y-4 mt-4">
+                        {!subjectId && (
+                            <div className="space-y-2">
+                                <Label>{t('المادة', 'Subject')} *</Label>
+                                <Select
+                                    value={form.subject_id}
+                                    onValueChange={(value) => setForm({ ...form, subject_id: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={t('اختر مادة', 'Select Subject')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allSubjects.map((s) => (
+                                            <SelectItem key={s.id} value={s.id}>
+                                                {s.title_ar}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="title_ar">{t('العنوان بالعربية', 'Arabic Title')} *</Label>
@@ -540,7 +571,16 @@ export default function LessonsManagement() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="title_en">{t('العنوان بالإنجليزية', 'English Title')}</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="title_en">{t('العنوان بالإنجليزية', 'English Title')}</Label>
+                                    <TranslationButton
+                                        sourceText={form.title_ar}
+                                        sourceLang="ar"
+                                        targetLang="en"
+                                        onTranslated={(text) => setForm({ ...form, title_en: text })}
+                                        label="Auto EN"
+                                    />
+                                </div>
                                 <Input
                                     id="title_en"
                                     value={form.title_en}
@@ -548,83 +588,82 @@ export default function LessonsManagement() {
                                 />
                             </div>
                         </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="type">{t('نوع الدرس', 'Lesson Type')}</Label>
-                            <Select value={form.type} onValueChange={(val: LessonType) => setForm({ ...form, type: val })}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="video">{t('فيديو', 'Video')}</SelectItem>
-                                    <SelectItem value="article">{t('مقال', 'Article')}</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {form.type === 'video' && (
-                            <>
-                                <div className="space-y-2">
-                                    <Label htmlFor="full_video_url">{t('رابط الفيديو الكامل', 'Full Video URL')}</Label>
-                                    <Input
-                                        id="full_video_url"
-                                        value={form.full_video_url}
-                                        onChange={(e) => setForm({ ...form, full_video_url: e.target.value })}
-                                        placeholder="https://..."
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="preview_video_url">{t('رابط فيديو المعاينة', 'Preview Video URL')}</Label>
-                                    <Input
-                                        id="preview_video_url"
-                                        value={form.preview_video_url}
-                                        onChange={(e) => setForm({ ...form, preview_video_url: e.target.value })}
-                                        placeholder="https://..."
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="duration">{t('المدة (بالثواني)', 'Duration (seconds)')}</Label>
-                                    <Input
-                                        id="duration"
-                                        type="number"
-                                        value={form.duration_seconds}
-                                        onChange={(e) => setForm({ ...form, duration_seconds: parseInt(e.target.value) || 0 })}
-                                    />
-                                </div>
-                            </>
-                        )}
-
-                        {form.type === 'article' && (
+                        {!editingLesson && (
                             <div className="space-y-2">
-                                <Label htmlFor="summary_ar">{t('محتوى المقال', 'Article Content')}</Label>
-                                <Textarea
-                                    id="summary_ar"
-                                    value={form.summary_ar}
-                                    onChange={(e) => setForm({ ...form, summary_ar: e.target.value })}
-                                    rows={6}
+                                <Label htmlFor="slug">{t('المعرّف', 'Slug')}</Label>
+                                <Input
+                                    id="slug"
+                                    value={form.slug}
+                                    onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                                    placeholder="lesson-title"
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    {t('سيتم إنشاؤه تلقائياً إذا تُرك فارغاً', 'Will be auto-generated if left empty')}
+                                </p>
                             </div>
                         )}
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="is_free_preview">{t('معاينة مجانية', 'Free Preview')}</Label>
-                                <Switch
-                                    id="is_free_preview"
-                                    checked={form.is_free_preview}
-                                    onCheckedChange={(checked) => setForm({ ...form, is_free_preview: checked })}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="is_published">{t('منشور', 'Published')}</Label>
-                                <Switch
-                                    id="is_published"
-                                    checked={form.is_published}
-                                    onCheckedChange={(checked) => setForm({ ...form, is_published: checked })}
-                                />
-                            </div>
+                        {/* Video URL */}
+                        <div className="space-y-2">
+                            <Label htmlFor="video_url">{t('رابط الفيديو', 'Video URL')}</Label>
+                            <Input
+                                id="video_url"
+                                value={form.video_url}
+                                onChange={(e) => setForm({ ...form, video_url: e.target.value })}
+                                placeholder="https://vimeo.com/..."
+                            />
                         </div>
-
+                        <div className="space-y-2">
+                            <Label htmlFor="summary_ar">{t('ملخص بالعربية', 'Arabic Summary')}</Label>
+                            <Textarea
+                                id="summary_ar"
+                                value={form.summary_ar}
+                                onChange={(e) => setForm({ ...form, summary_ar: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="summary_en">{t('ملخص بالإنجليزية', 'English Summary')}</Label>
+                                <TranslationButton
+                                    sourceText={form.summary_ar}
+                                    sourceLang="ar"
+                                    targetLang="en"
+                                    onTranslated={(text) => setForm({ ...form, summary_en: text })}
+                                    label="Auto EN"
+                                />
+                            </div>
+                            <Textarea
+                                id="summary_en"
+                                value={form.summary_en}
+                                onChange={(e) => setForm({ ...form, summary_en: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="order_index">{t('الترتيب', 'Order')}</Label>
+                            <Input
+                                id="order_index"
+                                type="number"
+                                value={form.order_index}
+                                onChange={(e) => setForm({ ...form, order_index: parseInt(e.target.value) || 0 })}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="is_paid">{t('درس مدفوع', 'Paid Lesson')}</Label>
+                            <Switch
+                                id="is_paid"
+                                checked={form.is_paid}
+                                onCheckedChange={(checked) => setForm({ ...form, is_paid: checked })}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="is_published">{t('منشور', 'Published')}</Label>
+                            <Switch
+                                id="is_published"
+                                checked={form.is_published}
+                                onCheckedChange={(checked) => setForm({ ...form, is_published: checked })}
+                            />
+                        </div>
                         <div className="flex gap-2 pt-4">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
                                 {t('إلغاء', 'Cancel')}
@@ -657,6 +696,6 @@ export default function LessonsManagement() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </div >
     );
 }

@@ -89,15 +89,11 @@ export default function FeaturedLessonsSection() {
                     title_en,
                     preview_video_url,
                     duration_seconds,
-                    course:courses(
-                        title_ar,
-                        title_en,
-                        teacher:profiles(full_name)
-                    ),
+                    creator:profiles!lessons_created_by_fkey(full_name),
                     subject:subjects(
                         title_ar,
                         title_en,
-                        level:levels(title_ar, title_en)
+                        stage:stages(title_ar, title_en)
                     )
                 )
             `)
@@ -121,11 +117,11 @@ export default function FeaturedLessonsSection() {
                     title_en: lesson?.title_en || '',
                     teaser_ar: item.teaser_ar || '',
                     teaser_en: item.teaser_en || '',
-                    subject_ar: lesson?.subject?.title_ar || lesson?.course?.title_ar || '',
-                    subject_en: lesson?.subject?.title_en || lesson?.course?.title_en || '',
-                    stage_ar: lesson?.subject?.level?.title_ar || '',
-                    stage_en: lesson?.subject?.level?.title_en || '',
-                    instructor: lesson?.course?.teacher?.full_name || '',
+                    subject_ar: lesson?.subject?.title_ar || '',
+                    subject_en: lesson?.subject?.title_en || '',
+                    stage_ar: lesson?.subject?.stage?.title_ar || '',
+                    stage_en: lesson?.subject?.stage?.title_en || '',
+                    instructor: lesson?.creator?.full_name || '',
                     duration,
                     is_preview: !!lesson?.preview_video_url,
                     thumbnail: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=225&fit=crop',

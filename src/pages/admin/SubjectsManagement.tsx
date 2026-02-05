@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
-import { dummyLevels, getDummySubjectsForLevel } from '@/data/dummy';
-import type { Level, Subject } from '@/types/database';
+import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
+import { TranslationButton } from '@/components/admin/TranslationButton';
+import { dummyStages, getDummySubjectsForStage } from '@/data/dummy';
+import type { Stage, Subject } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,20 +34,28 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, ArrowRight, RefreshCw, AlertCircle, BookOpen, Beaker } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ArrowRight, RefreshCw, AlertCircle, BookOpen, Beaker, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SubjectsManagement() {
     const { t } = useLanguage();
     // Accept both stageId (new) and levelId (old) for backward compatibility
     const params = useParams<{ stageId?: string; levelId?: string }>();
-    const levelId = params.stageId || params.levelId;
+    const stageId = params.stageId || params.levelId;
     const navigate = useNavigate();
     const mountedRef = useRef(true);
 
     // State
-    const [level, setLevel] = useState<Level | null>(null);
+    const [stage, setStage] = useState<Stage | null>(null);
+    const [allStages, setAllStages] = useState<Stage[]>([]); // For dropdown
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -60,6 +69,7 @@ export default function SubjectsManagement() {
 
     // Form state
     const [form, setForm] = useState({
+        stage_id: '', // New field for selection
         title_ar: '',
         title_en: '',
         description_ar: '',
@@ -71,54 +81,67 @@ export default function SubjectsManagement() {
 
     // Fetch data
     const fetchData = async () => {
-        if (!levelId || !mountedRef.current) return;
+        if (!mountedRef.current) return;
 
         setLoading(true);
         setError(null);
 
         try {
-            // Fetch level info
-            const { data: levelsData, source: levelsSource, error: levelsError } = await safeFetchSimple(
-                () => supabase.from('levels').select('*').eq('id', levelId).single(),
-                dummyLevels.find(l => l.id === levelId) || dummyLevels[0],
-                `admin-level-${levelId}`
-            );
+            // Always fetch all stages for the dropdown if we need them (or we can fetch on demand)
+            // It's small enough to fetch all.
+            const { data: stagesData } = await supabase
+                .from('stages')
+                .select('*')
+                .order('sort_order');
 
-            if (!mountedRef.current) return;
+            if (mountedRef.current && stagesData) {
+                setAllStages(stagesData);
+            }
 
-            if (levelsError && levelsSource !== 'dummy') {
-                setError(levelsError);
+            if (!stageId) {
+                // If no stage selected, we don't fetch subjects yet (or maybe all subjects? No, too many potentially).
+                // Wait, user wants to create FROM here.
                 setLoading(false);
                 return;
             }
 
-            setLevel(levelsData);
-
-            // Fetch subjects
-            const { data: subjectsData, source: subjectsSource, error: subjectsError } = await safeFetchSimple(
-                () => supabase.from('subjects').select('*').eq('level_id', levelId).order('sort_order'),
-                getDummySubjectsForLevel(levelId),
-                `admin-subjects-${levelId}`
-            );
+            // Fetch stage info
+            const { data: stageData, error: stageError } = await supabase
+                .from('stages')
+                .select('*')
+                .eq('id', stageId)
+                .single();
 
             if (!mountedRef.current) return;
 
-            setIsDummy(levelsSource === 'dummy' || subjectsSource === 'dummy');
-            setSubjects(subjectsData);
+            if (stageError) {
+                // ... validation error logic retained ...
+                setError(stageError.message);
+                setLoading(false);
+                return;
+            }
+
+            setStage(stageData as Stage);
+
+            // Fetch subjects for this stage
+            const { data: subjectsData, error: subjectsError } = await supabase
+                .from('subjects')
+                .select('*')
+                .eq('stage_id', stageId)
+                .order('sort_order', { ascending: true });
+
+            if (!mountedRef.current) return;
 
             if (subjectsError) {
-                setError(subjectsError);
+                setError(subjectsError.message);
+            } else {
+                setSubjects((subjectsData as Subject[]) || []);
             }
         } catch (err) {
-            if (!mountedRef.current) return;
-            setError(err instanceof Error ? err.message : 'Unknown error');
-            setLevel(dummyLevels[0]);
-            setSubjects(getDummySubjectsForLevel(levelId));
-            setIsDummy(true);
+            // ... catch logic ...
+            if (mountedRef.current) setError(err instanceof Error ? err.message : 'Error');
         } finally {
-            if (mountedRef.current) {
-                setLoading(false);
-            }
+            if (mountedRef.current) setLoading(false);
         }
     };
 
@@ -129,18 +152,18 @@ export default function SubjectsManagement() {
         return () => {
             mountedRef.current = false;
         };
-    }, [levelId]);
+    }, [stageId]);
 
     const handleRetry = () => {
-        clearCache(`admin-level-${levelId}`);
-        clearCache(`admin-subjects-${levelId}`);
         fetchData();
     };
 
     // Open add dialog
     const handleAdd = () => {
+        // ALLOW opening even if no stageId
         setEditingSubject(null);
         setForm({
+            stage_id: stageId || '', // Pre-fill if known
             title_ar: '',
             title_en: '',
             description_ar: '',
@@ -156,95 +179,130 @@ export default function SubjectsManagement() {
     const handleEdit = (subject: Subject) => {
         setEditingSubject(subject);
         setForm({
+            stage_id: subject.stage_id || '', // Should ensure type has stage_id
             title_ar: subject.title_ar,
             title_en: subject.title_en || '',
             description_ar: subject.description_ar || '',
             description_en: subject.description_en || '',
-            slug: subject.slug,
+            slug: subject.slug || '',
             sort_order: subject.sort_order,
             is_active: subject.is_active,
         });
         setDialogOpen(true);
     };
 
-    // Save (create or update)
+    // Save (create or update) with verification
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!levelId) return;
+
+        // Validation
+        const targetStageId = form.stage_id || stageId;
+        if (!targetStageId) {
+            toast.error(t('الرجاء اختيار المرحلة', 'Please select a stage'));
+            return;
+        }
+
+        if (!form.title_ar.trim()) {
+            toast.error(t('الرجاء إدخال اسم المادة', 'Please enter subject name'));
+            return;
+        }
 
         setSubmitting(true);
 
         try {
             if (editingSubject) {
-                // Update
-                const { error } = await supabase.from('subjects').update({
-                    title_ar: form.title_ar,
-                    title_en: form.title_en || null,
-                    description_ar: form.description_ar || null,
-                    description_en: form.description_en || null,
-                    sort_order: form.sort_order,
-                    is_active: form.is_active,
-                }).eq('id', editingSubject.id);
+                // Update with verification
+                const result = await verifiedUpdate(
+                    'subjects',
+                    editingSubject.id,
+                    {
+                        stage_id: targetStageId, // Allow moving to another stage if needed
+                        title_ar: form.title_ar,
+                        title_en: form.title_en || null,
+                        description_ar: form.description_ar || null,
+                        description_en: form.description_en || null,
+                        sort_order: form.sort_order,
+                        is_active: form.is_active,
+                    },
+                    {
+                        successMessage: { ar: 'تم تحديث المادة بنجاح', en: 'Subject updated successfully' },
+                        errorMessage: { ar: 'فشل في تحديث المادة', en: 'Failed to update subject' },
+                    }
+                );
 
-                if (error) {
-                    toast.error(t('فشل في تحديث المادة', 'Failed to update subject'), { description: error.message });
-                } else {
-                    toast.success(t('تم تحديث المادة بنجاح', 'Subject updated successfully'));
+                if (result.success) {
                     setDialogOpen(false);
-                    clearCache(`admin-subjects-${levelId}`);
-                    fetchData();
+                    fetchData(); // This only refreshes current view. If we added to another stage, it won't show.
                 }
             } else {
-                // Create
-                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-                const { error } = await supabase.from('subjects').insert({
-                    level_id: levelId,
-                    title_ar: form.title_ar,
-                    title_en: form.title_en || null,
-                    description_ar: form.description_ar || null,
-                    description_en: form.description_en || null,
-                    slug,
-                    sort_order: form.sort_order,
-                    is_active: form.is_active,
-                });
+                // Create with verification
+                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0621-\u064A-]/g, '');
 
-                if (error) {
-                    toast.error(t('فشل في إضافة المادة', 'Failed to add subject'), { description: error.message });
-                } else {
-                    toast.success(t('تمت إضافة المادة بنجاح', 'Subject added successfully'));
+                const result = await verifiedInsert(
+                    'subjects',
+                    {
+                        stage_id: targetStageId,
+                        title_ar: form.title_ar,
+                        title_en: form.title_en || null,
+                        description_ar: form.description_ar || null,
+                        description_en: form.description_en || null,
+                        slug,
+                        sort_order: form.sort_order,
+                        is_active: form.is_active,
+                    },
+                    {
+                        successMessage: { ar: 'تمت إضافة المادة بنجاح', en: 'Subject added successfully' },
+                        errorMessage: { ar: 'فشل في إضافة المادة', en: 'Failed to add subject' },
+                    }
+                );
+
+                if (result.success) {
                     setDialogOpen(false);
-                    clearCache(`admin-subjects-${levelId}`);
-                    fetchData();
+                    if (!stageId) {
+                        navigate(`/admin/stages/${targetStageId}/subjects`);
+                    } else if (targetStageId === stageId) {
+                        fetchData();
+                    }
                 }
             }
         } catch (err) {
-            toast.error(t('حدث خطأ', 'An error occurred'));
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Delete
+    // Delete with verification
     const handleDelete = async () => {
         if (!deleteTarget) return;
         setSubmitting(true);
 
         try {
-            const { error } = await supabase.from('subjects').delete().eq('id', deleteTarget.id);
+            const result = await verifiedDelete(
+                'subjects',
+                deleteTarget.id,
+                {
+                    successMessage: { ar: 'تم حذف المادة بنجاح', en: 'Subject deleted successfully' },
+                    errorMessage: { ar: 'فشل في حذف المادة', en: 'Failed to delete subject' },
+                }
+            );
 
-            if (error) {
-                toast.error(t('فشل في حذف المادة', 'Failed to delete subject'), { description: error.message });
-            } else {
-                toast.success(t('تم حذف المادة بنجاح', 'Subject deleted successfully'));
-                clearCache(`admin-subjects-${levelId}`);
+            if (result.success) {
                 fetchData();
             }
         } catch (err) {
-            toast.error(t('حدث خطأ', 'An error occurred'));
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
         } finally {
             setDeleteTarget(null);
             setSubmitting(false);
         }
+    };
+
+    // Navigate to lessons
+    const handleSubjectClick = (subject: Subject) => {
+        navigate(`/admin/subjects/${subject.id}/lessons`);
     };
 
     return (
@@ -257,9 +315,9 @@ export default function SubjectsManagement() {
                 >
                     {t('المراحل', 'Stages')}
                 </button>
-                <ArrowRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4" />
                 <span className="text-foreground">
-                    {level ? t(level.title_ar, level.title_en || level.title_ar) : '...'}
+                    {stage ? t(stage.title_ar, stage.title_en || stage.title_ar) : '...'}
                 </span>
             </div>
 
@@ -270,7 +328,7 @@ export default function SubjectsManagement() {
                         {t('المواد الدراسية', 'Subjects')}
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        {level && t(`المواد في مرحلة ${level.title_ar}`, `Subjects in ${level.title_en || level.title_ar}`)}
+                        {stage && t(`المواد في مرحلة ${stage.title_ar}`, `Subjects in ${stage.title_en || stage.title_ar}`)}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -287,8 +345,21 @@ export default function SubjectsManagement() {
                 </div>
             </div>
 
+            {/* Empty State for no Stage ID */}
+            {!stageId && (
+                <div className="p-12 text-center rounded-lg border border-border bg-background mb-6">
+                    <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                        {t('يرجى اختيار مرحلة لعرض المواد', 'Please select a stage to view subjects')}
+                    </h3>
+                    <Button variant="outline" onClick={() => navigate('/admin/stages')}>
+                        {t('الذهاب للمراحل', 'Go to Stages')}
+                    </Button>
+                </div>
+            )}
+
             {/* Error State */}
-            {error && (
+            {stageId && error && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
                     <div className="flex items-center gap-3">
                         <AlertCircle className="w-5 h-5 text-destructive" />
@@ -305,77 +376,82 @@ export default function SubjectsManagement() {
             )}
 
             {/* Table */}
-            <div className="bg-background rounded-lg border border-border overflow-hidden">
-                {loading ? (
-                    <div className="p-8 text-center">
-                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-                    </div>
-                ) : subjects.length === 0 && !isDummy ? (
-                    <div className="p-12 text-center">
-                        <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-foreground mb-2">
-                            {t('لا توجد مواد', 'No subjects')}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            {t('ابدأ بإضافة أول مادة دراسية', 'Start by adding the first subject')}
-                        </p>
-                        <Button onClick={handleAdd}>
-                            <Plus className="w-4 h-4 me-2" />
-                            {t('إضافة مادة', 'Add Subject')}
-                        </Button>
-                    </div>
-                ) : (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-12">#</TableHead>
-                                <TableHead>{t('اسم المادة', 'Subject Name')}</TableHead>
-                                <TableHead>{t('المعرّف', 'Slug')}</TableHead>
-                                <TableHead>{t('الحالة', 'Status')}</TableHead>
-                                <TableHead className="w-[100px]"></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {subjects.map((subject, index) => (
-                                <TableRow key={subject.id}>
-                                    <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                                    <TableCell>
-                                        <div>
-                                            <p className="font-medium text-foreground">{subject.title_ar}</p>
-                                            {subject.title_en && (
-                                                <p className="text-sm text-muted-foreground">{subject.title_en}</p>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground font-mono">
-                                        {subject.slug}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={subject.is_active ? 'default' : 'secondary'}>
-                                            {subject.is_active ? t('مفعّل', 'Active') : t('معطّل', 'Inactive')}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-1">
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(subject)}>
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => setDeleteTarget(subject)}
-                                                className="text-destructive hover:text-destructive"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
+            {stageId && (
+                <div className="bg-background rounded-lg border border-border overflow-hidden">
+                    {loading ? (
+                        <div className="p-8 text-center">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                        </div>
+                    ) : subjects.length === 0 && !isDummy ? (
+                        <div className="p-12 text-center">
+                            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-foreground mb-2">
+                                {t('لا توجد مواد', 'No subjects')}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                {t('ابدأ بإضافة أول مادة دراسية', 'Start by adding the first subject')}
+                            </p>
+                            <Button onClick={handleAdd}>
+                                <Plus className="w-4 h-4 me-2" />
+                                {t('إضافة مادة', 'Add Subject')}
+                            </Button>
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-12">#</TableHead>
+                                    <TableHead>{t('اسم المادة', 'Subject Name')}</TableHead>
+                                    <TableHead>{t('المعرّف', 'Slug')}</TableHead>
+                                    <TableHead>{t('الحالة', 'Status')}</TableHead>
+                                    <TableHead className="w-[150px]">{t('الإجراءات', 'Actions')}</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
-            </div>
+                            </TableHeader>
+                            <TableBody>
+                                {subjects.map((subject, index) => (
+                                    <TableRow key={subject.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleSubjectClick(subject)}>
+                                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                                        <TableCell>
+                                            <div>
+                                                <p className="font-medium text-foreground">{subject.title_ar}</p>
+                                                {subject.title_en && (
+                                                    <p className="text-sm text-muted-foreground">{subject.title_en}</p>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-sm text-muted-foreground font-mono">
+                                            {subject.slug}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={subject.is_active ? 'default' : 'secondary'}>
+                                                {subject.is_active ? t('مفعّل', 'Active') : t('معطّل', 'Inactive')}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(subject)}>
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => setDeleteTarget(subject)}
+                                                    className="text-destructive hover:text-destructive"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" onClick={() => handleSubjectClick(subject)}>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </div>
+            )}
 
             {/* Add/Edit Dialog */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -388,6 +464,27 @@ export default function SubjectsManagement() {
                         </DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSave} className="space-y-4 mt-4">
+                        {!stageId && (
+                            <div className="space-y-2">
+                                <Label>{t('المرحلة الدراسية', 'Educational Stage')} *</Label>
+                                <Select
+                                    value={form.stage_id}
+                                    onValueChange={(value) => setForm({ ...form, stage_id: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={t('اختر مرحلة', 'Select Stage')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allStages.map((s) => (
+                                            <SelectItem key={s.id} value={s.id}>
+                                                {s.title_ar}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <Label htmlFor="title_ar">{t('الاسم بالعربية', 'Arabic Name')} *</Label>
                             <Input
@@ -399,7 +496,16 @@ export default function SubjectsManagement() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="title_en">{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="title_en">{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                                <TranslationButton
+                                    sourceText={form.title_ar}
+                                    sourceLang="ar"
+                                    targetLang="en"
+                                    onTranslated={(text) => setForm({ ...form, title_en: text })}
+                                    label="Auto EN"
+                                />
+                            </div>
                             <Input
                                 id="title_en"
                                 value={form.title_en}
@@ -417,7 +523,16 @@ export default function SubjectsManagement() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="description_en">{t('الوصف بالإنجليزية', 'English Description')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="description_en">{t('الوصف بالإنجليزية', 'English Description')}</Label>
+                                <TranslationButton
+                                    sourceText={form.description_ar}
+                                    sourceLang="ar"
+                                    targetLang="en"
+                                    onTranslated={(text) => setForm({ ...form, description_en: text })}
+                                    label="Auto EN"
+                                />
+                            </div>
                             <Input
                                 id="description_en"
                                 value={form.description_en}
@@ -475,8 +590,8 @@ export default function SubjectsManagement() {
                         <AlertDialogTitle>{t('تأكيد الحذف', 'Confirm Delete')}</AlertDialogTitle>
                         <AlertDialogDescription>
                             {t(
-                                `هل أنت متأكد من حذف المادة "${deleteTarget?.title_ar}"؟`,
-                                `Are you sure you want to delete "${deleteTarget?.title_en || deleteTarget?.title_ar}"?`
+                                `هل أنت متأكد من حذف المادة "${deleteTarget?.title_ar}"؟ سيتم حذف جميع الدروس المرتبطة بها.`,
+                                `Are you sure you want to delete "${deleteTarget?.title_en || deleteTarget?.title_ar}"? All related lessons will be deleted.`
                             )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>

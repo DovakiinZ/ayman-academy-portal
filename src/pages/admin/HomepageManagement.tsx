@@ -87,31 +87,43 @@ export default function HomepageManagement() {
     };
 
     const fetchFeaturedSubjects = async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('home_featured_subjects')
             .select(`
                 *,
-                subject:subjects(id, title_ar, title_en, level:levels(title_ar, title_en))
+                subject:subjects(id, title_ar, title_en, stage:stages(title_ar, title_en))
             `)
             .order('home_order', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching featured subjects:', error);
+            toast.error(t('خطأ في جلب المواد المميزة', 'Error fetching featured subjects'));
+        }
+
         setFeaturedSubjects(data || []);
     };
 
     const fetchFeaturedLessons = async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('home_featured_lessons')
             .select(`
                 *,
-                lesson:lessons(id, title_ar, title_en, course:courses(title_ar, title_en))
+                lesson:lessons(id, title_ar, title_en, subject:subjects(title_ar, title_en))
             `)
             .order('home_order', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching featured lessons:', error);
+            toast.error(t('خطأ في جلب الدروس المميزة', 'Error fetching featured lessons'));
+        }
+
         setFeaturedLessons(data || []);
     };
 
     const fetchAllSubjects = async () => {
         const { data } = await supabase
             .from('subjects')
-            .select('id, title_ar, title_en, level:levels(title_ar, title_en)')
+            .select('id, title_ar, title_en, stage:stages(title_ar, title_en)')
             .eq('is_active', true)
             .order('title_ar');
         setAllSubjects(data as any || []);
@@ -120,7 +132,7 @@ export default function HomepageManagement() {
     const fetchAllLessons = async () => {
         const { data } = await supabase
             .from('lessons')
-            .select('id, title_ar, title_en, course:courses(title_ar, title_en)')
+            .select('id, title_ar, title_en, subject:subjects(title_ar, title_en)')
             .order('title_ar')
             .limit(100);
         setAllLessons(data as any || []);
@@ -568,7 +580,7 @@ export default function HomepageManagement() {
                                         <div className="flex-1">
                                             <p className="font-medium">{item.lesson?.title_ar}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {item.lesson?.course?.title_ar} • {item.teaser_ar || t('لا يوجد وصف', 'No teaser')}
+                                                {item.lesson?.subject?.title_ar} • {item.teaser_ar || t('لا يوجد وصف', 'No teaser')}
                                             </p>
                                         </div>
 
@@ -760,7 +772,7 @@ export default function HomepageManagement() {
                                 ))}
                                 {activeTab === 'lessons' && allLessons.map(lesson => (
                                     <option key={lesson.id} value={lesson.id}>
-                                        {lesson.title_ar} - {(lesson as any).course?.title_ar}
+                                        {lesson.title_ar} - {(lesson as any).subject?.title_ar}
                                     </option>
                                 ))}
                             </select>

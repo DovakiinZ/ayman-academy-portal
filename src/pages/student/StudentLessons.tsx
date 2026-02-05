@@ -32,12 +32,12 @@ export default function StudentLessons() {
             setLoading(true);
             setError(null);
 
-            // Fetch subject with level info
+            // Fetch subject with stage info
             const { data: subjectData, error: subjectError } = await supabase
                 .from('subjects')
                 .select(`
                     *,
-                    level:levels(*)
+                    stage:stages(*)
                 `)
                 .eq('id', subjectId)
                 .single();
@@ -63,26 +63,8 @@ export default function StudentLessons() {
                 // Fallback to dummy data
                 setLessons(dummyLessons as unknown as Lesson[]);
                 setIsDummy(true);
-            } else if (lessonsData && lessonsData.length > 0) {
-                setLessons(lessonsData as Lesson[]);
-                setIsDummy(false);
             } else {
-                // No lessons, try course-based lessons (backward compatibility)
-                const { data: courseLessons } = await supabase
-                    .from('lessons')
-                    .select(`
-                        *,
-                        course:courses!inner(subject_id)
-                    `)
-                    .eq('course.subject_id', subjectId)
-                    .eq('is_published', true)
-                    .order('order_index', { ascending: true });
-
-                if (courseLessons && courseLessons.length > 0) {
-                    setLessons(courseLessons as Lesson[]);
-                } else {
-                    setLessons([]);
-                }
+                setLessons(lessonsData as Lesson[] || []);
                 setIsDummy(false);
             }
         } catch (err) {
@@ -140,7 +122,7 @@ export default function StudentLessons() {
                 </Button>
                 <div className="flex-1">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <span>{t(subject.level?.title_ar || '', subject.level?.title_en || '')}</span>
+                        <span>{t(subject.stage?.title_ar || '', subject.stage?.title_en || '')}</span>
                         <span>•</span>
                         <span>{t(subject.title_ar, subject.title_en || subject.title_ar)}</span>
                     </div>

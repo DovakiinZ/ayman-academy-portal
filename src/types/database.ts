@@ -5,6 +5,7 @@
 export type UserRole = 'super_admin' | 'teacher' | 'student';
 export type LanguagePref = 'ar' | 'en';
 export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
+export type ContentItemType = 'video' | 'article' | 'image' | 'file' | 'link';
 
 export interface Profile {
     id: string;
@@ -14,7 +15,13 @@ export interface Profile {
     avatar_url?: string;
     language_pref?: LanguagePref;
     is_active: boolean;
-    created_at?: string;
+    // Teacher-specific fields
+    bio_ar?: string | null;
+    bio_en?: string | null;
+    show_on_home?: boolean;
+    home_order?: number;
+    expertise_tags_ar?: string[];
+    created_at: string;
     updated_at?: string;
 }
 
@@ -30,19 +37,26 @@ export interface TeacherInvite {
     created_at: string;
 }
 
+// Stage (formerly Level) - تمهيدي/ابتدائي/متوسط
 export interface Stage {
     id: string;
     slug: string;
     title_ar: string;
     title_en: string | null;
+    description_ar?: string | null;
+    description_en?: string | null;
     sort_order: number;
     is_active: boolean;
     created_at: string;
 }
 
+// Alias for backward compatibility
+export type Level = Stage;
+
 export interface Subject {
     id: string;
     stage_id: string;
+    slug?: string;
     title_ar: string;
     title_en: string | null;
     description_ar: string | null;
@@ -57,6 +71,7 @@ export interface Subject {
 export interface Lesson {
     id: string;
     subject_id: string;
+    slug?: string;
     title_ar: string;
     title_en: string | null;
     summary_ar: string | null;
@@ -64,8 +79,14 @@ export interface Lesson {
     order_index: number;
     is_published: boolean;
     is_paid: boolean;
-    created_by: string;
+    created_by: string | null;
     created_at: string;
+    video_url?: string | null;
+    // Legacy fields for backward compatibility
+    preview_video_url?: string | null;
+    full_video_url?: string | null;
+    duration_seconds?: number | null;
+    is_free_preview?: boolean;
     // Joins
     subject?: Subject;
     content_items?: LessonContentItem[];
@@ -74,7 +95,7 @@ export interface Lesson {
 export interface LessonContentItem {
     id: string;
     lesson_id: string;
-    type: 'video' | 'article' | 'image' | 'file' | 'link';
+    type: ContentItemType;
     title_ar: string | null;
     title_en: string | null;
     body_ar: string | null;
@@ -93,8 +114,10 @@ export interface SystemSetting {
 }
 
 export interface ContentTemplate {
+    id?: string;
     key: string;
     category: string | null;
+    description?: string | null;
     content_ar: string | null;
     content_en: string | null;
     updated_at: string;
@@ -109,7 +132,6 @@ export interface LessonComment {
     created_at: string;
     updated_at: string;
     user?: Profile;
-    // replies?: LessonComment[]; // Recursive if needed
 }
 
 export interface LessonRating {
@@ -131,7 +153,6 @@ export interface LessonProgress {
     last_position_seconds: number;
     completed_at: string | null;
     updated_at: string;
-    // Join
     lesson?: Lesson;
 }
 
@@ -167,7 +188,6 @@ export interface AuditLog {
     created_at: string;
 }
 
-// Quizzes (Simplified or Optional - Keeping definitions if table logic persists or is rebuilt)
 export interface Quiz {
     id: string;
     lesson_id: string | null;
@@ -176,6 +196,28 @@ export interface Quiz {
     passing_score: number;
     attempts_allowed: number;
     created_at: string;
+}
+
+export interface HomeFeaturedSubject {
+    id: string;
+    subject_id: string;
+    home_order: number;
+    is_visible: boolean;
+    teaser_ar?: string | null;
+    teaser_en?: string | null;
+    created_at: string;
+    subject?: Subject;
+}
+
+export interface HomeFeaturedLesson {
+    id: string;
+    lesson_id: string;
+    home_order: number;
+    is_visible: boolean;
+    teaser_ar?: string | null;
+    teaser_en?: string | null;
+    created_at: string;
+    lesson?: Lesson;
 }
 
 // Database helper type
@@ -236,6 +278,16 @@ export type Database = {
                 Row: LessonNote;
                 Insert: Partial<LessonNote>;
                 Update: Partial<LessonNote>;
+            };
+            home_featured_subjects: {
+                Row: HomeFeaturedSubject;
+                Insert: Partial<HomeFeaturedSubject>;
+                Update: Partial<HomeFeaturedSubject>;
+            };
+            home_featured_lessons: {
+                Row: HomeFeaturedLesson;
+                Insert: Partial<HomeFeaturedLesson>;
+                Update: Partial<HomeFeaturedLesson>;
             };
             messages: {
                 Row: Message;

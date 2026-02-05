@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
-import { dummyLevels, getDummySubjectsForLevel } from '@/data/dummy';
-import type { Level, Subject } from '@/types/database';
+import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
+import { TranslationButton } from '@/components/admin/TranslationButton';
+import { dummyStages, getDummySubjectsForStage } from '@/data/dummy';
+import type { Stage } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +35,7 @@ import {
 import { Loader2, Plus, MoreVertical, Pencil, Trash2, BookOpen, GraduationCap, RefreshCw, AlertCircle, Layers, Beaker } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface LevelWithSubjectCount extends Level {
+interface StageWithSubjectCount extends Stage {
     subjectCount?: number;
 }
 
@@ -44,15 +45,15 @@ export default function TaxonomyManagement() {
     const mountedRef = useRef(true);
 
     // State
-    const [levels, setLevels] = useState<LevelWithSubjectCount[]>([]);
+    const [stages, setStages] = useState<StageWithSubjectCount[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isDummy, setIsDummy] = useState(false);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingLevel, setEditingLevel] = useState<Level | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<Level | null>(null);
+    const [editingStage, setEditingStage] = useState<Stage | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Stage | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
     // Form state
@@ -66,59 +67,67 @@ export default function TaxonomyManagement() {
         is_active: true,
     });
 
-    // Fetch levels with subject counts
+    // Fetch stages with subject counts
     const fetchData = async () => {
         if (!mountedRef.current) return;
 
         setLoading(true);
         setError(null);
+        const startTime = Date.now();
+        devLog('Fetching stages...');
 
         try {
-            const { data: levelsData, source, error: levelsError } = await safeFetchSimple(
-                () => supabase.from('levels').select('*').order('sort_order', { ascending: true }),
-                dummyLevels,
-                'admin-levels'
-            );
+            const { data: stagesData, error: stagesError } = await supabase
+                .from('stages')
+                .select('*')
+                .order('sort_order', { ascending: true });
 
             if (!mountedRef.current) return;
 
-            if (levelsError) {
-                setError(levelsError);
+            if (stagesError) {
+                devLog('Stages fetch error', stagesError);
+                setError(stagesError.message);
+                // STRICT PERSISTENCE
+                setStages([]);
+                return;
             }
 
-            setIsDummy(source === 'dummy');
+            // If no data but no error, it's real (just empty)
+            if (!stagesData || stagesData.length === 0) {
+                devLog('No stages found in database');
+                setStages([]);
+                setIsDummy(false);
+                return;
+            }
+
+            setIsDummy(false);
 
             // Add subject counts
-            const levelsWithCounts: LevelWithSubjectCount[] = [];
-            for (const level of levelsData) {
-                if (source === 'dummy') {
-                    // Use dummy subject counts
-                    levelsWithCounts.push({
-                        ...level,
-                        subjectCount: getDummySubjectsForLevel(level.id).length,
-                    });
-                } else {
-                    // Fetch real subject count
-                    const { count } = await supabase
-                        .from('subjects')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('level_id', level.id);
+            const stagesWithCounts: StageWithSubjectCount[] = [];
+            for (const stage of stagesData as Stage[]) {
+                const { count } = await supabase
+                    .from('subjects')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('stage_id', stage.id);
 
-                    levelsWithCounts.push({
-                        ...level,
-                        subjectCount: count || 0,
-                    });
-                }
+                stagesWithCounts.push({
+                    ...stage,
+                    subjectCount: count || 0,
+                });
             }
 
             if (mountedRef.current) {
-                setLevels(levelsWithCounts);
+                setStages(stagesWithCounts);
+                const duration = Date.now() - startTime;
+                devLog(`Stages loaded in ${duration}ms`, { count: stagesWithCounts.length });
             }
         } catch (err) {
             if (!mountedRef.current) return;
-            setError(err instanceof Error ? err.message : 'Unknown error');
-            setLevels(dummyLevels.map(l => ({ ...l, subjectCount: getDummySubjectsForLevel(l.id).length })));
-            setIsDummy(true);
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            devLog('Stages fetch exception', err);
+            setError(message);
+            // STRICT PERSISTENCE
+            setStages([]);
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
@@ -136,111 +145,132 @@ export default function TaxonomyManagement() {
     }, []);
 
     const handleRetry = () => {
-        clearCache('admin-levels');
         fetchData();
     };
 
     // Open add dialog
     const handleAdd = () => {
-        setEditingLevel(null);
+        setEditingStage(null);
         setForm({
             title_ar: '',
             title_en: '',
             description_ar: '',
             description_en: '',
             slug: '',
-            sort_order: levels.length + 1,
+            sort_order: stages.length + 1,
             is_active: true,
         });
         setDialogOpen(true);
     };
 
     // Open edit dialog
-    const handleEdit = (level: Level) => {
-        setEditingLevel(level);
+    const handleEdit = (stage: Stage) => {
+        setEditingStage(stage);
         setForm({
-            title_ar: level.title_ar,
-            title_en: level.title_en || '',
-            description_ar: level.description_ar || '',
-            description_en: level.description_en || '',
-            slug: level.slug,
-            sort_order: level.sort_order,
-            is_active: level.is_active,
+            title_ar: stage.title_ar,
+            title_en: stage.title_en || '',
+            description_ar: stage.description_ar || '',
+            description_en: stage.description_en || '',
+            slug: stage.slug,
+            sort_order: stage.sort_order,
+            is_active: stage.is_active,
         });
         setDialogOpen(true);
     };
 
-    // Save (create or update)
+    // Save (create or update) with verification
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!form.title_ar.trim()) {
+            toast.error(t('الرجاء إدخال اسم المرحلة', 'Please enter stage name'));
+            return;
+        }
+
         setSubmitting(true);
 
         try {
-            if (editingLevel) {
-                // Update
-                const { error } = await supabase.from('levels').update({
-                    title_ar: form.title_ar,
-                    title_en: form.title_en || null,
-                    description_ar: form.description_ar || null,
-                    description_en: form.description_en || null,
-                    sort_order: form.sort_order,
-                    is_active: form.is_active,
-                }).eq('id', editingLevel.id);
+            if (editingStage) {
+                // Update with verification
+                const result = await verifiedUpdate(
+                    'stages',
+                    editingStage.id,
+                    {
+                        title_ar: form.title_ar,
+                        title_en: form.title_en || null,
+                        description_ar: form.description_ar || null,
+                        description_en: form.description_en || null,
+                        sort_order: form.sort_order,
+                        is_active: form.is_active,
+                    },
+                    {
+                        successMessage: { ar: 'تم تحديث المرحلة بنجاح', en: 'Stage updated successfully' },
+                        errorMessage: { ar: 'فشل في تحديث المرحلة', en: 'Failed to update stage' },
+                    }
+                );
 
-                if (error) {
-                    toast.error(t('فشل في تحديث المرحلة', 'Failed to update level'), { description: error.message });
-                } else {
-                    toast.success(t('تم تحديث المرحلة بنجاح', 'Level updated successfully'));
+                if (result.success) {
                     setDialogOpen(false);
-                    clearCache('admin-levels');
                     fetchData();
                 }
+                // Error toast is handled by verifiedUpdate
             } else {
-                // Create
-                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-');
-                const { error } = await supabase.from('levels').insert({
-                    title_ar: form.title_ar,
-                    title_en: form.title_en || null,
-                    description_ar: form.description_ar || null,
-                    description_en: form.description_en || null,
-                    slug,
-                    sort_order: form.sort_order,
-                    is_active: form.is_active,
-                });
+                // Create with verification
+                const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0621-\u064A-]/g, '');
 
-                if (error) {
-                    toast.error(t('فشل في إضافة المرحلة', 'Failed to add level'), { description: error.message });
-                } else {
-                    toast.success(t('تمت إضافة المرحلة بنجاح', 'Level added successfully'));
+                const result = await verifiedInsert(
+                    'stages',
+                    {
+                        title_ar: form.title_ar,
+                        title_en: form.title_en || null,
+                        description_ar: form.description_ar || null,
+                        description_en: form.description_en || null,
+                        slug,
+                        sort_order: form.sort_order,
+                        is_active: form.is_active,
+                    },
+                    {
+                        successMessage: { ar: 'تمت إضافة المرحلة بنجاح', en: 'Stage added successfully' },
+                        errorMessage: { ar: 'فشل في إضافة المرحلة', en: 'Failed to add stage' },
+                    }
+                );
+
+                if (result.success) {
                     setDialogOpen(false);
-                    clearCache('admin-levels');
                     fetchData();
                 }
+                // Error toast is handled by verifiedInsert
             }
         } catch (err) {
-            toast.error(t('حدث خطأ', 'An error occurred'));
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Delete
+    // Delete with verification
     const handleDelete = async () => {
         if (!deleteTarget) return;
         setSubmitting(true);
 
         try {
-            const { error } = await supabase.from('levels').delete().eq('id', deleteTarget.id);
+            const result = await verifiedDelete(
+                'stages',
+                deleteTarget.id,
+                {
+                    successMessage: { ar: 'تم حذف المرحلة بنجاح', en: 'Stage deleted successfully' },
+                    errorMessage: { ar: 'فشل في حذف المرحلة', en: 'Failed to delete stage' },
+                }
+            );
 
-            if (error) {
-                toast.error(t('فشل في حذف المرحلة', 'Failed to delete level'), { description: error.message });
-            } else {
-                toast.success(t('تم حذف المرحلة بنجاح', 'Level deleted successfully'));
-                clearCache('admin-levels');
+            if (result.success) {
                 fetchData();
             }
+            // Error toast is handled by verifiedDelete
         } catch (err) {
-            toast.error(t('حدث خطأ', 'An error occurred'));
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
         } finally {
             setDeleteTarget(null);
             setSubmitting(false);
@@ -248,12 +278,12 @@ export default function TaxonomyManagement() {
     };
 
     // Navigate to subjects
-    const handleLevelClick = (level: Level) => {
-        navigate(`/admin/stages/${level.id}/subjects`);
+    const handleStageClick = (stage: Stage) => {
+        navigate(`/admin/stages/${stage.id}/subjects`);
     };
 
-    // Level icons with colors
-    const levelIcons: Record<string, { icon: typeof GraduationCap; color: string }> = {
+    // Stage icons with colors
+    const stageIcons: Record<string, { icon: typeof GraduationCap; color: string }> = {
         'kindergarten': { icon: BookOpen, color: 'bg-pink-100 text-pink-600' },
         'primary': { icon: GraduationCap, color: 'bg-blue-100 text-blue-600' },
         'middle': { icon: Layers, color: 'bg-purple-100 text-purple-600' },
@@ -265,7 +295,7 @@ export default function TaxonomyManagement() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-2xl font-semibold text-foreground">
-                        {t('المراحل الدراسية', 'Stages')}
+                        {t('المراحل الدراسية', 'Educational Stages')}
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
                         {t('إدارة المراحل والمواد الدراسية', 'Manage stages and subjects')}
@@ -280,7 +310,7 @@ export default function TaxonomyManagement() {
                     )}
                     <Button onClick={handleAdd}>
                         <Plus className="w-4 h-4 me-2" />
-                        {t('إضافة مرحلة', 'Add Level')}
+                        {t('إضافة مرحلة', 'Add Stage')}
                     </Button>
                 </div>
             </div>
@@ -319,18 +349,18 @@ export default function TaxonomyManagement() {
                 </div>
             )}
 
-            {/* Levels Grid - always show data if available */}
-            {!loading && levels.length > 0 && (
+            {/* Stages Grid - always show data if available */}
+            {!loading && stages.length > 0 && (
                 <div className="grid gap-4 md:grid-cols-3">
-                    {levels.map((level) => {
-                        const iconConfig = levelIcons[level.slug] || { icon: GraduationCap, color: 'bg-gray-100 text-gray-600' };
+                    {stages.map((stage) => {
+                        const iconConfig = stageIcons[stage.slug] || { icon: GraduationCap, color: 'bg-gray-100 text-gray-600' };
                         const Icon = iconConfig.icon;
 
                         return (
                             <div
-                                key={level.id}
+                                key={stage.id}
                                 className="bg-background rounded-lg border border-border p-6 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group relative"
-                                onClick={() => handleLevelClick(level)}
+                                onClick={() => handleStageClick(stage)}
                             >
                                 {/* Actions dropdown */}
                                 <div className="absolute top-3 end-3 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -346,12 +376,12 @@ export default function TaxonomyManagement() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(level); }}>
+                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(stage); }}>
                                                 <Pencil className="w-4 h-4 me-2" />
                                                 {t('تعديل', 'Edit')}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
-                                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(level); }}
+                                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(stage); }}
                                                 className="text-destructive"
                                             >
                                                 <Trash2 className="w-4 h-4 me-2" />
@@ -367,15 +397,15 @@ export default function TaxonomyManagement() {
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-foreground text-lg">
-                                            {t(level.title_ar, level.title_en || level.title_ar)}
+                                            {t(stage.title_ar, stage.title_en || stage.title_ar)}
                                         </h3>
                                         <p className="text-sm text-muted-foreground">
-                                            {level.subjectCount} {t('مواد', 'subjects')}
+                                            {stage.subjectCount} {t('مواد', 'subjects')}
                                         </p>
                                     </div>
                                 </div>
 
-                                {!level.is_active && (
+                                {!stage.is_active && (
                                     <div className="mt-3 text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 inline-block">
                                         {t('غير مفعّل', 'Inactive')}
                                     </div>
@@ -391,18 +421,18 @@ export default function TaxonomyManagement() {
             )}
 
             {/* Empty State - only if not dummy and no data */}
-            {!loading && !isDummy && levels.length === 0 && (
+            {!loading && !isDummy && stages.length === 0 && (
                 <div className="bg-background rounded-lg border border-border p-12 text-center">
                     <Layers className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-foreground mb-2">
-                        {t('لا توجد مراحل دراسية', 'No educational levels')}
+                        {t('لا توجد مراحل دراسية', 'No educational stages')}
                     </h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                        {t('ابدأ بإضافة أول مرحلة دراسية', 'Start by adding the first educational level')}
+                        {t('ابدأ بإضافة أول مرحلة دراسية', 'Start by adding the first educational stage')}
                     </p>
                     <Button onClick={handleAdd}>
                         <Plus className="w-4 h-4 me-2" />
-                        {t('إضافة مرحلة', 'Add Level')}
+                        {t('إضافة مرحلة', 'Add Stage')}
                     </Button>
                 </div>
             )}
@@ -412,9 +442,9 @@ export default function TaxonomyManagement() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            {editingLevel
-                                ? t('تعديل المرحلة', 'Edit Level')
-                                : t('إضافة مرحلة جديدة', 'Add New Level')}
+                            {editingStage
+                                ? t('تعديل المرحلة', 'Edit Stage')
+                                : t('إضافة مرحلة جديدة', 'Add New Stage')}
                         </DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSave} className="space-y-4 mt-4">
@@ -429,7 +459,16 @@ export default function TaxonomyManagement() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="title_en">{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="title_en">{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                                <TranslationButton
+                                    sourceText={form.title_ar}
+                                    sourceLang="ar"
+                                    targetLang="en"
+                                    onTranslated={(text) => setForm({ ...form, title_en: text })}
+                                    label="Auto EN"
+                                />
+                            </div>
                             <Input
                                 id="title_en"
                                 value={form.title_en}
@@ -437,7 +476,34 @@ export default function TaxonomyManagement() {
                                 placeholder="Example: Primary"
                             />
                         </div>
-                        {!editingLevel && (
+                        <div className="space-y-2">
+                            <Label htmlFor="description_ar">{t('الوصف بالعربية', 'Arabic Description')}</Label>
+                            <Input
+                                id="description_ar"
+                                value={form.description_ar || ''}
+                                onChange={(e) => setForm({ ...form, description_ar: e.target.value })}
+                                placeholder={t('وصف المرحلة...', 'Stage description...')}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="description_en">{t('الوصف بالإنجليزية', 'English Description')}</Label>
+                                <TranslationButton
+                                    sourceText={form.description_ar}
+                                    sourceLang="ar"
+                                    targetLang="en"
+                                    onTranslated={(text) => setForm({ ...form, description_en: text })}
+                                    label="Auto EN"
+                                />
+                            </div>
+                            <Input
+                                id="description_en"
+                                value={form.description_en || ''}
+                                onChange={(e) => setForm({ ...form, description_en: e.target.value })}
+                                placeholder="Stage description..."
+                            />
+                        </div>
+                        {!editingStage && (
                             <div className="space-y-2">
                                 <Label htmlFor="slug">{t('المعرّف', 'Slug')}</Label>
                                 <Input
@@ -503,3 +569,4 @@ export default function TaxonomyManagement() {
         </div>
     );
 }
+

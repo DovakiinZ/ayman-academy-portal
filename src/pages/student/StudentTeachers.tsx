@@ -7,14 +7,14 @@ import { Profile } from '@/types/database';
 import { User, BookOpen, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-interface TeacherWithCourses extends Profile {
-    courses_count: number;
+interface TeacherWithLessons extends Profile {
+    lessons_count: number;
 }
 
 export default function StudentTeachers() {
     const { t, direction } = useLanguage();
     const { profile } = useAuth();
-    const [teachers, setTeachers] = useState<TeacherWithCourses[]>([]);
+    const [teachers, setTeachers] = useState<TeacherWithLessons[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -26,25 +26,26 @@ export default function StudentTeachers() {
     const fetchTeachers = async () => {
         if (!profile?.id) return;
 
-        // Get accessible teacher IDs
-        const { data: teacherIds } = await supabase.rpc('get_student_teachers', { p_user_id: profile.id });
+        // Get accessible teacher IDs from RPC (assumes it returns teacher_id)
+        // Note: Arg name must match Database type definition (student_uuid)
+        const { data: teacherIds } = await supabase.rpc('get_student_teachers', { student_uuid: profile.id });
 
         if (teacherIds && teacherIds.length > 0) {
             const { data: teachersData } = await supabase
                 .from('profiles')
                 .select(`
                     *,
-                    courses(count)
+                    lessons(count)
                 `)
                 .in('id', teacherIds.map((t: { teacher_id: string }) => t.teacher_id))
                 .eq('role', 'teacher')
                 .eq('is_active', true);
 
             if (teachersData) {
-                setTeachers(teachersData.map(t => ({
+                setTeachers((teachersData as any[]).map(t => ({
                     ...t,
-                    courses_count: t.courses?.[0]?.count || 0
-                })) as TeacherWithCourses[]);
+                    lessons_count: t.lessons?.[0]?.count || 0
+                })) as unknown as TeacherWithLessons[]);
             }
         }
 
@@ -79,7 +80,7 @@ export default function StudentTeachers() {
                         {t('لا يوجد معلمون متاحون', 'No teachers available')}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                        {t('اشترك في دورة للتواصل مع المعلمين', 'Subscribe to a course to connect with teachers')}
+                        {t('ابدأ بتصفح المواد للتواصل مع المعلمين', 'Start browsing subjects to connect with teachers')}
                     </p>
                 </div>
             ) : (
@@ -116,7 +117,7 @@ export default function StudentTeachers() {
                             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                                 <span className="flex items-center gap-1">
                                     <BookOpen className="w-4 h-4" />
-                                    {teacher.courses_count} {t('دورة', 'courses')}
+                                    {teacher.lessons_count} {t('درس', 'lessons')}
                                 </span>
                             </div>
 
@@ -130,7 +131,7 @@ export default function StudentTeachers() {
                                 </Link>
                                 <Link to={`/student/stages`}>
                                     <Button variant="ghost" size="sm">
-                                        {t('المراحل', 'Stages')}
+                                        {t('تصفح', 'Browse')}
                                         <ChevronIcon className="w-4 h-4 ms-1" />
                                     </Button>
                                 </Link>

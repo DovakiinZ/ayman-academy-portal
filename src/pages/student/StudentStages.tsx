@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { Level, Subject } from '@/types/database';
+import { Stage, Subject } from '@/types/database';
 import { GraduationCap, BookMarked, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
-import { dummyLevels } from '@/data/dummy';
+import { dummyStages } from '@/data/dummy';
 
-interface StageWithSubjects extends Level {
+interface StageWithSubjects extends Stage {
     subjects?: Subject[];
     subjects_count?: number;
 }
@@ -30,7 +30,7 @@ export default function StudentStages() {
             setError(null);
 
             const { data, error: fetchError } = await supabase
-                .from('levels')
+                .from('stages')
                 .select(`
                     *,
                     subjects(id)
@@ -40,23 +40,23 @@ export default function StudentStages() {
 
             if (fetchError) {
                 console.error('[StudentStages] Fetch error:', fetchError);
-                setStages(dummyLevels as StageWithSubjects[]);
+                setStages(dummyStages as StageWithSubjects[]);
                 setIsDummy(true);
                 setError(fetchError.message);
             } else if (data && data.length > 0) {
-                setStages(data.map(s => ({
+                setStages((data as any[]).map(s => ({
                     ...s,
                     subjects_count: s.subjects?.length || 0
                 })) as StageWithSubjects[]);
                 setIsDummy(false);
             } else {
                 // No data, use dummy
-                setStages(dummyLevels as StageWithSubjects[]);
+                setStages(dummyStages as StageWithSubjects[]);
                 setIsDummy(true);
             }
         } catch (err) {
             console.error('[StudentStages] Exception:', err);
-            setStages(dummyLevels as StageWithSubjects[]);
+            setStages(dummyStages as StageWithSubjects[]);
             setIsDummy(true);
             setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {

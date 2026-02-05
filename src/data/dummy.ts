@@ -3,14 +3,14 @@
  * Used when Supabase returns empty/fails
  */
 
-import type { Level, Subject, Course, Lesson, Profile, TeacherInvite } from '@/types/database';
+import type { Stage, Subject, Lesson, Profile, TeacherInvite } from '@/types/database';
 
 // ============================================
-// LEVELS
+// STAGES (formerly Levels)
 // ============================================
-export const dummyLevels: Level[] = [
+export const dummyStages: Stage[] = [
     {
-        id: 'dummy-level-1',
+        id: 'dummy-stage-1',
         slug: 'kindergarten',
         title_ar: 'تمهيدي',
         title_en: 'Kindergarten',
@@ -19,7 +19,7 @@ export const dummyLevels: Level[] = [
         created_at: new Date().toISOString(),
     },
     {
-        id: 'dummy-level-2',
+        id: 'dummy-stage-2',
         slug: 'primary',
         title_ar: 'ابتدائي',
         title_en: 'Primary',
@@ -28,7 +28,7 @@ export const dummyLevels: Level[] = [
         created_at: new Date().toISOString(),
     },
     {
-        id: 'dummy-level-3',
+        id: 'dummy-stage-3',
         slug: 'middle',
         title_ar: 'متوسط',
         title_en: 'Middle School',
@@ -38,24 +38,27 @@ export const dummyLevels: Level[] = [
     },
 ];
 
+// Backward compatibility alias
+export const dummyLevels = dummyStages;
+
 // ============================================
 // SUBJECTS
 // ============================================
 export const dummySubjects: Record<string, Subject[]> = {
-    'dummy-level-1': [
-        { id: 'dummy-subject-1', level_id: 'dummy-level-1', slug: 'arabic', title_ar: 'اللغة العربية', title_en: 'Arabic', sort_order: 1, is_active: true, created_at: new Date().toISOString() },
-        { id: 'dummy-subject-2', level_id: 'dummy-level-1', slug: 'math', title_ar: 'الرياضيات', title_en: 'Math', sort_order: 2, is_active: true, created_at: new Date().toISOString() },
+    'dummy-stage-1': [
+        { id: 'dummy-subject-1', stage_id: 'dummy-stage-1', slug: 'arabic', title_ar: 'اللغة العربية', title_en: 'Arabic', description_ar: null, description_en: null, sort_order: 1, is_active: true, created_at: new Date().toISOString() },
+        { id: 'dummy-subject-2', stage_id: 'dummy-stage-1', slug: 'math', title_ar: 'الرياضيات', title_en: 'Math', description_ar: null, description_en: null, sort_order: 2, is_active: true, created_at: new Date().toISOString() },
     ],
-    'dummy-level-2': [
-        { id: 'dummy-subject-3', level_id: 'dummy-level-2', slug: 'arabic', title_ar: 'اللغة العربية', title_en: 'Arabic', sort_order: 1, is_active: true, created_at: new Date().toISOString() },
-        { id: 'dummy-subject-4', level_id: 'dummy-level-2', slug: 'math', title_ar: 'الرياضيات', title_en: 'Math', sort_order: 2, is_active: true, created_at: new Date().toISOString() },
-        { id: 'dummy-subject-5', level_id: 'dummy-level-2', slug: 'science', title_ar: 'العلوم', title_en: 'Science', sort_order: 3, is_active: true, created_at: new Date().toISOString() },
-        { id: 'dummy-subject-6', level_id: 'dummy-level-2', slug: 'english', title_ar: 'اللغة الإنجليزية', title_en: 'English', sort_order: 4, is_active: true, created_at: new Date().toISOString() },
+    'dummy-stage-2': [
+        { id: 'dummy-subject-3', stage_id: 'dummy-stage-2', slug: 'arabic', title_ar: 'اللغة العربية', title_en: 'Arabic', description_ar: null, description_en: null, sort_order: 1, is_active: true, created_at: new Date().toISOString() },
+        { id: 'dummy-subject-4', stage_id: 'dummy-stage-2', slug: 'math', title_ar: 'الرياضيات', title_en: 'Math', description_ar: null, description_en: null, sort_order: 2, is_active: true, created_at: new Date().toISOString() },
+        { id: 'dummy-subject-5', stage_id: 'dummy-stage-2', slug: 'science', title_ar: 'العلوم', title_en: 'Science', description_ar: null, description_en: null, sort_order: 3, is_active: true, created_at: new Date().toISOString() },
+        { id: 'dummy-subject-6', stage_id: 'dummy-stage-2', slug: 'english', title_ar: 'اللغة الإنجليزية', title_en: 'English', description_ar: null, description_en: null, sort_order: 4, is_active: true, created_at: new Date().toISOString() },
     ],
-    'dummy-level-3': [
-        { id: 'dummy-subject-7', level_id: 'dummy-level-3', slug: 'arabic', title_ar: 'اللغة العربية', title_en: 'Arabic', sort_order: 1, is_active: true, created_at: new Date().toISOString() },
-        { id: 'dummy-subject-8', level_id: 'dummy-level-3', slug: 'math', title_ar: 'الرياضيات', title_en: 'Math', sort_order: 2, is_active: true, created_at: new Date().toISOString() },
-        { id: 'dummy-subject-9', level_id: 'dummy-level-3', slug: 'physics', title_ar: 'الفيزياء', title_en: 'Physics', sort_order: 3, is_active: true, created_at: new Date().toISOString() },
+    'dummy-stage-3': [
+        { id: 'dummy-subject-7', stage_id: 'dummy-stage-3', slug: 'arabic', title_ar: 'اللغة العربية', title_en: 'Arabic', description_ar: null, description_en: null, sort_order: 1, is_active: true, created_at: new Date().toISOString() },
+        { id: 'dummy-subject-8', stage_id: 'dummy-stage-3', slug: 'math', title_ar: 'الرياضيات', title_en: 'Math', description_ar: null, description_en: null, sort_order: 2, is_active: true, created_at: new Date().toISOString() },
+        { id: 'dummy-subject-9', stage_id: 'dummy-stage-3', slug: 'physics', title_ar: 'الفيزياء', title_en: 'Physics', description_ar: null, description_en: null, sort_order: 3, is_active: true, created_at: new Date().toISOString() },
     ],
 };
 
@@ -74,62 +77,12 @@ export const dummyTeacherInvites: Partial<TeacherInvite>[] = [
 ];
 
 // ============================================
-// COURSES
-// ============================================
-export const dummyCourses: Array<Partial<Course> & { teacher?: Partial<Profile>; level?: Partial<Level> }> = [
-    {
-        id: 'dummy-course-1',
-        title_ar: 'أساسيات اللغة العربية',
-        title_en: 'Arabic Basics',
-        slug: 'arabic-basics',
-        description_ar: 'تعلم أساسيات اللغة العربية للمبتدئين',
-        teacher_id: 'dummy-teacher-1',
-        level_id: 'dummy-level-2',
-        is_published: true,
-        is_paid: true,
-        price_amount: 99,
-        created_at: new Date().toISOString(),
-        teacher: { id: 'dummy-teacher-1', full_name: 'أحمد المعلم', email: 'ahmed.teacher@example.com' },
-        level: { id: 'dummy-level-2', title_ar: 'ابتدائي', title_en: 'Primary' },
-    },
-    {
-        id: 'dummy-course-2',
-        title_ar: 'الرياضيات المتقدمة',
-        title_en: 'Advanced Math',
-        slug: 'advanced-math',
-        description_ar: 'دورة شاملة في الرياضيات المتقدمة',
-        teacher_id: 'dummy-teacher-2',
-        level_id: 'dummy-level-3',
-        is_published: true,
-        is_paid: false,
-        created_at: new Date().toISOString(),
-        teacher: { id: 'dummy-teacher-2', full_name: 'فاطمة المعلمة', email: 'fatima.teacher@example.com' },
-        level: { id: 'dummy-level-3', title_ar: 'متوسط', title_en: 'Middle School' },
-    },
-    {
-        id: 'dummy-course-3',
-        title_ar: 'الفيزياء للجميع',
-        title_en: 'Physics for All',
-        slug: 'physics-for-all',
-        description_ar: 'مقدمة في علم الفيزياء',
-        teacher_id: 'dummy-teacher-1',
-        level_id: 'dummy-level-3',
-        is_published: false,
-        is_paid: true,
-        price_amount: 149,
-        created_at: new Date().toISOString(),
-        teacher: { id: 'dummy-teacher-1', full_name: 'أحمد المعلم', email: 'ahmed.teacher@example.com' },
-        level: { id: 'dummy-level-3', title_ar: 'متوسط', title_en: 'Middle School' },
-    },
-];
-
-// ============================================
 // LESSONS
 // ============================================
 export const dummyLessons: Array<Partial<Lesson>> = [
-    { id: 'dummy-lesson-1', course_id: 'dummy-course-1', title_ar: 'الدرس الأول: الحروف الهجائية', title_en: 'Lesson 1: Alphabet', order_index: 1, is_published: true, is_free_preview: true, lesson_type: 'video', created_at: new Date().toISOString() },
-    { id: 'dummy-lesson-2', course_id: 'dummy-course-1', title_ar: 'الدرس الثاني: الحركات', title_en: 'Lesson 2: Vowels', order_index: 2, is_published: true, is_free_preview: false, lesson_type: 'video', created_at: new Date().toISOString() },
-    { id: 'dummy-lesson-3', course_id: 'dummy-course-1', title_ar: 'الدرس الثالث: الكلمات', title_en: 'Lesson 3: Words', order_index: 3, is_published: false, is_free_preview: false, lesson_type: 'article', created_at: new Date().toISOString() },
+    { id: 'dummy-lesson-1', subject_id: 'dummy-subject-1', title_ar: 'الدرس الأول: الحروف الهجائية', title_en: 'Lesson 1: Alphabet', order_index: 1, is_published: true, is_free_preview: true, created_at: new Date().toISOString() },
+    { id: 'dummy-lesson-2', subject_id: 'dummy-subject-1', title_ar: 'الدرس الثاني: الحركات', title_en: 'Lesson 2: Vowels', order_index: 2, is_published: true, is_free_preview: false, created_at: new Date().toISOString() },
+    { id: 'dummy-lesson-3', subject_id: 'dummy-subject-1', title_ar: 'الدرس الثالث: الكلمات', title_en: 'Lesson 3: Words', order_index: 3, is_published: false, is_free_preview: false, created_at: new Date().toISOString() },
 ];
 
 // ============================================
@@ -137,17 +90,23 @@ export const dummyLessons: Array<Partial<Lesson>> = [
 // ============================================
 export const dummyStats = {
     teachers: 3,
-    courses: 3,
+    subjects: 9,
     lessons: 8,
     pendingInvites: 2,
 };
 
 // ============================================
-// HELPER TO GET SUBJECTS FOR A LEVEL
+// HELPER TO GET SUBJECTS FOR A STAGE
 // ============================================
-export function getDummySubjectsForLevel(levelId: string): Subject[] {
+export function getDummySubjectsForStage(stageId: string): Subject[] {
     // Return real dummy subjects or generic ones
-    return dummySubjects[levelId] || [
-        { id: `dummy-subject-${levelId}-1`, level_id: levelId, slug: 'general', title_ar: 'مادة عامة', title_en: 'General Subject', sort_order: 1, is_active: true, created_at: new Date().toISOString() },
+    return dummySubjects[stageId] || [
+        { id: `dummy-subject-${stageId}-1`, stage_id: stageId, slug: 'general', title_ar: 'مادة عامة', title_en: 'General Subject', description_ar: null, description_en: null, sort_order: 1, is_active: true, created_at: new Date().toISOString() },
     ];
 }
+
+// Backward compatibility alias
+export function getDummySubjectsForLevel(levelId: string): Subject[] {
+    return getDummySubjectsForStage(levelId);
+}
+

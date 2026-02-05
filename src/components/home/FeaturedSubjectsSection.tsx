@@ -77,7 +77,7 @@ export default function FeaturedSubjectsSection() {
                     id,
                     title_ar,
                     title_en,
-                    level:levels(id, title_ar, title_en)
+                    stage:stages(id, title_ar, title_en)
                 )
             `)
             .eq('is_visible', true)
@@ -94,8 +94,8 @@ export default function FeaturedSubjectsSection() {
                 title_en: item.subject?.title_en || '',
                 teaser_ar: item.teaser_ar || '',
                 teaser_en: item.teaser_en || '',
-                stage_ar: item.subject?.level?.title_ar || '',
-                stage_en: item.subject?.level?.title_en || '',
+                stage_ar: item.subject?.stage?.title_ar || '',
+                stage_en: item.subject?.stage?.title_en || '',
                 lessons_count: 0, // Would need a separate count query
             }));
             setSubjects(transformed);

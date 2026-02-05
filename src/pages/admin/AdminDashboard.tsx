@@ -5,21 +5,30 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
 import { dummyStats } from '@/data/dummy';
-import { GraduationCap, BookOpen, PlayCircle, UserPlus, AlertCircle, RefreshCw, Beaker } from 'lucide-react';
+import { GraduationCap, BookOpen, PlayCircle, UserPlus, AlertCircle, RefreshCw, Beaker, BookMarked } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AdminStats {
     teachers: number;
-    courses: number;
+    stages: number;
+    subjects: number;
     lessons: number;
     pendingInvites: number;
 }
+
+const initialStats: AdminStats = {
+    teachers: 0,
+    stages: 0,
+    subjects: 0,
+    lessons: 0,
+    pendingInvites: 0,
+};
 
 export default function AdminDashboard() {
     const { user } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
-    const [stats, setStats] = useState<AdminStats>(dummyStats);
+    const [stats, setStats] = useState<AdminStats>(initialStats);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDummy, setIsDummy] = useState(false);
@@ -37,24 +46,44 @@ export default function AdminDashboard() {
 
         try {
             // Fetch all counts in parallel
-            const [teachersResult, coursesResult, lessonsResult, invitesResult] = await Promise.all([
+            const [teachersResult, stagesResult, subjectsResult, lessonsResult, invitesResult] = await Promise.all([
                 safeFetchSimple(
-                    () => supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'teacher'),
+                    async () => {
+                        const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'teacher');
+                        return { data: { count: count ?? 0 }, error };
+                    },
                     { count: dummyStats.teachers },
                     'admin-teachers-count'
                 ),
                 safeFetchSimple(
-                    () => supabase.from('courses').select('id', { count: 'exact', head: true }),
-                    { count: dummyStats.courses },
-                    'admin-courses-count'
+                    async () => {
+                        const { count, error } = await supabase.from('stages').select('*', { count: 'exact', head: true });
+                        return { data: { count: count ?? 0 }, error };
+                    },
+                    { count: 0 },
+                    'admin-stages-count'
                 ),
                 safeFetchSimple(
-                    () => supabase.from('lessons').select('id', { count: 'exact', head: true }),
+                    async () => {
+                        const { count, error } = await supabase.from('subjects').select('*', { count: 'exact', head: true });
+                        return { data: { count: count ?? 0 }, error };
+                    },
+                    { count: 0 },
+                    'admin-subjects-count'
+                ),
+                safeFetchSimple(
+                    async () => {
+                        const { count, error } = await supabase.from('lessons').select('*', { count: 'exact', head: true });
+                        return { data: { count: count ?? 0 }, error };
+                    },
                     { count: dummyStats.lessons },
                     'admin-lessons-count'
                 ),
                 safeFetchSimple(
-                    () => supabase.from('teacher_invites').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+                    async () => {
+                        const { count, error } = await supabase.from('teacher_invites').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+                        return { data: { count: count ?? 0 }, error };
+                    },
                     { count: dummyStats.pendingInvites },
                     'admin-invites-count'
                 ),
@@ -62,25 +91,26 @@ export default function AdminDashboard() {
 
             if (!mountedRef.current) return;
 
-            const isAnyDummy = [teachersResult, coursesResult, lessonsResult, invitesResult].some(r => r.source === 'dummy');
+            const isAnyDummy = [teachersResult, stagesResult, subjectsResult, lessonsResult, invitesResult].some(r => r.source === 'dummy');
             setIsDummy(isAnyDummy);
 
             setStats({
-                teachers: (teachersResult.data as { count?: number }).count ?? dummyStats.teachers,
-                courses: (coursesResult.data as { count?: number }).count ?? dummyStats.courses,
-                lessons: (lessonsResult.data as { count?: number }).count ?? dummyStats.lessons,
-                pendingInvites: (invitesResult.data as { count?: number }).count ?? dummyStats.pendingInvites,
+                teachers: (teachersResult.data as { count?: number }).count ?? 0,
+                stages: (stagesResult.data as { count?: number }).count ?? 0,
+                subjects: (subjectsResult.data as { count?: number }).count ?? 0,
+                lessons: (lessonsResult.data as { count?: number }).count ?? 0,
+                pendingInvites: (invitesResult.data as { count?: number }).count ?? 0,
             });
 
             // Show error only if all failed
-            const errors = [teachersResult.error, coursesResult.error, lessonsResult.error, invitesResult.error].filter(Boolean);
-            if (errors.length === 4) {
+            const errors = [teachersResult.error, stagesResult.error, subjectsResult.error, lessonsResult.error, invitesResult.error].filter(Boolean);
+            if (errors.length === 5) {
                 setError(errors[0] || 'Failed to fetch data');
             }
         } catch (err) {
             if (!mountedRef.current) return;
             setError(err instanceof Error ? err.message : 'Unknown error');
-            setStats(dummyStats);
+            setStats(initialStats);
             setIsDummy(true);
         } finally {
             if (mountedRef.current) {
@@ -113,25 +143,25 @@ export default function AdminDashboard() {
             link: '/admin/teachers',
         },
         {
-            title: t('الدورات', 'Courses'),
-            value: stats.courses,
+            title: t('المراحل', 'Stages'),
+            value: stats.stages,
             icon: BookOpen,
             color: 'bg-green-100 text-green-600',
-            link: '/admin/courses',
+            link: '/admin/stages',
+        },
+        {
+            title: t('المواد', 'Subjects'),
+            value: stats.subjects,
+            icon: BookMarked,
+            color: 'bg-orange-100 text-orange-600',
+            link: '/admin/subjects',
         },
         {
             title: t('الدروس', 'Lessons'),
             value: stats.lessons,
             icon: PlayCircle,
             color: 'bg-purple-100 text-purple-600',
-            link: '/admin/courses',
-        },
-        {
-            title: t('دعوات معلقة', 'Pending Invites'),
-            value: stats.pendingInvites,
-            icon: UserPlus,
-            color: 'bg-amber-100 text-amber-600',
-            link: '/admin/teachers',
+            link: '/admin/lessons',
         },
     ];
 
@@ -212,18 +242,18 @@ export default function AdminDashboard() {
                             <p className="text-xs text-muted-foreground">{t('إضافة معلم جديد للأكاديمية', 'Add a new teacher to the academy')}</p>
                         </div>
                     </Button>
-                    <Button variant="outline" className="justify-start h-auto py-4" onClick={() => navigate('/admin/courses')}>
-                        <BookOpen className="w-5 h-5 me-3" />
+                    <Button variant="outline" className="justify-start h-auto py-4" onClick={() => navigate('/admin/subjects')}>
+                        <BookMarked className="w-5 h-5 me-3" />
                         <div className="text-start">
-                            <p className="font-medium">{t('إضافة دورة', 'Add Course')}</p>
-                            <p className="text-xs text-muted-foreground">{t('إنشاء دورة تعليمية جديدة', 'Create a new educational course')}</p>
+                            <p className="font-medium">{t('إضافة مادة', 'Add Subject')}</p>
+                            <p className="text-xs text-muted-foreground">{t('إنشاء مادة دراسية جديدة', 'Create a new study subject')}</p>
                         </div>
                     </Button>
-                    <Button variant="outline" className="justify-start h-auto py-4" onClick={() => navigate('/admin/taxonomy')}>
+                    <Button variant="outline" className="justify-start h-auto py-4" onClick={() => navigate('/admin/stages')}>
                         <GraduationCap className="w-5 h-5 me-3" />
                         <div className="text-start">
-                            <p className="font-medium">{t('إدارة التصنيفات', 'Manage Taxonomy')}</p>
-                            <p className="text-xs text-muted-foreground">{t('إدارة المراحل والمواد الدراسية', 'Manage levels and subjects')}</p>
+                            <p className="font-medium">{t('إدارة المراحل', 'Manage Stages')}</p>
+                            <p className="text-xs text-muted-foreground">{t('إدارة المراحل الدراسية', 'Manage academic stages')}</p>
                         </div>
                     </Button>
                 </div>
