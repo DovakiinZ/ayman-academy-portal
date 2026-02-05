@@ -4,7 +4,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
-import { dummyStages, getDummySubjectsForStage } from '@/data/dummy';
 import type { Stage, Subject } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,7 +58,6 @@ export default function SubjectsManagement() {
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -134,12 +132,16 @@ export default function SubjectsManagement() {
 
             if (subjectsError) {
                 setError(subjectsError.message);
+                toast.error('فشل في تحميل المواد', { description: subjectsError.message });
             } else {
                 setSubjects((subjectsData as Subject[]) || []);
             }
         } catch (err) {
-            // ... catch logic ...
-            if (mountedRef.current) setError(err instanceof Error ? err.message : 'Error');
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            if (mountedRef.current) {
+                setError(message);
+                toast.error('حدث خطأ', { description: message });
+            }
         } finally {
             if (mountedRef.current) setLoading(false);
         }
@@ -332,12 +334,6 @@ export default function SubjectsManagement() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {isDummy && !loading && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
-                            <Beaker className="w-3.5 h-3.5" />
-                            {t('بيانات تجريبية', 'Demo Data')}
-                        </div>
-                    )}
                     <Button onClick={handleAdd}>
                         <Plus className="w-4 h-4 me-2" />
                         {t('إضافة مادة', 'Add Subject')}
@@ -382,7 +378,7 @@ export default function SubjectsManagement() {
                         <div className="p-8 text-center">
                             <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                         </div>
-                    ) : subjects.length === 0 && !isDummy ? (
+                    ) : subjects.length === 0 ? (
                         <div className="p-12 text-center">
                             <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                             <h3 className="text-lg font-medium text-foreground mb-2">

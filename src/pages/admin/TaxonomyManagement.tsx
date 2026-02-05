@@ -4,7 +4,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
-import { dummyStages, getDummySubjectsForStage } from '@/data/dummy';
 import type { Stage } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +47,6 @@ export default function TaxonomyManagement() {
     const [stages, setStages] = useState<StageWithSubjectCount[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -87,7 +85,7 @@ export default function TaxonomyManagement() {
             if (stagesError) {
                 devLog('Stages fetch error', stagesError);
                 setError(stagesError.message);
-                // STRICT PERSISTENCE
+                toast.error('فشل في تحميل المراحل', { description: stagesError.message });
                 setStages([]);
                 return;
             }
@@ -96,11 +94,8 @@ export default function TaxonomyManagement() {
             if (!stagesData || stagesData.length === 0) {
                 devLog('No stages found in database');
                 setStages([]);
-                setIsDummy(false);
                 return;
             }
-
-            setIsDummy(false);
 
             // Add subject counts
             const stagesWithCounts: StageWithSubjectCount[] = [];
@@ -126,7 +121,7 @@ export default function TaxonomyManagement() {
             const message = err instanceof Error ? err.message : 'Unknown error';
             devLog('Stages fetch exception', err);
             setError(message);
-            // STRICT PERSISTENCE
+            toast.error('حدث خطأ', { description: message });
             setStages([]);
         } finally {
             if (mountedRef.current) {
@@ -302,12 +297,6 @@ export default function TaxonomyManagement() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {isDummy && !loading && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
-                            <Beaker className="w-3.5 h-3.5" />
-                            {t('بيانات تجريبية', 'Demo Data')}
-                        </div>
-                    )}
                     <Button onClick={handleAdd}>
                         <Plus className="w-4 h-4 me-2" />
                         {t('إضافة مرحلة', 'Add Stage')}
@@ -420,8 +409,8 @@ export default function TaxonomyManagement() {
                 </div>
             )}
 
-            {/* Empty State - only if not dummy and no data */}
-            {!loading && !isDummy && stages.length === 0 && (
+            {/* Empty State */}
+            {!loading && stages.length === 0 && (
                 <div className="bg-background rounded-lg border border-border p-12 text-center">
                     <Layers className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-foreground mb-2">

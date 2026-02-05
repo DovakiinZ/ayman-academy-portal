@@ -13,6 +13,30 @@ import { supabase } from './supabase';
 import { toast } from 'sonner';
 
 // ============================================
+// AUTH CHECK
+// ============================================
+
+export async function checkAuth(): Promise<boolean> {
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (isDev) {
+        console.log('[AdminDB] Auth Check:', {
+            hasSession: !!session,
+            user: session?.user?.email,
+            role: session?.user?.role,
+            expires: session?.expires_at
+        });
+    }
+
+    if (error || !session) {
+        devError('Auth check failed - no session', error);
+        toast.error('غير مسجل الدخول', { description: 'الرجاء تسجيل الدخول للمتابعة' });
+        return false;
+    }
+    return true;
+}
+
+// ============================================
 // TYPES
 // ============================================
 
@@ -58,6 +82,11 @@ export async function verifiedInsert<T extends Record<string, unknown>>(
     data: T,
     options: QueryOptions = {}
 ): Promise<DbResult<T & { id: string }>> {
+    // 0. Check Auth
+    if (!await checkAuth()) {
+        return { data: null, error: 'Not authenticated', success: false };
+    }
+
     const startTime = Date.now();
     devLog(`INSERT into ${table}`, data);
 
@@ -140,6 +169,11 @@ export async function verifiedUpdate<T extends Record<string, unknown>>(
     data: Partial<T>,
     options: QueryOptions = {}
 ): Promise<DbResult<T>> {
+    // 0. Check Auth
+    if (!await checkAuth()) {
+        return { data: null, error: 'Not authenticated', success: false };
+    }
+
     const startTime = Date.now();
     devLog(`UPDATE ${table}/${id}`, data);
 
@@ -231,6 +265,11 @@ export async function verifiedDelete(
     id: string,
     options: QueryOptions = {}
 ): Promise<DbResult<null>> {
+    // 0. Check Auth
+    if (!await checkAuth()) {
+        return { data: null, error: 'Not authenticated', success: false };
+    }
+
     const startTime = Date.now();
     devLog(`DELETE ${table}/${id}`);
 

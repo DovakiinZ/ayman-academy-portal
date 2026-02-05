@@ -3,7 +3,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
-import { dummyTeachers, dummyTeacherInvites } from '@/data/dummy';
 import type { Profile, TeacherInvite } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +54,6 @@ export default function TeachersManagement() {
     const [invites, setInvites] = useState<TeacherInvite[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
 
     // Invite dialog state
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -101,24 +99,17 @@ export default function TeachersManagement() {
 
             if (!mountedRef.current) return;
 
-            if (teachersResult.error && invitesResult.error) {
-                devLog('Both fetches failed', { teachers: teachersResult.error, invites: invitesResult.error });
-                setError(teachersResult.error.message);
-                setTeachers(dummyTeachers as Profile[]);
-                setInvites(dummyTeacherInvites as TeacherInvite[]);
-                setIsDummy(true);
-            } else {
-                setTeachers((teachersResult.data as Profile[]) || []);
-                setInvites((invitesResult.data as TeacherInvite[]) || []);
-                setIsDummy(false);
-
-                if (teachersResult.error) {
-                    devLog('Teachers fetch error', teachersResult.error);
-                }
-                if (invitesResult.error) {
-                    devLog('Invites fetch error', invitesResult.error);
-                }
+            if (teachersResult.error) {
+                devLog('Teachers fetch error', teachersResult.error);
+                toast.error('فشل في تحميل المعلمين', { description: teachersResult.error.message });
             }
+            if (invitesResult.error) {
+                devLog('Invites fetch error', invitesResult.error);
+                toast.error('فشل في تحميل الدعوات', { description: invitesResult.error.message });
+            }
+
+            setTeachers((teachersResult.data as Profile[]) || []);
+            setInvites((invitesResult.data as TeacherInvite[]) || []);
 
             const duration = Date.now() - startTime;
             devLog(`Data loaded in ${duration}ms`, {
@@ -130,9 +121,9 @@ export default function TeachersManagement() {
             const message = err instanceof Error ? err.message : 'Unknown error';
             devLog('Fetch exception', err);
             setError(message);
-            setTeachers(dummyTeachers as Profile[]);
-            setInvites(dummyTeacherInvites as TeacherInvite[]);
-            setIsDummy(true);
+            toast.error('حدث خطأ', { description: message });
+            setTeachers([]);
+            setInvites([]);
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
@@ -385,12 +376,6 @@ export default function TeachersManagement() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {isDummy && !loading && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
-                            <Beaker className="w-3.5 h-3.5" />
-                            {t('بيانات تجريبية', 'Demo Data')}
-                        </div>
-                    )}
                     <Button onClick={() => setInviteDialogOpen(true)}>
                         <UserPlus className="w-4 h-4 me-2" />
                         {t('دعوة معلم', 'Invite Teacher')}
@@ -491,7 +476,7 @@ export default function TeachersManagement() {
                         <div className="p-8 text-center">
                             <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                         </div>
-                    ) : teachers.length === 0 && !isDummy ? (
+                    ) : teachers.length === 0 ? (
                         <div className="p-12 text-center">
                             <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                             <h3 className="text-lg font-medium text-foreground mb-2">

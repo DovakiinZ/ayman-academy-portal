@@ -4,7 +4,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
-import { dummyLessons } from '@/data/dummy';
 import type { Subject, Lesson } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,7 +58,6 @@ export default function LessonsManagement() {
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -122,9 +120,9 @@ export default function LessonsManagement() {
             if (subjectError) {
                 devLog('Subject fetch error', subjectError);
                 setError(subjectError.message);
-                setLessons(dummyLessons.filter(l => l.subject_id === subjectId) as Lesson[]);
-                setIsDummy(true);
-                setLoading(false);
+                toast.error('فشل في تحميل المادة', { description: subjectError.message });
+                setLessons([]);
+                // Do not return here, let finally handle loading=false
                 return;
             }
 
@@ -142,11 +140,10 @@ export default function LessonsManagement() {
             if (lessonsError) {
                 devLog('Lessons fetch error', lessonsError);
                 setError(lessonsError.message);
-                setLessons(dummyLessons.filter(l => l.subject_id === subjectId) as Lesson[]);
-                setIsDummy(true);
+                toast.error('فشل في تحميل الدروس', { description: lessonsError.message });
+                setLessons([]);
             } else {
                 setLessons((lessonsData as Lesson[]) || []);
-                setIsDummy(false);
             }
 
             const duration = Date.now() - startTime;
@@ -156,9 +153,7 @@ export default function LessonsManagement() {
                 const message = err instanceof Error ? err.message : 'Unknown error';
                 devLog('Fetch exception', err);
                 setError(message);
-                // STRICT PERSISTENCE: Do not fall back to dummy data
-                // setLessons(dummyLessons as Lesson[]);
-                // setIsDummy(true);
+                toast.error('حدث خطأ', { description: message });
                 setLessons([]); // Clear list on error
             }
         } finally {
@@ -395,12 +390,6 @@ export default function LessonsManagement() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {isDummy && !loading && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs text-amber-700">
-                            <Beaker className="w-3.5 h-3.5" />
-                            {t('بيانات تجريبية', 'Demo Data')}
-                        </div>
-                    )}
                     <Button onClick={handleAdd}>
                         <Plus className="w-4 h-4 me-2" />
                         {t('إضافة درس', 'Add Lesson')}
@@ -441,7 +430,7 @@ export default function LessonsManagement() {
                     <div className="p-8 text-center">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                     </div>
-                ) : lessons.length === 0 && !isDummy ? (
+                ) : lessons.length === 0 ? (
                     <div className="p-12 text-center">
                         <PlayCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-foreground mb-2">
