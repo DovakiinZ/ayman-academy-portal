@@ -6,33 +6,29 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-
-interface Question {
-    id: string;
-    question_text_ar: string;
-    question_text_en: string;
-    question_type: 'mcq' | 'true_false';
-    options: string[];
-    correct_option_index: number;
-    explanation_ar: string;
-    explanation_en: string;
-}
+import { useParams } from 'react-router-dom';
+import { useSettings } from '@/contexts/SettingsContext';
+import { LessonQuizQuestion } from '@/types/database';
 
 interface QuizPlayerProps {
-    quizId: string;
-    lessonId: string;
+    quizId?: string;
+    lessonId?: string;
 }
 
-export default function QuizPlayer({ quizId }: QuizPlayerProps) {
-    const { t } = useLanguage();
-    const [questions, setQuestions] = useState<Question[]>([]);
+export default function QuizPlayer({ quizId: propQuizId }: QuizPlayerProps) {
+    const { t, direction } = useLanguage();
+    const { get } = useSettings();
+    const params = useParams<{ quizId: string }>();
+    const quizId = propQuizId || params.quizId;
+
+    const [questions, setQuestions] = useState<LessonQuizQuestion[]>([]);
     const [loading, setLoading] = useState(true);
-    const [answers, setAnswers] = useState<Record<string, number>>({});
+    const [answers, setAnswers] = useState<Record<string, string>>({}); // valid question_id -> selected_option_value
     const [submitted, setSubmitted] = useState(false);
     const [score, setScore] = useState(0);
 
     useEffect(() => {
-        fetchQuiz();
+        if (quizId) fetchQuiz();
     }, [quizId]);
 
     const fetchQuiz = async () => {
@@ -41,7 +37,7 @@ export default function QuizPlayer({ quizId }: QuizPlayerProps) {
                 .from('lesson_quiz_questions')
                 .select('*')
                 .eq('quiz_id', quizId)
-                .order('sort_order', { ascending: true });
+                .order('order_index', { ascending: true });
 
             if (error) throw error;
             setQuestions(data || []);
@@ -53,9 +49,9 @@ export default function QuizPlayer({ quizId }: QuizPlayerProps) {
         }
     };
 
-    const handleAnswer = (questionId: string, optionIndex: number) => {
+    const handleAnswer = (questionId: string, value: string) => {
         if (submitted) return;
-        setAnswers(prev => ({ ...prev, [questionId]: optionIndex }));
+        setAnswers(prev => ({ ...prev, [questionId]: value }));
     };
 
     const handleSubmit = () => {
@@ -66,7 +62,7 @@ export default function QuizPlayer({ quizId }: QuizPlayerProps) {
 
         let correctCount = 0;
         questions.forEach(q => {
-            if (answers[q.id] === q.correct_option_index) {
+            if (answers[q.id] === q.correct_answer) {
                 correctCount++;
             }
         });
@@ -98,29 +94,31 @@ export default function QuizPlayer({ quizId }: QuizPlayerProps) {
                 </div>
                 <h2 className="text-3xl font-bold mb-2">{score}%</h2>
                 <p className="text-muted-foreground mb-8">
-                    {score >= 70 ? t('ممتاز! لقد اجتزت الاختبار', 'Excellent! You passed the quiz') : t('حاول مرة أخرى لتحسين نتيجتك', 'Try again to improve your score')}
+                    {score >= get('completion.certificate_threshold_percent', 70) ? t('ممتاز! لقد اجتزت الاختبار', 'Excellent! You passed the quiz') : t('حاول مرة أخرى لتحسين نتيجتك', 'Try again to improve your score')}
                 </p>
 
                 <div className="max-w-2xl mx-auto text-start space-y-6 mb-12">
                     {questions.map((q, idx) => {
-                        const isCorrect = answers[q.id] === q.correct_option_index;
+                        const isCorrect = answers[q.id] === q.correct_answer;
                         return (
-                            <div key={q.id} className={`p-4 rounded-lg border ${isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                            <div key={q.id} className={`p-4 rounded-lg border ${isCorrect ? 'border-green-200 bg-green-50 dark:bg-green-900/20' : 'border-red-200 bg-red-50 dark:bg-red-900/20'}`}>
                                 <div className="flex gap-3">
                                     {isCorrect ? <CheckCircle className="w-5 h-5 text-green-600 shrink-0" /> : <XCircle className="w-5 h-5 text-red-600 shrink-0" />}
-                                    <div>
-                                        <p className="font-medium mb-1">{idx + 1}. {t(q.question_text_ar, q.question_text_en)}</p>
+                                    <div className="flex-1">
+                                        <p className="font-medium mb-1">{idx + 1}. {t(q.question_ar, q.question_en)}</p>
                                         <p className="text-sm text-muted-foreground">
-                                            {t('إجابتك:', 'Your answer:')} {q.options[answers[q.id]]}
+                                            {t('إجابتك:', 'Your answer:')} {answers[q.id]}
                                         </p>
                                         {!isCorrect && (
                                             <p className="text-sm font-medium text-green-700 mt-1">
-                                                {t('الإجابة الصحيحة:', 'Correct answer:')} {q.options[q.correct_option_index]}
+                                                {t('الإجابة الصحيحة:', 'Correct answer:')} {q.correct_answer}
                                             </p>
                                         )}
-                                        <div className="mt-2 text-xs opacity-80">
-                                            {t(q.explanation_ar, q.explanation_en)}
-                                        </div>
+                                        {(q.explanation_ar || q.explanation_en) && (
+                                            <div className="mt-2 text-xs opacity-80 border-t border-current/20 pt-2">
+                                                {t(q.explanation_ar || '', q.explanation_en || q.explanation_ar || '')}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -145,15 +143,15 @@ export default function QuizPlayer({ quizId }: QuizPlayerProps) {
                             {idx + 1}
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-lg font-medium mb-4">{t(q.question_text_ar, q.question_text_en)}</h3>
+                            <h3 className="text-lg font-medium mb-4">{t(q.question_ar, q.question_en)}</h3>
                             <RadioGroup
-                                value={answers[q.id]?.toString()}
-                                onValueChange={(val) => handleAnswer(q.id, parseInt(val))}
+                                value={answers[q.id]}
+                                onValueChange={(val) => handleAnswer(q.id, val)}
                                 className="space-y-3"
                             >
-                                {q.options.map((option, optIdx) => (
+                                {Array.isArray(q.options) && q.options.map((option: string, optIdx: number) => (
                                     <div key={optIdx} className="flex items-center space-x-2 space-x-reverse">
-                                        <RadioGroupItem value={optIdx.toString()} id={`q${q.id}-opt${optIdx}`} />
+                                        <RadioGroupItem value={option} id={`q${q.id}-opt${optIdx}`} />
                                         <Label htmlFor={`q${q.id}-opt${optIdx}`} className="font-normal cursor-pointer flex-1 p-2 rounded hover:bg-secondary/50 transition-colors">
                                             {option}
                                         </Label>

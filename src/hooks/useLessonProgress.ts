@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
+import { useSettings } from '@/contexts/SettingsContext';
+
 export interface LessonProgress {
     id: string;
     lesson_id: string;
@@ -14,6 +16,7 @@ export interface LessonProgress {
 
 export function useLessonProgress(lessonId: string) {
     const { user } = useAuth();
+    const { get } = useSettings();
     const [progress, setProgress] = useState<LessonProgress | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -46,7 +49,7 @@ export function useLessonProgress(lessonId: string) {
     const updateProgress = async (percent: number, positionSeconds: number) => {
         if (!user || !lessonId) return;
 
-        const isCompleted = percent >= 90;
+        const isCompleted = percent >= get('completion.lesson_complete_percent', 90);
         const now = new Date().toISOString();
 
         const updates = {
@@ -61,7 +64,7 @@ export function useLessonProgress(lessonId: string) {
         try {
             const { data, error } = await supabase
                 .from('lesson_progress')
-                .upsert(updates, { onConflict: 'user_id,lesson_id' })
+                .upsert(updates as any, { onConflict: 'user_id,lesson_id' })
                 .select()
                 .single();
 

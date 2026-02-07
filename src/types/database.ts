@@ -77,16 +77,27 @@ export interface Lesson {
     summary_ar: string | null;
     summary_en: string | null;
     order_index: number;
-    is_published: boolean;
     is_paid: boolean;
     created_by: string | null;
     created_at: string;
+    // Metadata
+    objectives_ar?: string | null;
+    objectives_en?: string | null;
+    prerequisites_ar?: string | null;
+    prerequisites_en?: string | null;
+    duration_minutes?: number | null;
+    cover_image_url?: string | null;
     video_url?: string | null;
     // Legacy fields for backward compatibility
     preview_video_url?: string | null;
     full_video_url?: string | null;
     duration_seconds?: number | null;
     is_free_preview?: boolean;
+    // Student Experience fields
+    show_on_home?: boolean;
+    home_order?: number;
+    teaser_ar?: string | null;
+    teaser_en?: string | null;
     // Joins
     subject?: Subject;
     content_items?: LessonContentItem[];
@@ -198,6 +209,64 @@ export interface Quiz {
     created_at: string;
 }
 
+
+
+export type LessonBlockType = 'rich_text' | 'video' | 'image' | 'file' | 'link' | 'tip' | 'warning' | 'example' | 'exercise' | 'qa' | 'equation';
+
+export interface LessonSection {
+    id: string;
+    lesson_id: string;
+    title_ar: string;
+    title_en: string | null;
+    order_index: number;
+    created_at: string;
+    // Joins
+    blocks?: LessonBlock[];
+}
+
+export interface LessonBlock {
+    id: string;
+    lesson_id: string;
+    section_id: string | null;
+    type: LessonBlockType;
+    title_ar: string | null;
+    title_en: string | null;
+    content_ar: string | null;
+    content_en: string | null;
+    url: string | null;
+    metadata: Record<string, any> | null;
+    order_index: number;
+    is_published: boolean;
+    created_at: string;
+}
+
+export type QuizQuestionType = 'mcq' | 'true_false' | 'multi_select';
+
+export interface LessonQuiz {
+    id: string;
+    lesson_id: string;
+    is_enabled: boolean;
+    unlock_after_percent: number;
+    passing_score: number;
+    created_at: string;
+    // Joins
+    questions?: LessonQuizQuestion[];
+}
+
+export interface LessonQuizQuestion {
+    id: string;
+    quiz_id: string;
+    type: QuizQuestionType;
+    question_ar: string;
+    question_en: string | null;
+    options: any[]; // JSONB
+    correct_answer: any; // JSONB
+    explanation_ar: string | null;
+    explanation_en: string | null;
+    order_index: number;
+    created_at: string;
+}
+
 export interface HomeFeaturedSubject {
     id: string;
     subject_id: string;
@@ -303,6 +372,26 @@ export type Database = {
                 Row: TeacherInvite;
                 Insert: Partial<TeacherInvite>;
                 Update: Partial<TeacherInvite>;
+            };
+            lesson_sections: {
+                Row: LessonSection;
+                Insert: Partial<LessonSection>;
+                Update: Partial<LessonSection>;
+            };
+            lesson_blocks: {
+                Row: LessonBlock;
+                Insert: Partial<LessonBlock>;
+                Update: Partial<LessonBlock>;
+            };
+            lesson_quizzes: {
+                Row: LessonQuiz;
+                Insert: Partial<LessonQuiz>;
+                Update: Partial<LessonQuiz>;
+            };
+            lesson_quiz_questions: {
+                Row: LessonQuizQuestion;
+                Insert: Partial<LessonQuizQuestion>;
+                Update: Partial<LessonQuizQuestion>;
             };
         };
         Functions: {

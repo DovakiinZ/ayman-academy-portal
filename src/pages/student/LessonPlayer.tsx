@@ -2,16 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { supabase } from '@/lib/supabase';
 import { useLessonProgress } from '@/hooks/useLessonProgress';
-import { Lesson, Subject, LessonContentItem } from '@/types/database';
-import { Loader2, ChevronRight, ChevronLeft, FileText, Download, CheckCircle, BrainCircuit } from 'lucide-react';
+import { Lesson, Subject, LessonContentItem, LessonSection, LessonBlock } from '@/types/database';
+import { Loader2, ChevronRight, ChevronLeft, FileText, Download, CheckCircle, BrainCircuit, Video as VideoIcon, Image as ImageIcon, Lightbulb, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LessonNotes from '@/components/student/LessonNotes';
 import LessonComments from '@/components/student/LessonComments';
 import RatingWidget from '@/components/student/RatingWidget';
 import CourseContentSidebar from '@/components/student/CourseContentSidebar';
 import QuizPlayer from './QuizPlayer';
+import { cn } from '@/lib/utils';
 
 // Helper to extract YouTube ID
 const getYoutubeId = (url: string) => {
@@ -24,11 +26,14 @@ const getYoutubeId = (url: string) => {
 interface LessonWithDetails extends Lesson {
     subject: Subject;
     content_items: LessonContentItem[];
+    sections: LessonSection[];
+    blocks: LessonBlock[];
 }
 
 export default function LessonPlayer() {
     const { id } = useParams();
     const { t, direction } = useLanguage();
+    const { settings } = useSettings();
     const { profile } = useAuth();
     const navigate = useNavigate();
 
@@ -66,7 +71,9 @@ export default function LessonPlayer() {
             .select(`
                 *,
                 subject:subjects(*),
-                content_items:lesson_content_items(*)
+                content_items:lesson_content_items(*),
+                sections:lesson_sections(*),
+                blocks:lesson_blocks(*)
             `)
             .eq('id', id!)
             .eq('is_published', true)
@@ -78,11 +85,21 @@ export default function LessonPlayer() {
             return;
         }
 
-        const typedLesson = lessonData as unknown as LessonWithDetails;
+        const data = lessonData as any;
+        const sortedSections = (data.sections || []).sort((a: any, b: any) => a.order_index - b.order_index);
+        const sortedBlocks = (data.blocks || []).sort((a: any, b: any) => a.order_index - b.order_index);
+
+        const typedLesson = {
+            ...data,
+            sections: sortedSections,
+            blocks: sortedBlocks
+        } as unknown as LessonWithDetails;
+
         setLesson(typedLesson);
 
-        // Find video content
-        // For now, assume video is in content_items or video_url field
+        // Find video content - prioritize blocks video? or keep legacy?
+        // Let's keep legacy top video for now if exists, otherwise check blocks?
+        // Actually, if there are blocks, we probably render them in the content area
         if (typedLesson.video_url) {
             setCurrentVideoUrl(typedLesson.video_url);
         } else if (typedLesson.full_video_url) {
@@ -99,7 +116,7 @@ export default function LessonPlayer() {
             .single();
 
         if (quizData) {
-            setQuizId(quizData.id);
+            setQuizId((quizData as unknown as { id: string }).id);
         }
 
         startTracking();
@@ -171,9 +188,9 @@ export default function LessonPlayer() {
             <div className="flex-1 flex flex-col lg:flex-row h-[calc(100vh-3.5rem)] overflow-hidden">
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col overflow-y-auto bg-background">
-                    {/* Video Container */}
-                    <div className="w-full bg-black aspect-video lg:max-h-[70vh] flex items-center justify-center shrink-0">
-                        {youtubeId ? (
+                    {/* Video Container (Legacy or Hero Video) */}
+                    {youtubeId && (
+                        <div className="w-full bg-black aspect-video lg:max-h-[70vh] flex items-center justify-center shrink-0">
                             <iframe
                                 width="100%"
                                 height="100%"
@@ -184,18 +201,16 @@ export default function LessonPlayer() {
                                 allowFullScreen
                                 className="w-full h-full"
                             ></iframe>
-                        ) : (
-                            <div className="text-white text-center p-4">
-                                <p>{t('لا يوجد فيديو لهذا الدرس', 'No video for this lesson')}</p>
-                            </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Tabs */}
                     <div className="border-b border-border sticky top-0 bg-background z-10 px-4">
                         <div className="flex gap-6 overflow-x-auto">
                             {['overview', 'quiz', 'qa', 'notes', 'reviews'].map((tab) => {
                                 if (tab === 'quiz' && !quizId) return null;
+                                if (tab === 'qa' && settings['ui.enable_comments'] === false) return null;
+                                if (tab === 'reviews' && settings['ui.enable_ratings'] === false) return null;
                                 return (
                                     <button
                                         key={tab}
@@ -205,16 +220,16 @@ export default function LessonPlayer() {
                                             : 'border-transparent text-muted-foreground hover:text-foreground'
                                             }`}
                                     >
-                                        {tab === 'overview' && t('نظرة عامة', 'Overview')}
                                         {tab === 'quiz' && (
                                             <div className="flex items-center gap-1.5">
                                                 <span>{t('الاختبار', 'Quiz')}</span>
                                                 {!isCompleted && <span className="text-[10px] bg-secondary px-1.5 rounded text-muted-foreground">{t('مغلق', 'Locked')}</span>}
                                             </div>
                                         )}
-                                        {tab === 'qa' && t('الأسئلة والنقاش', 'Q&A')}
+                                        {tab === 'qa' && settings['ui.enable_comments'] !== false && t('الأسئلة والنقاش', 'Q&A')}
                                         {tab === 'notes' && t('ملاحظاتي', 'Notes')}
-                                        {tab === 'reviews' && t('التقييمات', 'Reviews')}
+                                        {tab === 'reviews' && settings['ui.enable_ratings'] !== false && t('التقييمات', 'Reviews')}
+                                        {tab === 'overview' && t('الدرس', 'Lesson')}
                                     </button>
                                 );
                             })}
@@ -222,17 +237,23 @@ export default function LessonPlayer() {
                     </div>
 
                     {/* Tab Content */}
-                    <div className="p-4 lg:p-8 max-w-4xl">
+                    <div className="p-4 lg:p-8 max-w-4xl mx-auto w-full">
                         {activeTab === 'overview' && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <div>
-                                    <h2 className="text-2xl font-bold mb-4">{t('حول هذا الدرس', 'About this lesson')}</h2>
-                                    <div className="prose dark:prose-invert max-w-none text-muted-foreground">
-                                        <p className="whitespace-pre-wrap">
-                                            {t(lesson.summary_ar || '', lesson.summary_en || lesson.summary_ar || '')}
-                                        </p>
+                                {/* Blocks Content Renderer */}
+                                {lesson.sections && lesson.sections.length > 0 ? (
+                                    <LessonContentRenderer lesson={lesson} />
+                                ) : (
+                                    /* Legacy Description Fallback */
+                                    <div>
+                                        <h2 className="text-2xl font-bold mb-4">{t('حول هذا الدرس', 'About this lesson')}</h2>
+                                        <div className="prose dark:prose-invert max-w-none text-muted-foreground">
+                                            <p className="whitespace-pre-wrap">
+                                                {t(lesson.summary_ar || '', lesson.summary_en || lesson.summary_ar || '')}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {quizId && (
                                     <div className="bg-secondary/20 border border-border rounded-lg p-6">
@@ -259,7 +280,7 @@ export default function LessonPlayer() {
                                     </div>
                                 )}
 
-                                {/* Resources */}
+                                {/* Resources (Legacy) */}
                                 {resources.length > 0 && (
                                     <div>
                                         <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -316,4 +337,117 @@ export default function LessonPlayer() {
             </div>
         </div>
     );
+}
+
+function LessonContentRenderer({ lesson }: { lesson: LessonWithDetails }) {
+    const { t } = useLanguage();
+
+    // Group blocks by section (including null section)
+    const blocksBySection: Record<string, LessonBlock[]> = {};
+    const unsectionedBlocks: LessonBlock[] = [];
+
+    lesson.blocks.forEach(block => {
+        if (block.section_id) {
+            if (!blocksBySection[block.section_id]) blocksBySection[block.section_id] = [];
+            blocksBySection[block.section_id].push(block);
+        } else {
+            unsectionedBlocks.push(block);
+        }
+    });
+
+    return (
+        <div className="space-y-12">
+            {/* Unsectioned Blocks */}
+            {unsectionedBlocks.length > 0 && (
+                <div className="space-y-6">
+                    {unsectionedBlocks.map(block => (
+                        <BlockDisplay key={block.id} block={block} />
+                    ))}
+                </div>
+            )}
+
+            {/* Sections */}
+            {lesson.sections.map(section => (
+                <div key={section.id} className="space-y-6">
+                    <h2 className="text-xl font-bold border-b border-border pb-2">
+                        {t(section.title_ar, section.title_en || section.title_ar)}
+                    </h2>
+                    <div className="space-y-6">
+                        {(blocksBySection[section.id] || []).map(block => (
+                            <BlockDisplay key={block.id} block={block} />
+                        ))}
+                        {(!blocksBySection[section.id] || blocksBySection[section.id].length === 0) && (
+                            <p className="text-muted-foreground italic text-sm">{t('لا يوجد محتوى في هذا القسم', 'No content in this section')}</p>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function BlockDisplay({ block }: { block: LessonBlock }) {
+    const { t } = useLanguage();
+
+    switch (block.type) {
+        case 'rich_text':
+            return (
+                <div className="prose dark:prose-invert max-w-none">
+                    <p className="whitespace-pre-wrap">{t(block.content_ar || '', block.content_en || block.content_ar || '')}</p>
+                </div>
+            );
+        case 'tip':
+            return (
+                <div className="bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500 p-4 rounded-r-md">
+                    <div className="flex items-center gap-2 mb-1 text-blue-600 font-semibold text-sm">
+                        <Lightbulb className="w-4 h-4" />
+                        {t('نصيحة', 'Tip')}
+                    </div>
+                    <p className="text-sm">{t(block.content_ar || '', block.content_en || block.content_ar || '')}</p>
+                </div>
+            );
+        case 'warning':
+            return (
+                <div className="bg-yellow-50 dark:bg-yellow-950/30 border-l-4 border-yellow-500 p-4 rounded-r-md">
+                    <div className="flex items-center gap-2 mb-1 text-yellow-600 font-semibold text-sm">
+                        <AlertTriangle className="w-4 h-4" />
+                        {t('تنبيه', 'Warning')}
+                    </div>
+                    <p className="text-sm">{t(block.content_ar || '', block.content_en || block.content_ar || '')}</p>
+                </div>
+            );
+        case 'video':
+            // If it's a youtube link, embed it
+            const localYoutubeId = block.url ? getYoutubeId(block.url) : null;
+            if (localYoutubeId) {
+                return (
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                        <iframe
+                            width="100%"
+                            height="100%"
+                            src={`https://www.youtube.com/embed/${localYoutubeId}`}
+                            title="Video player"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            className="w-full h-full"
+                        ></iframe>
+                    </div>
+                )
+            }
+            return (
+                <a href={block.url} target="_blank" rel="noopener" className="block p-4 bg-secondary/20 rounded-lg flex items-center gap-3 hover:bg-secondary/40 transition-colors">
+                    <VideoIcon className="w-6 h-6 text-primary" />
+                    <span className="text-blue-500 underline">{block.url}</span>
+                </a>
+            );
+        case 'image':
+            return (
+                <div className="rounded-lg overflow-hidden my-4">
+                    <img src={block.url} alt="Lesson Content" className="max-w-full h-auto mx-auto rounded-lg shadow-sm" />
+                </div>
+            );
+        default:
+            return null;
+    }
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -260,11 +260,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     return;
                 }
 
+                // Optimization: Ignore session updates if token hasn't changed
+                // This prevents re-renders when switching tabs (which triggers TOKEN_REFRESHED)
+                if (newSession?.access_token === session?.access_token) {
+                    return;
+                }
+
                 setSession(newSession);
                 setUser(newSession?.user ?? null);
 
                 if (newSession?.user && event === 'SIGNED_IN') {
-                    setProfileLoading(true);
+                    // Only show loading state if we don't have a profile or user changed
+                    // This prevents "flashing" or re-mounting when switching tabs (which triggers SIGNED_IN)
+                    const shouldShowLoading = !profile || profile.id !== newSession.user.id;
+
+                    if (shouldShowLoading) {
+                        setProfileLoading(true);
+                    }
+
                     try {
                         const profileData = await fetchProfileWithTimeout(newSession.user.id);
                         if (mounted) {
@@ -276,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             setError(message);
                         }
                     } finally {
-                        if (mounted) setProfileLoading(false);
+                        if (mounted && shouldShowLoading) setProfileLoading(false);
                     }
                 }
 
@@ -381,28 +394,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // RENDER
     // ============================================
 
+    // ============================================
+    // MEMOIZED VALUE
+    // ============================================
+
+    const value = useMemo(() => ({
+        user,
+        profile,
+        session,
+        role,
+        isLoading,
+        profileLoading,
+        error,
+        isAuthenticated,
+        isSuperAdmin,
+        isTeacher,
+        isStudent,
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        updatePassword,
+        redirectByRole,
+        retryProfileFetch,
+        clearError,
+    }), [
+        user,
+        profile,
+        session,
+        role,
+        isLoading,
+        profileLoading,
+        error,
+        isAuthenticated,
+        isSuperAdmin,
+        isTeacher,
+        isStudent,
+        redirectByRole,
+        retryProfileFetch
+    ]);
+
+    // ============================================
+    // RENDER
+    // ============================================
+
     return (
-        <AuthContext.Provider value={{
-            user,
-            profile,
-            session,
-            role,
-            isLoading,
-            profileLoading,
-            error,
-            isAuthenticated,
-            isSuperAdmin,
-            isTeacher,
-            isStudent,
-            signIn,
-            signUp,
-            signOut,
-            resetPassword,
-            updatePassword,
-            redirectByRole,
-            retryProfileFetch,
-            clearError,
-        }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

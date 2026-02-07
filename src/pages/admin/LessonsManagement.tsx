@@ -255,7 +255,7 @@ export default function LessonsManagement() {
                         subject_id: targetSubjectId,
                         title_ar: form.title_ar,
                         title_en: form.title_en || null,
-                        video_url: form.video_url || null,
+                        full_video_url: form.video_url || null,
                         summary_ar: form.summary_ar || null,
                         summary_en: form.summary_en || null,
                         order_index: form.order_index,
@@ -287,7 +287,7 @@ export default function LessonsManagement() {
                         title_ar: form.title_ar,
                         title_en: form.title_en || null,
                         slug,
-                        video_url: form.video_url || null,
+                        full_video_url: form.video_url || null,
                         summary_ar: form.summary_ar || null,
                         summary_en: form.summary_en || null,
                         order_index: form.order_index,
@@ -306,8 +306,11 @@ export default function LessonsManagement() {
 
                 if (result.success) {
                     setDialogOpen(false);
-                    if (!subjectId) {
-                        navigate(`/admin/subjects/${targetSubjectId}/lessons`);
+                    // Navigate to builder if we have the ID
+                    if (result.data) {
+                        // Type assertion might be needed if verifiedInsert is generic
+                        const newLesson = result.data as Lesson;
+                        navigate(`/admin/lessons/${newLesson.id}`);
                     } else {
                         fetchData();
                     }
@@ -520,7 +523,7 @@ export default function LessonsManagement() {
                                             >
                                                 <ArrowDown className="w-4 h-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(lesson)}>
+                                            <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/lessons/${lesson.id}`)}>
                                                 <Pencil className="w-4 h-4" />
                                             </Button>
                                             <Button
