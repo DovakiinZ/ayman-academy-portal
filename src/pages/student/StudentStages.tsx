@@ -17,7 +17,7 @@ export default function StudentStages() {
     const [stages, setStages] = useState<StageWithSubjects[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
+
 
     useEffect(() => {
         fetchStages();
@@ -104,13 +104,7 @@ export default function StudentStages() {
                 </p>
             </div>
 
-            {/* Demo Data Badge */}
-            {isDummy && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-                    <AlertCircle className="w-4 h-4" />
-                    {t('يتم عرض بيانات تجريبية', 'Showing demo data')}
-                </div>
-            )}
+
 
             {/* Stages Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

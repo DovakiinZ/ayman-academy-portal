@@ -4,7 +4,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import {
     LayoutDashboard,
     BookOpen,
-    Plus,
     User,
     LogOut,
     Menu,
@@ -17,9 +16,8 @@ import logo from '@/assets/logo.png';
 
 const navItems = [
     { path: '/teacher', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
-    { path: '/teacher/courses', icon: BookOpen, label: { ar: 'دوراتي', en: 'My Courses' } },
+    { path: '/teacher/lessons', icon: BookOpen, label: { ar: 'دروسي', en: 'My Lessons' } },
     { path: '/teacher/quizzes', icon: ClipboardList, label: { ar: 'الاختبارات', en: 'Quizzes' } },
-    { path: '/teacher/courses/new', icon: Plus, label: { ar: 'إنشاء دورة', en: 'Create Course' } },
     { path: '/teacher/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },
 ];
 

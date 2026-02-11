@@ -31,6 +31,7 @@ import StudentDashboard from "./pages/student/StudentDashboard";
 import StudentStages from "./pages/student/StudentStages";
 import StudentSubjects from "./pages/student/StudentSubjects";
 import StudentLessons from "./pages/student/StudentLessons";
+import MySubjects from "./pages/student/MySubjects";
 import StudentTeachers from "./pages/student/StudentTeachers";
 import StudentProfile from "./pages/student/StudentProfile";
 import Messages from "./pages/student/Messages";
@@ -50,6 +51,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 
 import TeacherLayout from "./components/teacher/TeacherLayout";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
+import TeacherLessons from "./pages/teacher/TeacherLessons";
 // import LessonEditor from "./pages/teacher/LessonEditor"; // Deprecated
 import LessonEditor from "./components/admin/lessons/LessonEditor";
 import TeacherProfile from "./pages/teacher/TeacherProfile";
@@ -119,6 +121,7 @@ const App = () => (
                     </ProtectedRoute>
                   }>
                     <Route index element={<TeacherDashboard />} />
+                    <Route path="lessons" element={<TeacherLessons />} />
                     <Route path="lessons/:id" element={<LessonEditor />} />
                     <Route path="profile" element={<TeacherProfile />} />
                   </Route>
@@ -132,6 +135,7 @@ const App = () => (
                     <Route index element={<StudentDashboard />} />
                     <Route path="stages" element={<StudentStages />} />
                     <Route path="stages/:stageId" element={<StudentSubjects />} />
+                    <Route path="subjects" element={<MySubjects />} />
                     <Route path="subjects/:subjectId" element={<StudentLessons />} />
                     <Route path="teachers" element={<StudentTeachers />} />
                     <Route path="messages" element={<Messages />} />

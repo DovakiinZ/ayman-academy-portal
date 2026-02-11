@@ -3,8 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
     LayoutDashboard,
-    GraduationCap,
-    Users,
+    BookOpen,
     MessageSquare,
     User,
     LogOut,
@@ -17,8 +16,7 @@ import logo from '@/assets/logo.png';
 
 const navItems = [
     { path: '/student', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
-    { path: '/student/stages', icon: GraduationCap, label: { ar: 'المراحل', en: 'Stages' } },
-    { path: '/student/teachers', icon: Users, label: { ar: 'المعلمون', en: 'Teachers' } },
+    { path: '/student/subjects', icon: BookOpen, label: { ar: 'موادي', en: 'My Subjects' } },
     { path: '/student/messages', icon: MessageSquare, label: { ar: 'الرسائل', en: 'Messages' } },
     { path: '/student/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },
 ];

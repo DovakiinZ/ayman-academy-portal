@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 import { useSettings } from '@/contexts/SettingsContext';
 
@@ -68,10 +69,15 @@ export function useLessonProgress(lessonId: string) {
                 .select()
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error updating progress:', error);
+                toast.error('Failed to update progress');
+                return;
+            }
             setProgress(data);
         } catch (err) {
             console.error('Error updating progress:', err);
+            toast.error('Failed to update progress');
         }
     };
 

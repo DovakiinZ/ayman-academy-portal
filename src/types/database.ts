@@ -64,6 +64,11 @@ export interface Subject {
     sort_order: number;
     is_active: boolean;
     created_at: string;
+    // Homepage fields
+    show_on_home?: boolean;
+    home_order?: number;
+    teaser_ar?: string | null;
+    teaser_en?: string | null;
     // Joins
     stage?: Stage;
 }
@@ -78,6 +83,7 @@ export interface Lesson {
     summary_en: string | null;
     order_index: number;
     is_paid: boolean;
+    is_published: boolean;
     created_by: string | null;
     created_at: string;
     // Metadata
@@ -131,6 +137,30 @@ export interface ContentTemplate {
     description?: string | null;
     content_ar: string | null;
     content_en: string | null;
+    updated_at: string;
+}
+
+// New token-based template system
+export interface TemplateVariable {
+    token: string;
+    label_ar: string;
+    label_en: string;
+}
+
+export type TemplateType = 'certificate' | 'message' | 'email' | 'page_block';
+
+export interface Template {
+    id: string;
+    key: string;
+    title_ar: string;
+    title_en: string;
+    description: string | null;
+    type: TemplateType;
+    content_ar: string;
+    content_en: string;
+    variables: TemplateVariable[];
+    is_active: boolean;
+    created_at: string;
     updated_at: string;
 }
 
@@ -392,6 +422,11 @@ export type Database = {
                 Row: LessonQuizQuestion;
                 Insert: Partial<LessonQuizQuestion>;
                 Update: Partial<LessonQuizQuestion>;
+            };
+            templates: {
+                Row: Template;
+                Insert: Partial<Template>;
+                Update: Partial<Template>;
             };
         };
         Functions: {

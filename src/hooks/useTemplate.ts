@@ -1,25 +1,25 @@
 /**
  * useTemplate Hook
- * Helper to easily fetch a specific template with fallback
+ * Helper to fetch and render a specific template with token interpolation
  */
 
 import { useTemplates } from '@/contexts/TemplateContext';
 
+/**
+ * Get a rendered template by key.
+ * Automatically selects the correct language and interpolates variables.
+ */
 export function useTemplate(
     key: string,
     defaultAr: string,
     defaultEn?: string,
-    variables?: Record<string, string | number>
+    variables?: Record<string, string>
 ) {
-    const { getTemplate } = useTemplates();
+    const { getTemplate, renderTemplate } = useTemplates();
 
-    // Get raw text
-    const text = getTemplate(key, defaultAr, defaultEn);
+    if (variables) {
+        return renderTemplate(key, variables, defaultAr, defaultEn);
+    }
 
-    // Interpolate variables if provided
-    if (!variables) return text;
-
-    return Object.entries(variables).reduce((acc, [key, value]) => {
-        return acc.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-    }, text);
+    return getTemplate(key, defaultAr, defaultEn);
 }

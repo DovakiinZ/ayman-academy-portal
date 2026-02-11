@@ -154,6 +154,7 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
             } else {
                 const result = await verifiedInsert('lesson_quiz_questions', {
                     quiz_id: quizId,
+                    lesson_id: lessonId,
                     ...q
                 }, { successMessage: { ar: 'تم إضافة السؤال', en: 'Question added' } });
 

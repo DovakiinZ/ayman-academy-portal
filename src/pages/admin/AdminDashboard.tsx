@@ -30,7 +30,7 @@ export default function AdminDashboard() {
     const [stats, setStats] = useState<AdminStats>(initialStats);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isDummy, setIsDummy] = useState(false);
+
     const mountedRef = useRef(true);
     const initialLoadDone = useRef(false);
 
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
             if (!mountedRef.current) return;
             setError(err instanceof Error ? err.message : 'Unknown error');
             setStats(initialStats);
-            setIsDummy(true);
+
         } finally {
             if (mountedRef.current) {
                 setLoading(false);

@@ -41,23 +41,36 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, ArrowRight, RefreshCw, AlertCircle, BookOpen, Beaker, ChevronRight } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, ArrowRight, RefreshCw, AlertCircle, BookOpen, Search, Filter, X, ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface SubjectWithJoins extends Subject {
+    stage?: Stage | null;
+    lessons?: { count: number }[];
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export default function SubjectsManagement() {
     const { t } = useLanguage();
-    // Accept both stageId (new) and levelId (old) for backward compatibility
     const params = useParams<{ stageId?: string; levelId?: string }>();
     const stageId = params.stageId || params.levelId;
     const navigate = useNavigate();
     const mountedRef = useRef(true);
 
-    // State
+    // Data
     const [stage, setStage] = useState<Stage | null>(null);
-    const [allStages, setAllStages] = useState<Stage[]>([]); // For dropdown
-    const [subjects, setSubjects] = useState<Subject[]>([]);
+    const [allStages, setAllStages] = useState<Stage[]>([]);
+    const [subjects, setSubjects] = useState<SubjectWithJoins[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Filters (for global view)
+    const [filterStage, setFilterStage] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showFilters, setShowFilters] = useState(!stageId);
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -67,7 +80,7 @@ export default function SubjectsManagement() {
 
     // Form state
     const [form, setForm] = useState({
-        stage_id: '', // New field for selection
+        stage_id: '',
         title_ar: '',
         title_en: '',
         description_ar: '',
@@ -81,16 +94,15 @@ export default function SubjectsManagement() {
         teaser_en: '',
     });
 
-    // Fetch data
+    // ─── Fetch Data ─────────────────────────────────────────────────────────
+
     const fetchData = async () => {
         if (!mountedRef.current) return;
-
         setLoading(true);
         setError(null);
 
         try {
-            // Always fetch all stages for the dropdown if we need them (or we can fetch on demand)
-            // It's small enough to fetch all.
+            // Always fetch all stages for dropdown
             const { data: stagesData } = await supabase
                 .from('stages')
                 .select('*')
@@ -100,51 +112,41 @@ export default function SubjectsManagement() {
                 setAllStages(stagesData);
             }
 
-            if (!stageId) {
-                // If no stage selected, we don't fetch subjects yet (or maybe all subjects? No, too many potentially).
-                // Wait, user wants to create FROM here.
-                setLoading(false);
-                return;
-            }
-
-            // Fetch stage info
-            const { data: stageData, error: stageError } = await supabase
-                .from('stages')
-                .select('*')
-                .eq('id', stageId)
-                .single();
-
-            if (!mountedRef.current) return;
-
-            if (stageError) {
-                // ... validation error logic retained ...
-                setError(stageError.message);
-                setLoading(false);
-                return;
-            }
-
-            setStage(stageData as Stage);
-
-            // Fetch subjects for this stage
-            const { data: subjectsData, error: subjectsError } = await supabase
+            // Build subjects query — always fetch with stage join + lesson count
+            let query = supabase
                 .from('subjects')
-                .select('*')
-                .eq('stage_id', stageId)
+                .select('*, stage:stages(id, title_ar, title_en), lessons(count)')
                 .order('sort_order', { ascending: true });
+
+            // If stageId in URL, scope to that stage
+            if (stageId) {
+                query = query.eq('stage_id', stageId);
+
+                // Also set the stage info
+                const matchedStage = (stagesData as any[])?.find(s => s.id === stageId);
+                if (mountedRef.current && matchedStage) {
+                    setStage(matchedStage as Stage);
+                }
+            }
+
+            const { data: subjectsData, error: subjectsError } = await query;
 
             if (!mountedRef.current) return;
 
             if (subjectsError) {
+                devLog('Subjects fetch error', subjectsError);
                 setError(subjectsError.message);
-                toast.error('فشل في تحميل المواد', { description: subjectsError.message });
+                toast.error(t('فشل في تحميل المواد', 'Failed to load subjects'), { description: subjectsError.message });
+                setSubjects([]);
             } else {
-                setSubjects((subjectsData as Subject[]) || []);
+                setSubjects((subjectsData as SubjectWithJoins[]) || []);
+                devLog(`Loaded ${subjectsData?.length || 0} subjects`);
             }
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             if (mountedRef.current) {
                 setError(message);
-                toast.error('حدث خطأ', { description: message });
+                toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
             }
         } finally {
             if (mountedRef.current) setLoading(false);
@@ -154,22 +156,43 @@ export default function SubjectsManagement() {
     useEffect(() => {
         mountedRef.current = true;
         fetchData();
-
-        return () => {
-            mountedRef.current = false;
-        };
+        return () => { mountedRef.current = false; };
     }, [stageId]);
 
-    const handleRetry = () => {
-        fetchData();
+    // ─── Filtered Subjects ──────────────────────────────────────────────────
+
+    const filteredSubjects = subjects.filter(subject => {
+        if (filterStage !== 'all' && subject.stage_id !== filterStage) return false;
+
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const matchTitle = subject.title_ar?.toLowerCase().includes(q) || subject.title_en?.toLowerCase().includes(q);
+            if (!matchTitle) return false;
+        }
+        return true;
+    });
+
+    const hasActiveFilters = filterStage !== 'all' || searchQuery.trim().length > 0;
+
+    const clearFilters = () => {
+        setFilterStage('all');
+        setSearchQuery('');
     };
 
-    // Open add dialog
+    // Get lesson count from join
+    const getLessonCount = (subject: SubjectWithJoins) => {
+        if (subject.lessons && subject.lessons.length > 0) {
+            return subject.lessons[0]?.count || 0;
+        }
+        return 0;
+    };
+
+    // ─── CRUD Handlers ──────────────────────────────────────────────────────
+
     const handleAdd = () => {
-        // ALLOW opening even if no stageId
         setEditingSubject(null);
         setForm({
-            stage_id: stageId || '', // Pre-fill if known
+            stage_id: stageId || '',
             title_ar: '',
             title_en: '',
             description_ar: '',
@@ -185,11 +208,10 @@ export default function SubjectsManagement() {
         setDialogOpen(true);
     };
 
-    // Open edit dialog
     const handleEdit = (subject: Subject) => {
         setEditingSubject(subject);
         setForm({
-            stage_id: subject.stage_id || '', // Should ensure type has stage_id
+            stage_id: subject.stage_id || '',
             title_ar: subject.title_ar,
             title_en: subject.title_en || '',
             description_ar: subject.description_ar || '',
@@ -205,17 +227,14 @@ export default function SubjectsManagement() {
         setDialogOpen(true);
     };
 
-    // Save (create or update) with verification
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validation
         const targetStageId = form.stage_id || stageId;
         if (!targetStageId) {
             toast.error(t('الرجاء اختيار المرحلة', 'Please select a stage'));
             return;
         }
-
         if (!form.title_ar.trim()) {
             toast.error(t('الرجاء إدخال اسم المادة', 'Please enter subject name'));
             return;
@@ -225,12 +244,11 @@ export default function SubjectsManagement() {
 
         try {
             if (editingSubject) {
-                // Update with verification
                 const result = await verifiedUpdate(
                     'subjects',
                     editingSubject.id,
                     {
-                        stage_id: targetStageId, // Allow moving to another stage if needed
+                        stage_id: targetStageId,
                         title_ar: form.title_ar,
                         title_en: form.title_en || null,
                         description_ar: form.description_ar || null,
@@ -247,15 +265,12 @@ export default function SubjectsManagement() {
                         errorMessage: { ar: 'فشل في تحديث المادة', en: 'Failed to update subject' },
                     }
                 );
-
                 if (result.success) {
                     setDialogOpen(false);
-                    fetchData(); // This only refreshes current view. If we added to another stage, it won't show.
+                    fetchData();
                 }
             } else {
-                // Create with verification
                 const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0621-\u064A-]/g, '');
-
                 const result = await verifiedInsert(
                     'subjects',
                     {
@@ -277,14 +292,9 @@ export default function SubjectsManagement() {
                         errorMessage: { ar: 'فشل في إضافة المادة', en: 'Failed to add subject' },
                     }
                 );
-
                 if (result.success) {
                     setDialogOpen(false);
-                    if (!stageId) {
-                        navigate(`/admin/stages/${targetStageId}/subjects`);
-                    } else if (targetStageId === stageId) {
-                        fetchData();
-                    }
+                    fetchData();
                 }
             }
         } catch (err) {
@@ -295,7 +305,6 @@ export default function SubjectsManagement() {
         }
     };
 
-    // Delete with verification
     const handleDelete = async () => {
         if (!deleteTarget) return;
         setSubmitting(true);
@@ -309,10 +318,7 @@ export default function SubjectsManagement() {
                     errorMessage: { ar: 'فشل في حذف المادة', en: 'Failed to delete subject' },
                 }
             );
-
-            if (result.success) {
-                fetchData();
-            }
+            if (result.success) fetchData();
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
@@ -322,26 +328,29 @@ export default function SubjectsManagement() {
         }
     };
 
-    // Navigate to lessons
     const handleSubjectClick = (subject: Subject) => {
         navigate(`/admin/subjects/${subject.id}/lessons`);
     };
 
+    // ─── Render ─────────────────────────────────────────────────────────────
+
     return (
         <div>
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                <button
-                    onClick={() => navigate('/admin/stages')}
-                    className="hover:text-foreground transition-colors"
-                >
-                    {t('المراحل', 'Stages')}
-                </button>
-                <ChevronRight className="w-4 h-4" />
-                <span className="text-foreground">
-                    {stage ? t(stage.title_ar, stage.title_en || stage.title_ar) : '...'}
-                </span>
-            </div>
+            {/* Breadcrumb — only when scoped to a stage */}
+            {stageId && stage && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                    <button
+                        onClick={() => navigate('/admin/stages')}
+                        className="hover:text-foreground transition-colors"
+                    >
+                        {t('المراحل', 'Stages')}
+                    </button>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="text-foreground">
+                        {t(stage.title_ar, stage.title_en || stage.title_ar)}
+                    </span>
+                </div>
+            )}
 
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
@@ -350,10 +359,31 @@ export default function SubjectsManagement() {
                         {t('المواد الدراسية', 'Subjects')}
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        {stage && t(`المواد في مرحلة ${stage.title_ar}`, `Subjects in ${stage.title_en || stage.title_ar}`)}
+                        {stageId && stage
+                            ? t(`المواد في مرحلة ${stage.title_ar}`, `Subjects in ${stage.title_en || stage.title_ar}`)
+                            : t(`${filteredSubjects.length} مادة`, `${filteredSubjects.length} subjects`)
+                        }
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                    {!stageId && (
+                        <Button
+                            variant={showFilters ? 'secondary' : 'outline'}
+                            size="sm"
+                            onClick={() => setShowFilters(!showFilters)}
+                        >
+                            <Filter className="w-4 h-4 me-2" />
+                            {t('فلاتر', 'Filters')}
+                            {hasActiveFilters && (
+                                <Badge variant="destructive" className="ms-2 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                                    !
+                                </Badge>
+                            )}
+                        </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={fetchData}>
+                        <RefreshCw className="w-4 h-4" />
+                    </Button>
                     <Button onClick={handleAdd}>
                         <Plus className="w-4 h-4 me-2" />
                         {t('إضافة مادة', 'Add Subject')}
@@ -361,21 +391,48 @@ export default function SubjectsManagement() {
                 </div>
             </div>
 
-            {/* Empty State for no Stage ID */}
-            {!stageId && (
-                <div className="p-12 text-center rounded-lg border border-border bg-background mb-6">
-                    <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-foreground mb-2">
-                        {t('يرجى اختيار مرحلة لعرض المواد', 'Please select a stage to view subjects')}
-                    </h3>
-                    <Button variant="outline" onClick={() => navigate('/admin/stages')}>
-                        {t('الذهاب للمراحل', 'Go to Stages')}
-                    </Button>
+            {/* Filter Bar — global view */}
+            {!stageId && showFilters && (
+                <div className="bg-background rounded-lg border border-border p-4 mb-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-foreground">{t('فلترة النتائج', 'Filter Results')}</h3>
+                        {hasActiveFilters && (
+                            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
+                                <X className="w-3 h-3 me-1" />
+                                {t('مسح الكل', 'Clear All')}
+                            </Button>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Search */}
+                        <div className="relative">
+                            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={t('بحث بالاسم...', 'Search by name...')}
+                                className="ps-9"
+                            />
+                        </div>
+
+                        {/* Stage filter */}
+                        <Select value={filterStage} onValueChange={setFilterStage}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={t('كل المراحل', 'All Stages')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">{t('كل المراحل', 'All Stages')}</SelectItem>
+                                {allStages.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>{t(s.title_ar, s.title_en || s.title_ar)}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             )}
 
-            {/* Error State */}
-            {stageId && error && (
+            {/* Error */}
+            {error && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
                     <div className="flex items-center gap-3">
                         <AlertCircle className="w-5 h-5 text-destructive" />
@@ -383,7 +440,7 @@ export default function SubjectsManagement() {
                             <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
                             <p className="text-xs text-destructive/80">{error}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                        <Button variant="outline" size="sm" onClick={fetchData}>
                             <RefreshCw className="w-4 h-4 me-2" />
                             {t('إعادة المحاولة', 'Retry')}
                         </Button>
@@ -392,86 +449,109 @@ export default function SubjectsManagement() {
             )}
 
             {/* Table */}
-            {stageId && (
-                <div className="bg-background rounded-lg border border-border overflow-hidden">
-                    {loading ? (
-                        <div className="p-8 text-center">
-                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-                        </div>
-                    ) : subjects.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-foreground mb-2">
-                                {t('لا توجد مواد', 'No subjects')}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                {t('ابدأ بإضافة أول مادة دراسية', 'Start by adding the first subject')}
-                            </p>
+            <div className="bg-background rounded-lg border border-border overflow-hidden">
+                {loading ? (
+                    <div className="p-8 text-center">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                    </div>
+                ) : filteredSubjects.length === 0 ? (
+                    <div className="p-12 text-center">
+                        <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-foreground mb-2">
+                            {hasActiveFilters
+                                ? t('لا توجد نتائج', 'No results found')
+                                : t('لا توجد مواد', 'No subjects')
+                            }
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            {hasActiveFilters
+                                ? t('حاول تغيير الفلاتر', 'Try changing the filters')
+                                : t('ابدأ بإضافة أول مادة دراسية', 'Start by adding the first subject')
+                            }
+                        </p>
+                        {hasActiveFilters ? (
+                            <Button variant="outline" onClick={clearFilters}>
+                                {t('مسح الفلاتر', 'Clear Filters')}
+                            </Button>
+                        ) : (
                             <Button onClick={handleAdd}>
                                 <Plus className="w-4 h-4 me-2" />
                                 {t('إضافة مادة', 'Add Subject')}
                             </Button>
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-12">#</TableHead>
-                                    <TableHead>{t('اسم المادة', 'Subject Name')}</TableHead>
-                                    <TableHead>{t('المعرّف', 'Slug')}</TableHead>
-                                    <TableHead>{t('الحالة', 'Status')}</TableHead>
-                                    <TableHead className="w-[150px]">{t('الإجراءات', 'Actions')}</TableHead>
+                        )}
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-12">#</TableHead>
+                                <TableHead>{t('اسم المادة', 'Subject Name')}</TableHead>
+                                {!stageId && <TableHead>{t('المرحلة', 'Stage')}</TableHead>}
+                                <TableHead>{t('الدروس', 'Lessons')}</TableHead>
+                                <TableHead>{t('الحالة', 'Status')}</TableHead>
+                                <TableHead className="w-[150px]">{t('الإجراءات', 'Actions')}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredSubjects.map((subject, index) => (
+                                <TableRow key={subject.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleSubjectClick(subject)}>
+                                    <TableCell className="text-muted-foreground">{subject.sort_order || index + 1}</TableCell>
+                                    <TableCell>
+                                        <div>
+                                            <p className="font-medium text-foreground">{subject.title_ar}</p>
+                                            {subject.title_en && (
+                                                <p className="text-sm text-muted-foreground">{subject.title_en}</p>
+                                            )}
+                                            {subject.description_ar && (
+                                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{subject.description_ar}</p>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    {!stageId && (
+                                        <TableCell>
+                                            <Badge variant="outline">{(subject as SubjectWithJoins).stage?.title_ar || '—'}</Badge>
+                                        </TableCell>
+                                    )}
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5">
+                                            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                                            <span className="text-sm">{getLessonCount(subject)}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={subject.is_active ? 'default' : 'secondary'}>
+                                            {subject.is_active ? t('مفعّل', 'Active') : t('معطّل', 'Inactive')}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(subject)} title={t('تعديل', 'Edit')}>
+                                                <Pencil className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setDeleteTarget(subject)}
+                                                className="text-destructive hover:text-destructive"
+                                                title={t('حذف', 'Delete')}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" onClick={() => handleSubjectClick(subject)} title={t('عرض الدروس', 'View Lessons')}>
+                                                <ArrowRight className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {subjects.map((subject, index) => (
-                                    <TableRow key={subject.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleSubjectClick(subject)}>
-                                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                                        <TableCell>
-                                            <div>
-                                                <p className="font-medium text-foreground">{subject.title_ar}</p>
-                                                {subject.title_en && (
-                                                    <p className="text-sm text-muted-foreground">{subject.title_en}</p>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground font-mono">
-                                            {subject.slug}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant={subject.is_active ? 'default' : 'secondary'}>
-                                                {subject.is_active ? t('مفعّل', 'Active') : t('معطّل', 'Inactive')}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(subject)}>
-                                                    <Pencil className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => setDeleteTarget(subject)}
-                                                    className="text-destructive hover:text-destructive"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" onClick={() => handleSubjectClick(subject)}>
-                                                    <ArrowRight className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </div>
-            )}
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </div>
 
             {/* Add/Edit Dialog */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>
                             {editingSubject
@@ -480,26 +560,25 @@ export default function SubjectsManagement() {
                         </DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSave} className="space-y-4 mt-4">
-                        {!stageId && (
-                            <div className="space-y-2">
-                                <Label>{t('المرحلة الدراسية', 'Educational Stage')} *</Label>
-                                <Select
-                                    value={form.stage_id}
-                                    onValueChange={(value) => setForm({ ...form, stage_id: value })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={t('اختر مرحلة', 'Select Stage')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {allStages.map((s) => (
-                                            <SelectItem key={s.id} value={s.id}>
-                                                {s.title_ar}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
+                        {/* Always show stage picker */}
+                        <div className="space-y-2">
+                            <Label>{t('المرحلة الدراسية', 'Educational Stage')} *</Label>
+                            <Select
+                                value={form.stage_id}
+                                onValueChange={(value) => setForm({ ...form, stage_id: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder={t('اختر مرحلة', 'Select Stage')} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {allStages.map((s) => (
+                                        <SelectItem key={s.id} value={s.id}>
+                                            {s.title_ar}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="title_ar">{t('الاسم بالعربية', 'Arabic Name')} *</Label>
@@ -599,7 +678,6 @@ export default function SubjectsManagement() {
                                         onCheckedChange={(checked) => setForm({ ...form, show_on_home: checked })}
                                     />
                                 </div>
-
                                 {form.show_on_home && (
                                     <>
                                         <div className="space-y-2">

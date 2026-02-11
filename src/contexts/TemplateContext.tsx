@@ -1,16 +1,25 @@
 /**
  * TemplateContext - Manages dynamic text templates
- * Caches templates to minimize database requests
+ * Updated to use the new `templates` table with token rendering support
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { ContentTemplate } from '@/types/database';
+import { Template } from '@/types/database';
+import { renderTemplate as render } from '@/lib/templateRenderer';
 
 interface TemplateContextType {
+    /** Get raw template text by key (language-aware) */
     getTemplate: (key: string, defaultAr: string, defaultEn?: string) => string;
+    /** Render a template with token values */
+    renderTemplate: (key: string, values: Record<string, string>, defaultAr: string, defaultEn?: string) => string;
+    /** Get full template object by key */
+    getTemplateObject: (key: string) => Template | undefined;
+    /** Force reload templates from DB */
     refreshTemplates: () => Promise<void>;
+    /** All loaded templates */
+    templates: Template[];
     isLoading: boolean;
 }
 
@@ -18,11 +27,10 @@ const TemplateContext = createContext<TemplateContextType | undefined>(undefined
 
 export function TemplateProvider({ children }: { children: React.ReactNode }) {
     const { language } = useLanguage();
-    const [templates, setTemplates] = useState<Record<string, ContentTemplate>>({});
+    const [templates, setTemplates] = useState<Template[]>([]);
+    const [templateMap, setTemplateMap] = useState<Record<string, Template>>({});
     const [isLoading, setIsLoading] = useState(true);
-    const [loadedCategories, setLoadedCategories] = useState<Set<string>>(new Set());
 
-    // Initial load of all public templates
     useEffect(() => {
         refreshTemplates();
     }, []);
@@ -31,50 +39,62 @@ export function TemplateProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(true);
         try {
             const { data, error } = await supabase
-                .from('content_templates')
+                .from('templates')
                 .select('*')
-                .eq('is_public', true);
+                .eq('is_active', true)
+                .order('type')
+                .order('key');
 
             if (error) throw error;
 
-            const templateMap: Record<string, ContentTemplate> = {};
-            (data as ContentTemplate[] | null)?.forEach(t => {
-                templateMap[t.key] = t;
-            });
+            const list = (data as Template[]) || [];
+            setTemplates(list);
 
-            setTemplates(templateMap);
+            const map: Record<string, Template> = {};
+            list.forEach(t => { map[t.key] = t; });
+            setTemplateMap(map);
         } catch (err) {
-            console.error('Error fetching templates:', err);
+            console.error('[TemplateContext] Error fetching templates:', err);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Helper to replace variables like {{name}}
-    const interpolate = (text: string, variables?: Record<string, string | number>) => {
-        if (!variables) return text;
-        return Object.entries(variables).reduce((acc, [key, value]) => {
-            return acc.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-        }, text);
-    };
-
     const getTemplate = useCallback((key: string, defaultAr: string, defaultEn?: string) => {
-        const template = templates[key];
-
-        // If template exists, use it based on current language
+        const template = templateMap[key];
         if (template) {
             if (language === 'ar' && template.content_ar) return template.content_ar;
             if (language === 'en' && template.content_en) return template.content_en;
-            // Fallback to other language if current is missing
             return template.content_ar || template.content_en || defaultAr;
         }
-
-        // Fallback to defaults provided in code
         return language === 'ar' ? defaultAr : (defaultEn || defaultAr);
-    }, [templates, language]);
+    }, [templateMap, language]);
+
+    const renderTemplateText = useCallback((
+        key: string,
+        values: Record<string, string>,
+        defaultAr: string,
+        defaultEn?: string
+    ) => {
+        const raw = getTemplate(key, defaultAr, defaultEn);
+        const template = templateMap[key];
+        const allowedTokens = template?.variables?.map(v => v.token);
+        return render(raw, values, { allowedTokens, escapeValues: false });
+    }, [getTemplate, templateMap]);
+
+    const getTemplateObject = useCallback((key: string) => {
+        return templateMap[key];
+    }, [templateMap]);
 
     return (
-        <TemplateContext.Provider value={{ getTemplate, refreshTemplates, isLoading }}>
+        <TemplateContext.Provider value={{
+            getTemplate,
+            renderTemplate: renderTemplateText,
+            getTemplateObject,
+            refreshTemplates,
+            templates,
+            isLoading,
+        }}>
             {children}
         </TemplateContext.Provider>
     );

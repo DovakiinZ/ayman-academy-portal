@@ -1,12 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LessonBlock, LessonBlockType } from '@/types/database';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GripVertical, X, Type, Image as ImageIcon, Video, FileText, Link as LinkIcon, AlertTriangle, Lightbulb, Plus, MoreHorizontal } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import AIBlockAssistant from './AIBlockAssistant';
+import {
+    GripVertical, X, Type, Image as ImageIcon, Video, FileText,
+    Link as LinkIcon, AlertTriangle, Lightbulb, Plus, Eye, EyeOff,
+    BookOpen, PenLine, Sigma, HelpCircle, Beaker, Sparkles,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -16,7 +22,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    DropdownMenuSeparator
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 
 interface BlockEditorProps {
@@ -44,7 +51,7 @@ export default function BlockEditor({ blocks, onReorder, onCreateBlock, onUpdate
         <div className="space-y-6 pb-20">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {blocks.map((block) => (
                             <SortableBlock
                                 key={block.id}
@@ -65,43 +72,87 @@ export default function BlockEditor({ blocks, onReorder, onCreateBlock, onUpdate
     );
 }
 
+// ─── Block Type Config ──────────────────────────────────────────────────────
+
+const BLOCK_TYPE_CONFIG: Record<LessonBlockType, { icon: any; label_ar: string; label_en: string; color: string }> = {
+    rich_text: { icon: Type, label_ar: 'نص', label_en: 'Text', color: 'text-foreground' },
+    video: { icon: Video, label_ar: 'فيديو', label_en: 'Video', color: 'text-red-500' },
+    image: { icon: ImageIcon, label_ar: 'صورة', label_en: 'Image', color: 'text-green-500' },
+    file: { icon: FileText, label_ar: 'ملف', label_en: 'File', color: 'text-blue-500' },
+    link: { icon: LinkIcon, label_ar: 'رابط', label_en: 'Link', color: 'text-purple-500' },
+    tip: { icon: Lightbulb, label_ar: 'نصيحة', label_en: 'Tip', color: 'text-blue-500' },
+    warning: { icon: AlertTriangle, label_ar: 'تنبيه', label_en: 'Warning', color: 'text-yellow-500' },
+    example: { icon: Beaker, label_ar: 'مثال', label_en: 'Example', color: 'text-emerald-500' },
+    exercise: { icon: PenLine, label_ar: 'تمرين', label_en: 'Exercise', color: 'text-orange-500' },
+    equation: { icon: Sigma, label_ar: 'معادلة', label_en: 'Equation', color: 'text-indigo-500' },
+    qa: { icon: HelpCircle, label_ar: 'سؤال وجواب', label_en: 'Q&A', color: 'text-pink-500' },
+};
+
+// ─── Add Block Menu ─────────────────────────────────────────────────────────
+
 function AddBlockMenu({ onAdd }: { onAdd: (type: LessonBlockType) => void }) {
     const { t } = useLanguage();
+
+    const textTypes: LessonBlockType[] = ['rich_text', 'tip', 'warning', 'example', 'exercise'];
+    const mediaTypes: LessonBlockType[] = ['video', 'image', 'file', 'link'];
+    const advancedTypes: LessonBlockType[] = ['equation', 'qa'];
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2 border-dashed">
                     <Plus className="w-4 h-4" />
                     {t('إضافة محتوى', 'Add Content')}
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="w-56">
-                <DropdownMenuItem onClick={() => onAdd('rich_text')}>
-                    <Type className="w-4 h-4 me-2" />
-                    {t('نص', 'Text')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onAdd('video')}>
-                    <Video className="w-4 h-4 me-2" />
-                    {t('فيديو', 'Video')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onAdd('image')}>
-                    <ImageIcon className="w-4 h-4 me-2" />
-                    {t('صورة', 'Image')}
-                </DropdownMenuItem>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t('نصوص', 'Text')}
+                </DropdownMenuLabel>
+                {textTypes.map(type => {
+                    const cfg = BLOCK_TYPE_CONFIG[type];
+                    const Icon = cfg.icon;
+                    return (
+                        <DropdownMenuItem key={type} onClick={() => onAdd(type)}>
+                            <Icon className={cn("w-4 h-4 me-2", cfg.color)} />
+                            {t(cfg.label_ar, cfg.label_en)}
+                        </DropdownMenuItem>
+                    );
+                })}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onAdd('tip')}>
-                    <Lightbulb className="w-4 h-4 me-2" />
-                    {t('نصيحة', 'Tip')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onAdd('warning')}>
-                    <AlertTriangle className="w-4 h-4 me-2" />
-                    {t('تنبيه', 'Warning')}
-                </DropdownMenuItem>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t('وسائط', 'Media')}
+                </DropdownMenuLabel>
+                {mediaTypes.map(type => {
+                    const cfg = BLOCK_TYPE_CONFIG[type];
+                    const Icon = cfg.icon;
+                    return (
+                        <DropdownMenuItem key={type} onClick={() => onAdd(type)}>
+                            <Icon className={cn("w-4 h-4 me-2", cfg.color)} />
+                            {t(cfg.label_ar, cfg.label_en)}
+                        </DropdownMenuItem>
+                    );
+                })}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t('متقدم', 'Advanced')}
+                </DropdownMenuLabel>
+                {advancedTypes.map(type => {
+                    const cfg = BLOCK_TYPE_CONFIG[type];
+                    const Icon = cfg.icon;
+                    return (
+                        <DropdownMenuItem key={type} onClick={() => onAdd(type)}>
+                            <Icon className={cn("w-4 h-4 me-2", cfg.color)} />
+                            {t(cfg.label_ar, cfg.label_en)}
+                        </DropdownMenuItem>
+                    );
+                })}
             </DropdownMenuContent>
         </DropdownMenu>
     );
 }
+
+// ─── Sortable Block Wrapper ─────────────────────────────────────────────────
 
 function SortableBlock({
     block,
@@ -112,7 +163,12 @@ function SortableBlock({
     onUpdate: (id: string, data: Partial<LessonBlock>) => void;
     onDelete: (id: string) => void;
 }) {
+    const { t } = useLanguage();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+    const [lang, setLang] = useState<'ar' | 'en'>('ar');
+
+    const cfg = BLOCK_TYPE_CONFIG[block.type] || BLOCK_TYPE_CONFIG.rich_text;
+    const Icon = cfg.icon;
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -122,77 +178,174 @@ function SortableBlock({
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="group relative pl-10 pr-2 transition-all">
+        <div ref={setNodeRef} style={style} className={cn(
+            "group relative ps-10 pe-2 transition-all",
+            !block.is_published && "opacity-60"
+        )}>
             {/* Drag Handle */}
-            <div {...attributes} {...listeners} className="absolute left-0 top-2 p-2 rounded hover:bg-accent cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
+            <div {...attributes} {...listeners} className="absolute start-0 top-2 p-2 rounded hover:bg-accent cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
                 <GripVertical className="w-5 h-5 text-muted-foreground" />
             </div>
 
             {/* Block Content Wrapper */}
             <div className="min-h-[3rem] rounded-lg border border-transparent group-hover:border-border/50 bg-background transition-colors p-1 relative">
-                <BlockRenderer block={block} updateBlock={onUpdate} />
+                {/* Block Header */}
+                <div className="flex items-center justify-between px-2 py-1 mb-1">
+                    <div className="flex items-center gap-2">
+                        <Icon className={cn("w-3.5 h-3.5", cfg.color)} />
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            {t(cfg.label_ar, cfg.label_en)}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* AR/EN tabs */}
+                        <div className="flex bg-secondary rounded-md overflow-hidden me-1">
+                            <button
+                                onClick={() => setLang('ar')}
+                                className={cn(
+                                    "px-2 py-0.5 text-[10px] font-medium transition-colors",
+                                    lang === 'ar' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >AR</button>
+                            <button
+                                onClick={() => setLang('en')}
+                                className={cn(
+                                    "px-2 py-0.5 text-[10px] font-medium transition-colors",
+                                    lang === 'en' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >EN</button>
+                        </div>
+                        {/* Publish toggle */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => onUpdate(block.id, { is_published: !block.is_published })}
+                            title={block.is_published ? t('إخفاء', 'Unpublish') : t('نشر', 'Publish')}
+                        >
+                            {block.is_published
+                                ? <Eye className="w-3.5 h-3.5 text-green-500" />
+                                : <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                            }
+                        </Button>
+                        {/* Delete */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                            onClick={() => onDelete(block.id)}
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </Button>
+                    </div>
+                </div>
 
-                {/* Actions */}
-                <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-background shadow-sm rounded-md border border-border">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => onDelete(block.id)}>
-                        <X className="w-3.5 h-3.5" />
-                    </Button>
+                <BlockRenderer block={block} updateBlock={onUpdate} lang={lang} />
+
+                {/* AI Assistant */}
+                <div className="px-2 py-1">
+                    <AIBlockAssistant
+                        block={block}
+                        lang={lang}
+                        onApply={(content) => {
+                            const field = lang === 'ar' ? 'content_ar' : 'content_en';
+                            onUpdate(block.id, { [field]: content });
+                        }}
+                    />
                 </div>
             </div>
         </div>
     );
 }
 
-function BlockRenderer({ block, updateBlock }: { block: LessonBlock, updateBlock: (id: string, data: Partial<LessonBlock>) => void }) {
+// ─── Block Renderer (routes to type-specific editor) ────────────────────────
+
+function BlockRenderer({
+    block,
+    updateBlock,
+    lang,
+}: {
+    block: LessonBlock;
+    updateBlock: (id: string, data: Partial<LessonBlock>) => void;
+    lang: 'ar' | 'en';
+}) {
     switch (block.type) {
         case 'rich_text':
         case 'tip':
         case 'warning':
-            return <RichTextBlock block={block} updateBlock={updateBlock} />;
+        case 'example':
+        case 'exercise':
+            return <TextContentBlock block={block} updateBlock={updateBlock} lang={lang} />;
         case 'video':
-            return <VideoBlock block={block} updateBlock={updateBlock} />;
+            return <VideoBlock block={block} updateBlock={updateBlock} lang={lang} />;
         case 'image':
-            return <ImageBlock block={block} updateBlock={updateBlock} />;
+            return <ImageBlock block={block} updateBlock={updateBlock} lang={lang} />;
+        case 'file':
+            return <FileBlock block={block} updateBlock={updateBlock} lang={lang} />;
+        case 'link':
+            return <LinkBlock block={block} updateBlock={updateBlock} lang={lang} />;
+        case 'equation':
+            return <EquationBlock block={block} updateBlock={updateBlock} lang={lang} />;
+        case 'qa':
+            return <QABlock block={block} updateBlock={updateBlock} lang={lang} />;
         default:
-            return <div className="p-4 text-sm text-muted-foreground bg-accent/20 rounded">Unknown block type: {block.type}</div>;
+            return <div className="p-4 text-sm text-muted-foreground bg-accent/20 rounded">Unknown: {block.type}</div>;
     }
 }
 
-function RichTextBlock({ block, updateBlock }: { block: LessonBlock, updateBlock: (id: string, data: Partial<LessonBlock>) => void }) {
-    const { t } = useLanguage();
-    const [localContent, setLocalContent] = useState(block.content_ar || '');
+// ─── Shared helpers ─────────────────────────────────────────────────────────
+
+function useBlockContent(block: LessonBlock, lang: 'ar' | 'en', updateBlock: (id: string, data: Partial<LessonBlock>) => void) {
+    const contentField = lang === 'ar' ? 'content_ar' : 'content_en';
+    const titleField = lang === 'ar' ? 'title_ar' : 'title_en';
+    const [localContent, setLocalContent] = useState(block[contentField] || '');
+    const [localTitle, setLocalTitle] = useState(block[titleField] || '');
 
     useEffect(() => {
-        setLocalContent(block.content_ar || '');
-    }, [block.content_ar]);
+        setLocalContent(block[contentField] || '');
+        setLocalTitle(block[titleField] || '');
+    }, [block[contentField], block[titleField], lang]);
 
-    const handleBlur = () => {
-        if (localContent !== block.content_ar) {
-            updateBlock(block.id, { content_ar: localContent });
+    const commitContent = useCallback(() => {
+        if (localContent !== (block[contentField] || '')) {
+            updateBlock(block.id, { [contentField]: localContent });
         }
-    };
+    }, [localContent, block, contentField, updateBlock]);
 
-    const styles = {
+    const commitTitle = useCallback(() => {
+        if (localTitle !== (block[titleField] || '')) {
+            updateBlock(block.id, { [titleField]: localTitle });
+        }
+    }, [localTitle, block, titleField, updateBlock]);
+
+    return { localContent, setLocalContent, commitContent, localTitle, setLocalTitle, commitTitle };
+}
+
+// ─── Text-based blocks (rich_text, tip, warning, example, exercise) ─────────
+
+function TextContentBlock({ block, updateBlock, lang }: { block: LessonBlock; updateBlock: (id: string, data: Partial<LessonBlock>) => void; lang: 'ar' | 'en' }) {
+    const { t } = useLanguage();
+    const { localContent, setLocalContent, commitContent } = useBlockContent(block, lang, updateBlock);
+
+    const styles: Record<string, string> = {
         'rich_text': '',
-        'tip': 'bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500 p-4',
-        'warning': 'bg-yellow-50 dark:bg-yellow-950/30 border-l-4 border-yellow-500 p-4'
+        'tip': 'bg-blue-50 dark:bg-blue-950/30 border-s-4 border-blue-500 p-4',
+        'warning': 'bg-yellow-50 dark:bg-yellow-950/30 border-s-4 border-yellow-500 p-4',
+        'example': 'bg-emerald-50 dark:bg-emerald-950/30 border-s-4 border-emerald-500 p-4',
+        'exercise': 'bg-orange-50 dark:bg-orange-950/30 border-s-4 border-orange-500 p-4',
     };
 
     return (
-        <div className={cn("relative", styles[block.type as keyof typeof styles] || '')}>
-            {block.type !== 'rich_text' && (
-                <div className="absolute top-2 right-2 text-xs font-bold text-muted-foreground uppercase opacity-50 select-none">
-                    {block.type}
-                </div>
-            )}
+        <div className={cn("relative rounded-md", styles[block.type] || '')}>
             <Textarea
                 value={localContent}
                 onChange={(e) => setLocalContent(e.target.value)}
-                onBlur={handleBlur}
-                placeholder={t('اكتب هنا...', 'Type here...')}
+                onBlur={commitContent}
+                placeholder={lang === 'ar' ? 'اكتب هنا...' : 'Type here...'}
+                dir={lang === 'ar' ? 'rtl' : 'ltr'}
                 className={cn(
-                    "min-h-[100px] resize-none border-none shadow-none focus-visible:ring-0 px-0 bg-transparent",
-                    block.type === 'rich_text' ? "text-lg" : "text-sm",
+                    "min-h-[80px] resize-none border-none shadow-none focus-visible:ring-0 px-0 bg-transparent",
+                    block.type === 'rich_text' ? "text-base" : "text-sm",
                     !localContent && "italic"
                 )}
             />
@@ -200,79 +353,242 @@ function RichTextBlock({ block, updateBlock }: { block: LessonBlock, updateBlock
     );
 }
 
-function VideoBlock({ block, updateBlock }: { block: LessonBlock, updateBlock: (id: string, data: Partial<LessonBlock>) => void }) {
+// ─── Video Block ────────────────────────────────────────────────────────────
+
+function VideoBlock({ block, updateBlock, lang }: { block: LessonBlock; updateBlock: (id: string, data: Partial<LessonBlock>) => void; lang: 'ar' | 'en' }) {
     const { t } = useLanguage();
     const [url, setUrl] = useState(block.url || '');
+    const { localTitle, setLocalTitle, commitTitle } = useBlockContent(block, lang, updateBlock);
 
-    const handleBlur = () => {
-        if (url !== block.url) {
-            updateBlock(block.id, { url: url });
-        }
+    useEffect(() => { setUrl(block.url || ''); }, [block.url]);
+
+    const handleUrlBlur = () => {
+        if (url !== block.url) updateBlock(block.id, { url });
     };
 
+    const getYoutubeId = (urlStr: string) => {
+        const match = urlStr.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*)/);
+        return (match && match[1].length === 11) ? match[1] : null;
+    };
+
+    const ytId = url ? getYoutubeId(url) : null;
+
     return (
-        <div className="p-4 border rounded-md space-y-3 bg-card">
-            <div className="flex items-center gap-2 mb-2">
-                <Video className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{t('فيديو', 'Video')}</span>
-            </div>
-            <div className="space-y-1">
-                <Label className="text-xs">{t('رابط الفيديو', 'Video URL')}</Label>
-                <Input
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="https://..."
-                    className="h-8"
-                />
-            </div>
-            {block.url && (
-                <div className="aspect-video bg-black/5 rounded-md flex items-center justify-center overflow-hidden relative mt-2">
-                    <div className="text-xs text-muted-foreground flex flex-col items-center">
-                        <Video className="w-8 h-8 mb-2 opacity-20" />
-                        {block.url}
-                    </div>
+        <div className="p-3 space-y-2">
+            <Input
+                value={localTitle}
+                onChange={(e) => setLocalTitle(e.target.value)}
+                onBlur={commitTitle}
+                placeholder={lang === 'ar' ? 'عنوان الفيديو (اختياري)' : 'Video title (optional)'}
+                dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                className="h-8 text-sm font-medium border-none shadow-none focus-visible:ring-1 bg-transparent"
+            />
+            <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onBlur={handleUrlBlur}
+                placeholder="https://youtube.com/..."
+                className="h-8 text-xs"
+            />
+            {ytId && (
+                <div className="aspect-video bg-black rounded-md overflow-hidden mt-1">
+                    <iframe
+                        width="100%" height="100%"
+                        src={`https://www.youtube.com/embed/${ytId}`}
+                        title="Preview" frameBorder="0" allowFullScreen
+                        className="w-full h-full"
+                    />
                 </div>
             )}
         </div>
     );
 }
 
-function ImageBlock({ block, updateBlock }: { block: LessonBlock, updateBlock: (id: string, data: Partial<LessonBlock>) => void }) {
+// ─── Image Block ────────────────────────────────────────────────────────────
+
+function ImageBlock({ block, updateBlock, lang }: { block: LessonBlock; updateBlock: (id: string, data: Partial<LessonBlock>) => void; lang: 'ar' | 'en' }) {
     const { t } = useLanguage();
     const [url, setUrl] = useState(block.url || '');
 
+    useEffect(() => { setUrl(block.url || ''); }, [block.url]);
+
     const handleBlur = () => {
-        if (url !== block.url) {
-            updateBlock(block.id, { url: url });
-        }
+        if (url !== block.url) updateBlock(block.id, { url });
     };
 
     return (
-        <div className="p-4 border rounded-md space-y-3 bg-card">
-            <div className="flex items-center gap-2 mb-2">
-                <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{t('صورة', 'Image')}</span>
-            </div>
-            <div className="space-y-1">
-                <Label className="text-xs">{t('رابط الصورة', 'Image URL')}</Label>
-                <Input
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="https://..."
-                    className="h-8"
-                />
-            </div>
-            <div className="mt-2 text-xs text-muted-foreground">
-                {t('أو', 'Or')} <span className="underline cursor-pointer">{t('اختار ملف', 'Pick file')}</span>
-            </div>
-
+        <div className="p-3 space-y-2">
+            <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onBlur={handleBlur}
+                placeholder={lang === 'ar' ? 'رابط الصورة...' : 'Image URL...'}
+                className="h-8 text-xs"
+            />
             {block.url && (
-                <div className="mt-2 rounded-md overflow-hidden bg-accent/10 relative group">
-                    <img src={block.url} alt="Preview" className="max-h-64 object-contain mx-auto" />
+                <div className="mt-1 rounded-md overflow-hidden bg-accent/10">
+                    <img src={block.url} alt="Preview" className="max-h-48 object-contain mx-auto" />
                 </div>
             )}
+        </div>
+    );
+}
+
+// ─── File Block ─────────────────────────────────────────────────────────────
+
+function FileBlock({ block, updateBlock, lang }: { block: LessonBlock; updateBlock: (id: string, data: Partial<LessonBlock>) => void; lang: 'ar' | 'en' }) {
+    const { t } = useLanguage();
+    const [url, setUrl] = useState(block.url || '');
+    const { localTitle, setLocalTitle, commitTitle } = useBlockContent(block, lang, updateBlock);
+
+    useEffect(() => { setUrl(block.url || ''); }, [block.url]);
+
+    const handleUrlBlur = () => {
+        if (url !== block.url) updateBlock(block.id, { url });
+    };
+
+    return (
+        <div className="p-3 border rounded-md bg-card space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+                <FileText className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-medium">{t('ملف مرفق', 'Attached File')}</span>
+            </div>
+            <Input
+                value={localTitle}
+                onChange={(e) => setLocalTitle(e.target.value)}
+                onBlur={commitTitle}
+                placeholder={lang === 'ar' ? 'اسم الملف' : 'File name'}
+                dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                className="h-8 text-sm"
+            />
+            <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onBlur={handleUrlBlur}
+                placeholder="https://..."
+                className="h-8 text-xs"
+            />
+        </div>
+    );
+}
+
+// ─── Link Block ─────────────────────────────────────────────────────────────
+
+function LinkBlock({ block, updateBlock, lang }: { block: LessonBlock; updateBlock: (id: string, data: Partial<LessonBlock>) => void; lang: 'ar' | 'en' }) {
+    const { t } = useLanguage();
+    const [url, setUrl] = useState(block.url || '');
+    const { localTitle, setLocalTitle, commitTitle, localContent, setLocalContent, commitContent } = useBlockContent(block, lang, updateBlock);
+
+    useEffect(() => { setUrl(block.url || ''); }, [block.url]);
+
+    const handleUrlBlur = () => {
+        if (url !== block.url) updateBlock(block.id, { url });
+    };
+
+    return (
+        <div className="p-3 border rounded-md bg-card space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+                <LinkIcon className="w-4 h-4 text-purple-500" />
+                <span className="text-sm font-medium">{t('رابط خارجي', 'External Link')}</span>
+            </div>
+            <Input
+                value={localTitle}
+                onChange={(e) => setLocalTitle(e.target.value)}
+                onBlur={commitTitle}
+                placeholder={lang === 'ar' ? 'عنوان الرابط' : 'Link title'}
+                dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                className="h-8 text-sm"
+            />
+            <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onBlur={handleUrlBlur}
+                placeholder="https://..."
+                className="h-8 text-xs"
+            />
+            <Textarea
+                value={localContent}
+                onChange={(e) => setLocalContent(e.target.value)}
+                onBlur={commitContent}
+                placeholder={lang === 'ar' ? 'وصف الرابط (اختياري)' : 'Link description (optional)'}
+                dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                className="min-h-[40px] resize-none text-xs"
+            />
+        </div>
+    );
+}
+
+// ─── Equation Block ─────────────────────────────────────────────────────────
+
+function EquationBlock({ block, updateBlock, lang }: { block: LessonBlock; updateBlock: (id: string, data: Partial<LessonBlock>) => void; lang: 'ar' | 'en' }) {
+    const { t } = useLanguage();
+    const { localContent, setLocalContent, commitContent, localTitle, setLocalTitle, commitTitle } = useBlockContent(block, lang, updateBlock);
+
+    return (
+        <div className="p-3 border rounded-md bg-indigo-50 dark:bg-indigo-950/20 space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+                <Sigma className="w-4 h-4 text-indigo-500" />
+                <span className="text-sm font-medium">{t('معادلة', 'Equation')}</span>
+            </div>
+            <Input
+                value={localTitle}
+                onChange={(e) => setLocalTitle(e.target.value)}
+                onBlur={commitTitle}
+                placeholder={lang === 'ar' ? 'عنوان المعادلة' : 'Equation label'}
+                dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                className="h-8 text-sm bg-transparent border-none shadow-none focus-visible:ring-1"
+            />
+            <Textarea
+                value={localContent}
+                onChange={(e) => setLocalContent(e.target.value)}
+                onBlur={commitContent}
+                placeholder={lang === 'ar' ? 'اكتب المعادلة (LaTeX أو نص)' : 'Write your equation (LaTeX or text)'}
+                dir="ltr"
+                className="min-h-[60px] font-mono text-sm resize-none bg-white dark:bg-background"
+            />
+            {localContent && (
+                <div className="bg-white dark:bg-background rounded px-4 py-3 text-center text-lg font-mono border border-border">
+                    {localContent}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Q&A Block ──────────────────────────────────────────────────────────────
+
+function QABlock({ block, updateBlock, lang }: { block: LessonBlock; updateBlock: (id: string, data: Partial<LessonBlock>) => void; lang: 'ar' | 'en' }) {
+    const { t } = useLanguage();
+    const { localTitle, setLocalTitle, commitTitle, localContent, setLocalContent, commitContent } = useBlockContent(block, lang, updateBlock);
+
+    return (
+        <div className="p-3 border rounded-md bg-pink-50 dark:bg-pink-950/20 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+                <HelpCircle className="w-4 h-4 text-pink-500" />
+                <span className="text-sm font-medium">{t('سؤال وجواب', 'Q&A')}</span>
+            </div>
+            <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('السؤال', 'Question')}</Label>
+                <Input
+                    value={localTitle}
+                    onChange={(e) => setLocalTitle(e.target.value)}
+                    onBlur={commitTitle}
+                    placeholder={lang === 'ar' ? 'اكتب السؤال هنا...' : 'Write the question...'}
+                    dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                    className="h-8 text-sm font-medium"
+                />
+            </div>
+            <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('الإجابة', 'Answer')}</Label>
+                <Textarea
+                    value={localContent}
+                    onChange={(e) => setLocalContent(e.target.value)}
+                    onBlur={commitContent}
+                    placeholder={lang === 'ar' ? 'اكتب الإجابة هنا...' : 'Write the answer...'}
+                    dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                    className="min-h-[60px] resize-none text-sm"
+                />
+            </div>
         </div>
     );
 }
