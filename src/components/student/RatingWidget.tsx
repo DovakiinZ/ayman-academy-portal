@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
 interface RatingWidgetProps {
     entityId: string;
@@ -48,20 +49,32 @@ export default function RatingWidget({ entityId, entityType, title }: RatingWidg
         if (!rating || !profile?.id) return;
         setSaving(true);
 
-        const payload = {
-            user_id: profile.id,
-            entity_type: entityType,
-            entity_id: entityId,
-            stars: rating,
-            feedback: feedback.trim()
-        };
+        try {
+            const payload = {
+                user_id: profile.id,
+                entity_type: entityType,
+                entity_id: entityId,
+                stars: rating,
+                feedback: feedback.trim()
+            };
 
-        const { error } = existingId
-            ? await supabase.from('ratings').update(payload).eq('id', existingId)
-            : await supabase.from('ratings').insert(payload);
+            const { error } = existingId
+                ? await supabase.from('ratings').update(payload).eq('id', existingId)
+                : await supabase.from('ratings').insert(payload);
 
-        setSaving(false);
-        if (!error) setIsOpen(false);
+            if (error) {
+                console.error('Rating save error:', error);
+                toast.error(t('فشل في حفظ التقييم', 'Failed to save rating'));
+            } else {
+                toast.success(t('تم حفظ التقييم', 'Rating saved'));
+                setIsOpen(false);
+            }
+        } catch (err) {
+            console.error('Rating save exception:', err);
+            toast.error(t('حدث خطأ أثناء الحفظ', 'An error occurred while saving'));
+        } finally {
+            setSaving(false);
+        }
     };
 
     if (!isOpen && !rating) {
@@ -95,8 +108,8 @@ export default function RatingWidget({ entityId, entityType, title }: RatingWidg
                     >
                         <Star
                             className={`w-8 h-8 ${star <= (hoverRating || rating)
-                                    ? 'fill-yellow-400 text-yellow-400'
-                                    : 'text-muted-foreground'
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-muted-foreground'
                                 }`}
                         />
                     </button>

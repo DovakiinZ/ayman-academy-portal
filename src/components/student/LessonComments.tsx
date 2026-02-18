@@ -6,6 +6,7 @@ import { LessonComment, Profile } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, User, MessageCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface LessonCommentsProps {
     lessonId: string;
@@ -44,21 +45,31 @@ export default function LessonComments({ lessonId }: LessonCommentsProps) {
         if (!newComment.trim() || !profile?.id) return;
         setSubmitting(true);
 
-        const { data, error } = await supabase
-            .from('lesson_comments')
-            .insert({
-                user_id: profile.id,
-                lesson_id: lessonId,
-                content: newComment.trim()
-            })
-            .select('*, user:profiles(*)')
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from('lesson_comments')
+                .insert({
+                    user_id: profile.id,
+                    lesson_id: lessonId,
+                    content: newComment.trim()
+                })
+                .select('*, user:profiles(*)')
+                .single();
 
-        if (data && !error) {
-            setComments(prev => [data as CommentWithUser, ...prev]);
-            setNewComment('');
+            if (error) {
+                console.error('Comment submit error:', error);
+                toast.error(t('فشل في إرسال التعليق', 'Failed to post comment'));
+            } else if (data) {
+                setComments(prev => [data as CommentWithUser, ...prev]);
+                setNewComment('');
+                toast.success(t('تم إرسال التعليق', 'Comment posted'));
+            }
+        } catch (err) {
+            console.error('Comment submit exception:', err);
+            toast.error(t('حدث خطأ أثناء الإرسال', 'An error occurred while posting'));
+        } finally {
+            setSubmitting(false);
         }
-        setSubmitting(false);
     };
 
     if (loading) return null;

@@ -1,43 +1,59 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { GraduationCap, BookOpen, School, ArrowLeft, ArrowRight } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import type { Stage } from '@/types/database';
+import { GraduationCap, BookOpen, School, ArrowLeft, ArrowRight, Layers } from 'lucide-react';
 
-const stages = [
-  {
-    id: 'kindergarten',
-    icon: GraduationCap,
-    title: { ar: 'التمهيدي', en: 'Kindergarten' },
-    description: {
-      ar: 'أساسيات التعلم المبكر للأطفال من 4-6 سنوات',
-      en: 'Early learning fundamentals for children aged 4-6',
-    },
-    subjects: { ar: '8 مواد', en: '8 Subjects' },
-  },
-  {
-    id: 'primary',
-    icon: BookOpen,
-    title: { ar: 'الابتدائي', en: 'Primary' },
-    description: {
-      ar: 'بناء الأساس المعرفي في العلوم واللغات',
-      en: 'Building a solid foundation in sciences and languages',
-    },
-    subjects: { ar: '12 مادة', en: '12 Subjects' },
-  },
-  {
-    id: 'middle',
-    icon: School,
-    title: { ar: 'المتوسط', en: 'Middle School' },
-    description: {
-      ar: 'تطوير المهارات التحليلية والإبداعية',
-      en: 'Developing analytical and creative skills',
-    },
-    subjects: { ar: '15 مادة', en: '15 Subjects' },
-  },
-];
+// Icon pool — cycles if more than 4 stages
+const stageIcons = [GraduationCap, BookOpen, School, Layers];
 
 const StagesSection = () => {
   const { t, direction } = useLanguage();
   const ArrowIcon = direction === 'rtl' ? ArrowLeft : ArrowRight;
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStages();
+  }, []);
+
+  const fetchStages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('stages')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching stages:', error);
+        setStages([]);
+      } else {
+        setStages(data || []);
+      }
+    } catch (err) {
+      console.error('Stages fetch error:', err);
+      setStages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Hide section if loading or no data
+  if (loading) {
+    return (
+      <section className="section-academic">
+        <div className="container-academic">
+          <div className="flex items-center justify-center h-48">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (stages.length === 0) return null;
 
   return (
     <section className="section-academic">
@@ -55,32 +71,32 @@ const StagesSection = () => {
         </div>
 
         <div className="grid md:grid-cols-3 gap-5">
-          {stages.map((stage) => (
-            <Link
-              key={stage.id}
-              to={`/stages/${stage.id}`}
-              className="academic-card group hover:border-primary/20 transition-colors"
-            >
-              <div className="w-10 h-10 rounded-lg bg-primary/8 flex items-center justify-center mb-4">
-                <stage.icon className="w-5 h-5 text-primary" strokeWidth={1.5} />
-              </div>
-              <h3 className="text-lg font-medium text-foreground mb-2">
-                {t(stage.title.ar, stage.title.en)}
-              </h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                {t(stage.description.ar, stage.description.en)}
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="badge-stage">
-                  {t(stage.subjects.ar, stage.subjects.en)}
-                </span>
-                <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors flex items-center gap-1">
-                  {t('عرض المواد', 'View Subjects')}
-                  <ArrowIcon className="w-3 h-3" />
-                </span>
-              </div>
-            </Link>
-          ))}
+          {stages.map((stage, index) => {
+            const IconComponent = stageIcons[index % stageIcons.length];
+            return (
+              <Link
+                key={stage.id}
+                to={`/stages/${stage.slug || stage.id}`}
+                className="academic-card group hover:border-primary/20 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary/8 flex items-center justify-center mb-4">
+                  <IconComponent className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  {t(stage.title_ar, stage.title_en || stage.title_ar)}
+                </h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  {t(stage.description_ar || '', stage.description_en || stage.description_ar || '')}
+                </p>
+                <div className="flex items-center justify-end">
+                  <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors flex items-center gap-1">
+                    {t('عرض المواد', 'View Subjects')}
+                    <ArrowIcon className="w-3 h-3" />
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </section>

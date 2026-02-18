@@ -324,7 +324,7 @@ export default function LessonPlayer() {
                     )}
 
                     {/* Tabs */}
-                    <div className="border-b border-border sticky top-0 bg-background z-10 px-4">
+                    <div className="border-b border-border sticky top-0 bg-background z-[5] px-4">
                         <div className="flex gap-6 overflow-x-auto">
                             {['overview', 'quiz', 'qa', 'notes', 'reviews'].map((tab) => {
                                 if (tab === 'quiz' && !quizId) return null;

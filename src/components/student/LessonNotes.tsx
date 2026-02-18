@@ -6,6 +6,7 @@ import { LessonNote } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, Trash2, StickyNote } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface LessonNotesProps {
     lessonId: string;
@@ -42,35 +43,54 @@ export default function LessonNotes({ lessonId, currentTime }: LessonNotesProps)
         if (!note.trim() || !profile?.id) return;
         setSaving(true);
 
-        const newNote = {
-            user_id: profile.id,
-            lesson_id: lessonId,
-            content: note.trim(),
-            position_seconds: Math.floor(currentTime),
-            scroll_position: 0
-        };
+        try {
+            const newNote = {
+                user_id: profile.id,
+                lesson_id: lessonId,
+                content: note.trim(),
+                position_seconds: Math.floor(currentTime),
+                scroll_position: 0
+            };
 
-        const { data, error } = await supabase
-            .from('lesson_notes')
-            .insert(newNote)
-            .select()
-            .single();
+            const { data, error } = await supabase
+                .from('lesson_notes')
+                .insert(newNote)
+                .select()
+                .single();
 
-        if (data && !error) {
-            setSavedNotes(prev => [...prev, data as LessonNote].sort((a, b) => a.position_seconds - b.position_seconds));
-            setNote('');
+            if (error) {
+                console.error('Note save error:', error);
+                toast.error(t('فشل في حفظ الملاحظة', 'Failed to save note'));
+            } else if (data) {
+                setSavedNotes(prev => [...prev, data as LessonNote].sort((a, b) => a.position_seconds - b.position_seconds));
+                setNote('');
+                toast.success(t('تم حفظ الملاحظة', 'Note saved'));
+            }
+        } catch (err) {
+            console.error('Note save exception:', err);
+            toast.error(t('حدث خطأ أثناء الحفظ', 'An error occurred while saving'));
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
     };
 
     const handleDeleteNote = async (id: string) => {
-        const { error } = await supabase
-            .from('lesson_notes')
-            .delete()
-            .eq('id', id);
+        try {
+            const { error } = await supabase
+                .from('lesson_notes')
+                .delete()
+                .eq('id', id);
 
-        if (!error) {
-            setSavedNotes(prev => prev.filter(n => n.id !== id));
+            if (error) {
+                console.error('Note delete error:', error);
+                toast.error(t('فشل في حذف الملاحظة', 'Failed to delete note'));
+            } else {
+                setSavedNotes(prev => prev.filter(n => n.id !== id));
+                toast.success(t('تم حذف الملاحظة', 'Note deleted'));
+            }
+        } catch (err) {
+            console.error('Note delete exception:', err);
+            toast.error(t('حدث خطأ أثناء الحذف', 'An error occurred while deleting'));
         }
     };
 

@@ -34,7 +34,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users, Beaker, Pencil, Home } from 'lucide-react';
+import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users, Beaker, Pencil, Home, PlusCircle } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -74,6 +74,16 @@ export default function TeachersManagement() {
     const [submitting, setSubmitting] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<{ type: 'teacher' | 'invite'; item: Profile | TeacherInvite } | null>(null);
+
+    // Create teacher dialog state
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        full_name: '',
+        email: '',
+        bio_ar: '',
+        bio_en: '',
+        is_active: true,
+    });
 
     // Fetch data
     const fetchData = async () => {
@@ -142,6 +152,53 @@ export default function TeachersManagement() {
 
     const handleRetry = () => {
         fetchData();
+    };
+
+    // --- Create Teacher (Manual) ---
+    const handleCreateTeacher = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user?.id) {
+            toast.error(t('خطأ في المصادقة', 'Authentication error'));
+            return;
+        }
+
+        if (!createForm.full_name.trim()) {
+            toast.error(t('الرجاء إدخال الاسم', 'Please enter a name'));
+            return;
+        }
+
+        setSubmitting(true);
+
+        try {
+            const profileId = crypto.randomUUID();
+            const result = await verifiedInsert(
+                'profiles',
+                {
+                    id: profileId,
+                    full_name: createForm.full_name.trim(),
+                    email: createForm.email.trim() || null,
+                    bio_ar: createForm.bio_ar.trim() || null,
+                    bio_en: createForm.bio_en.trim() || null,
+                    role: 'teacher',
+                    is_active: createForm.is_active,
+                },
+                {
+                    successMessage: { ar: 'تم إنشاء حساب المعلم بنجاح', en: 'Teacher profile created successfully' },
+                    errorMessage: { ar: 'فشل في إنشاء حساب المعلم', en: 'Failed to create teacher profile' },
+                }
+            );
+
+            if (result.success) {
+                setCreateDialogOpen(false);
+                setCreateForm({ full_name: '', email: '', bio_ar: '', bio_en: '', is_active: true });
+                fetchData();
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('فشل في إنشاء حساب المعلم', 'Failed to create teacher profile'), { description: message });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     // --- Invite Handling ---
@@ -376,6 +433,10 @@ export default function TeachersManagement() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
+                        <PlusCircle className="w-4 h-4 me-2" />
+                        {t('إنشاء معلم', 'Create Teacher')}
+                    </Button>
                     <Button onClick={() => setInviteDialogOpen(true)}>
                         <UserPlus className="w-4 h-4 me-2" />
                         {t('دعوة معلم', 'Invite Teacher')}
@@ -681,6 +742,80 @@ export default function TeachersManagement() {
                             </Button>
                             <Button type="submit" className="flex-1" disabled={submitting}>
                                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('حفظ', 'Save')}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Create Teacher Dialog */}
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{t('إنشاء حساب معلم', 'Create Teacher Profile')}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateTeacher} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="create_name">{t('الاسم الكامل', 'Full Name')} *</Label>
+                            <Input
+                                id="create_name"
+                                value={createForm.full_name}
+                                onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_email">{t('البريد الإلكتروني', 'Email')}</Label>
+                            <Input
+                                id="create_email"
+                                type="email"
+                                value={createForm.email}
+                                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_bio_ar">{t('السيرة الذاتية بالعربية', 'Arabic Bio')}</Label>
+                            <Textarea
+                                id="create_bio_ar"
+                                value={createForm.bio_ar}
+                                onChange={(e) => setCreateForm({ ...createForm, bio_ar: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_bio_en">{t('السيرة الذاتية بالإنجليزية', 'English Bio')}</Label>
+                            <Textarea
+                                id="create_bio_en"
+                                value={createForm.bio_en}
+                                onChange={(e) => setCreateForm({ ...createForm, bio_en: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="create_active">{t('حالة الحساب', 'Account Status')}</Label>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">
+                                    {createForm.is_active ? t('نشط', 'Active') : t('معلق', 'Pending')}
+                                </span>
+                                <Switch
+                                    id="create_active"
+                                    checked={createForm.is_active}
+                                    onCheckedChange={(checked) => setCreateForm({ ...createForm, is_active: checked })}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground bg-secondary/30 p-3 rounded-lg">
+                            {t(
+                                'ملاحظة: هذا ينشئ ملف المعلم فقط. سيحتاج المعلم للتسجيل بشكل منفصل لتسجيل الدخول.',
+                                'Note: This creates a teacher profile only. The teacher will still need to register separately to log in.'
+                            )}
+                        </p>
+                        <div className="flex gap-2 pt-4">
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => setCreateDialogOpen(false)}>
+                                {t('إلغاء', 'Cancel')}
+                            </Button>
+                            <Button type="submit" className="flex-1" disabled={submitting}>
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('إنشاء', 'Create')}
                             </Button>
                         </div>
                     </form>
