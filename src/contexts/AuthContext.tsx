@@ -26,6 +26,7 @@ interface AuthContextType {
     resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
     updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
     redirectByRole: (role: UserRole | null) => void;
+    refreshProfile: () => Promise<void>;
     retryProfileFetch: () => Promise<void>;
     clearError: () => void;
 }
@@ -103,9 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                     const { data: insertedProfile, error: insertError } = await supabase
                         .from('profiles')
-                        .insert(newProfile)
+                        .insert(newProfile as any)
                         .select()
-                        .single();
+                        .single() as any;
 
                     if (insertError) {
                         devLog(`Profile creation error: ${insertError.message}`);
@@ -416,6 +417,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resetPassword,
         updatePassword,
         redirectByRole,
+        refreshProfile: retryProfileFetch,
         retryProfileFetch,
         clearError,
     }), [

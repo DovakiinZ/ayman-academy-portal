@@ -4,7 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
-import type { Subject, Lesson } from '@/types/database';
+import type { Subject, Lesson, Profile } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,13 +54,7 @@ interface Stage {
 }
 
 interface LessonWithJoins extends Lesson {
-    subject?: {
-        id: string;
-        title_ar: string;
-        title_en?: string | null;
-        stage_id?: string;
-        stage?: Stage | null;
-    } | null;
+    subject?: Subject | null;
 }
 
 export default function LessonsManagement() {
@@ -73,6 +67,7 @@ export default function LessonsManagement() {
     const [lessons, setLessons] = useState<LessonWithJoins[]>([]);
     const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
     const [allStages, setAllStages] = useState<Stage[]>([]);
+    const [allTeachers, setAllTeachers] = useState<Profile[]>([]);
     const [subject, setSubject] = useState<Subject | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -104,6 +99,7 @@ export default function LessonsManagement() {
         home_order: 0,
         teaser_ar: '',
         teaser_en: '',
+        created_by: '',
     });
 
     const fetchData = async () => {
@@ -112,19 +108,21 @@ export default function LessonsManagement() {
         setError(null);
 
         try {
-            const [stagesRes, subjectsRes] = await Promise.all([
+            const [stagesRes, subjectsRes, teachersRes] = await Promise.all([
                 supabase.from('stages').select('id, title_ar, title_en, sort_order').order('sort_order'),
                 supabase.from('subjects').select('id, title_ar, title_en, stage_id, sort_order').order('sort_order'),
+                supabase.from('profiles').select('*').eq('role', 'teacher').eq('is_active', true).order('full_name'),
             ]);
 
             if (mountedRef.current) {
                 if (stagesRes.data) setAllStages(stagesRes.data as Stage[]);
                 if (subjectsRes.data) setAllSubjects(subjectsRes.data as Subject[]);
+                if (teachersRes.data) setAllTeachers(teachersRes.data as Profile[]);
             }
 
             let query = (supabase
                 .from('lessons') as any)
-                .select('*, subject:subjects(id, title_ar, title_en, stage_id, stage:stages(id, title_ar, title_en))')
+                .select('*, created_by_teacher:profiles!created_by(id, full_name), subject:subjects(id, title_ar, title_en, stage_id, stage:stages(id, title_ar, title_en))')
                 .order('order_index', { ascending: true });
 
             if (subjectId) {
@@ -139,7 +137,7 @@ export default function LessonsManagement() {
                 }
             }
 
-            const { data: lessonsData, error: lessonsError } = await query;
+            const { data: lessonsData, error: lessonsError } = await (query as any);
 
             if (!mountedRef.current) return;
 
@@ -198,6 +196,7 @@ export default function LessonsManagement() {
             is_published: false, is_paid: true,
             show_on_home: false, home_order: 0,
             teaser_ar: '', teaser_en: '',
+            created_by: '',
         });
         setDialogOpen(true);
     };
@@ -219,6 +218,7 @@ export default function LessonsManagement() {
             home_order: lesson.home_order || 0,
             teaser_ar: lesson.teaser_ar || '',
             teaser_en: lesson.teaser_en || '',
+            created_by: lesson.created_by || '',
         });
         setDialogOpen(true);
     };
@@ -251,6 +251,7 @@ export default function LessonsManagement() {
                     home_order: form.home_order,
                     teaser_ar: form.teaser_ar || null,
                     teaser_en: form.teaser_en || null,
+                    created_by: form.created_by === 'none' ? null : (form.created_by || null),
                 }, {
                     successMessage: { ar: 'تم تحديث الدرس بنجاح', en: 'Lesson updated' },
                     errorMessage: { ar: 'فشل في تحديث الدرس', en: 'Failed to update lesson' },
@@ -273,6 +274,7 @@ export default function LessonsManagement() {
                     home_order: form.home_order,
                     teaser_ar: form.teaser_ar || null,
                     teaser_en: form.teaser_en || null,
+                    created_by: form.created_by === 'none' ? null : (form.created_by || null),
                 }, {
                     successMessage: { ar: 'تمت إضافة الدرس', en: 'Lesson added' },
                     errorMessage: { ar: 'فشل في إضافة الدرس', en: 'Failed to add lesson' },
@@ -457,6 +459,11 @@ export default function LessonsManagement() {
                                     {!subjectId && <TableCell><span className="text-sm">{lesson.subject?.title_ar || '—'}</span></TableCell>}
                                     {!subjectId && <TableCell><span className="text-sm text-muted-foreground">{lesson.subject?.stage?.title_ar || '—'}</span></TableCell>}
                                     <TableCell>
+                                        <span className="text-sm">
+                                            {(lesson as any).created_by_teacher?.full_name || '—'}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
                                         <Badge variant={lesson.is_paid ? 'default' : 'outline'} className={lesson.is_paid ? '' : 'text-green-600 border-green-200 bg-green-50'}>
                                             {lesson.is_paid ? t('مدفوع', 'Paid') : t('مجاني', 'Free')}
                                         </Badge>
@@ -499,6 +506,21 @@ export default function LessonsManagement() {
                                 <SelectTrigger><SelectValue placeholder={t('اختر مادة', 'Select Subject')} /></SelectTrigger>
                                 <SelectContent>{allSubjects.map((s) => <SelectItem key={s.id} value={s.id}>{s.title_ar}</SelectItem>)}</SelectContent>
                             </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{t('المعلم المسؤول', 'Responsible Teacher')}</Label>
+                            <Select value={form.created_by} onValueChange={(value) => setForm({ ...form, created_by: value })}>
+                                <SelectTrigger><SelectValue placeholder={t('اختر معلماً', 'Select Teacher')} /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">{t('بدون معلم', 'No Teacher')}</SelectItem>
+                                    {allTeachers.map((t) => (
+                                        <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground">
+                                {t('تحديد المعلم سيجعل الدرس يظهر في صفحته الشخصية', 'Assigning a teacher will show this lesson on their public profile')}
+                            </p>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">

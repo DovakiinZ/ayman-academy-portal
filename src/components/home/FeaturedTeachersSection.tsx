@@ -15,16 +15,35 @@ import { Button } from '@/components/ui/button';
 export default function FeaturedTeachersSection() {
     const { t, direction } = useLanguage();
     const [teachers, setTeachers] = useState<Partial<Profile>[]>([]);
+    const [stagesMap, setStagesMap] = useState<Record<string, any>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchFeaturedTeachers();
+        const init = async () => {
+            await fetchStages();
+            await fetchFeaturedTeachers();
+        };
+        init();
     }, []);
+
+    const fetchStages = async () => {
+        const { data, error } = await supabase
+            .from('stages')
+            .select('id, title_ar, title_en');
+
+        if (!error && data) {
+            const map: Record<string, any> = {};
+            data.forEach(s => {
+                map[s.id] = s;
+            });
+            setStagesMap(map);
+        }
+    };
 
     const fetchFeaturedTeachers = async () => {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, full_name, avatar_url, bio_ar, bio_en')
+            .select('id, full_name, avatar_url, bio_ar, bio_en, featured_stages')
             .eq('role', 'teacher')
             .eq('is_active', true)
             .eq('show_on_home', true)
@@ -95,6 +114,24 @@ export default function FeaturedTeachersSection() {
                                     <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                                         {t(teacher.bio_ar || '', teacher.bio_en || teacher.bio_ar || '')}
                                     </p>
+
+                                    {/* Assigned Stages */}
+                                    {teacher.featured_stages && teacher.featured_stages.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {teacher.featured_stages.map((stageId) => {
+                                                const stage = stagesMap[stageId];
+                                                if (!stage) return null;
+                                                return (
+                                                    <span
+                                                        key={stageId}
+                                                        className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20"
+                                                    >
+                                                        {t(stage.title_ar, stage.title_en || stage.title_ar)}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -113,7 +150,8 @@ export default function FeaturedTeachersSection() {
 
                 <div className="text-center mt-8">
                     <Link
-                        to="/stages"
+                        to="/instructors"
+                        target="_blank"
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                         {t('تعرف على جميع المعلمين', 'Meet All Instructors')}

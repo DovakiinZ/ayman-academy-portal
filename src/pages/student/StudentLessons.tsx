@@ -25,6 +25,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import ProgressMotivationBanner from '@/components/course/ProgressMotivationBanner';
+import { issueCertificate } from '@/lib/certificateGenerator';
 
 interface LessonWithProgress extends Lesson {
     progress?: LessonProgress;
@@ -173,39 +176,43 @@ export default function StudentLessons() {
                 </div>
             </div>
 
-            {/* Progress Card */}
-            <div className="bg-background border border-border rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                    <div>
-                        <p className="text-sm text-muted-foreground">
-                            {completedCount}/{totalCount} {t('دروس مكتملة', 'lessons completed')}
-                        </p>
-                    </div>
-                    <span className="text-sm font-bold text-primary">{progressPercent}%</span>
-                </div>
-                <div className="w-full h-2.5 bg-secondary rounded-full overflow-hidden mb-4">
-                    <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressPercent === 100 ? 'bg-green-500' : 'bg-primary'}`}
-                        style={{ width: `${progressPercent}%` }}
-                    />
-                </div>
-                {continueLesson && progressPercent < 100 && (
-                    <Link to={`/student/lesson/${continueLesson.id}`}>
-                        <Button className="gap-2">
-                            <Play className="w-4 h-4 fill-current" />
-                            {continueLesson.progress?.progress_percent
-                                ? t('متابعة', 'Continue')
-                                : t('ابدأ الآن', 'Start Now')}
-                        </Button>
-                    </Link>
-                )}
-                {progressPercent === 100 && (
-                    <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
-                        <CheckCircle className="w-4 h-4" />
-                        {t('أكملت جميع الدروس!', 'All lessons completed!')}
-                    </div>
-                )}
-            </div>
+            {/* Motivational Progress Banner */}
+            {totalCount > 0 && (
+                <ProgressMotivationBanner
+                    progressPercent={progressPercent}
+                    isCompleted={progressPercent === 100}
+                    completedLessons={completedCount}
+                    totalLessons={totalCount}
+                    onContinue={() => {
+                        if (continueLesson) {
+                            navigate(`/student/lesson/${continueLesson.id}`);
+                        }
+                    }}
+                    onClaimCertificate={async () => {
+                        if (!profile || !subjectId || !subject) return;
+                        try {
+                            const { certificate, error } = await issueCertificate({
+                                studentId: profile.id,
+                                studentName: profile.full_name || profile.email || 'طالب',
+                                lessonId: lessons[0]?.id || '',
+                                courseName: t(subject.title_ar, subject.title_en || subject.title_ar),
+                                subjectName: t(subject.title_ar, subject.title_en || subject.title_ar),
+                                subjectId: subjectId,
+                                score: 100,
+                            });
+                            if (certificate) {
+                                toast.success(t('🎉 تم إصدار الشهادة!', '🎉 Certificate issued!'));
+                                navigate('/student/certificates');
+                            } else if (error) {
+                                toast.error(error);
+                            }
+                        } catch (err) {
+                            console.error('Certificate claim error:', err);
+                            toast.error(t('فشل إصدار الشهادة', 'Failed to issue certificate'));
+                        }
+                    }}
+                />
+            )}
 
             {/* Lessons List */}
             <div className="space-y-2">

@@ -29,7 +29,7 @@ export default function FeaturedSubjectsSection() {
                 title_en,
                 teaser_ar,
                 teaser_en,
-                stage:stages(id, title_ar, title_en)
+                stage:stages(id, slug, title_ar, title_en)
             `)
             .eq('show_on_home', true)
             .order('home_order', { ascending: true })
@@ -46,6 +46,7 @@ export default function FeaturedSubjectsSection() {
                 title_en: item.title_en,
                 teaser_ar: item.teaser_ar,
                 teaser_en: item.teaser_en,
+                stage_slug: item.stage?.slug || item.stage?.id,
                 stage_ar: item.stage?.title_ar,
                 stage_en: item.stage?.title_en,
                 lessons_count: 0, // Placeholder
@@ -88,7 +89,7 @@ export default function FeaturedSubjectsSection() {
                     {subjects.map((subject) => (
                         <Link
                             key={subject.id}
-                            to={`/subject/${subject.id}`}
+                            to={`/stages/${subject.stage_slug}/${subject.id}`}
                             className="academic-card group hover:border-primary/30 transition-colors"
                         >
                             {/* Icon */}

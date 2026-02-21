@@ -15,12 +15,10 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedUpdate, verifiedInsert, devLog } from '@/lib/adminDb';
 import { Template, TemplateType, TemplateVariable } from '@/types/database';
-import {
-    renderTemplate,
-    SAMPLE_TOKEN_VALUES,
-    SAMPLE_TOKEN_VALUES_EN,
-} from '@/lib/templateRenderer';
+import { renderTemplate, SAMPLE_TOKEN_VALUES, SAMPLE_TOKEN_VALUES_EN } from '@/lib/templateRenderer';
+import { printCertificate } from '@/lib/printUtils';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,6 +38,7 @@ import {
     LayoutGrid,
     Plus,
     ChevronRight,
+    Printer,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -522,6 +521,17 @@ export default function TemplatesManagement() {
                                     <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)} title={t('معاينة', 'Preview')}>
                                         <Eye className={`w-4 h-4 ${showPreview ? 'text-primary' : ''}`} />
                                     </Button>
+                                    <Button variant="outline" size="sm" onClick={() => {
+                                        const content = previewContent();
+                                        const isCert = selectedTemplate.type === 'certificate';
+                                        const finalHtml = isCert
+                                            ? `<div class="is-certificate"><div class="preview-content">${content}</div></div>`
+                                            : `<div class="preview-content">${content}</div>`;
+                                        printCertificate(finalHtml, { title: language === 'ar' ? editForm.title_ar : editForm.title_en });
+                                    }} title={t('طباعة', 'Print')}>
+                                        <Printer className="w-4 h-4 me-1.5" />
+                                        {t('طباعة', 'Print')}
+                                    </Button>
                                     <Button variant="outline" size="sm" onClick={handleDuplicate} disabled={saving}>
                                         <Copy className="w-4 h-4 me-1.5" />
                                         {t('نسخ', 'Duplicate')}
@@ -629,7 +639,7 @@ export default function TemplatesManagement() {
                                 {/* Live Preview */}
                                 {showPreview && (
                                     <div className="border border-border rounded-lg overflow-hidden">
-                                        <div className="bg-secondary/30 px-4 py-2 border-b border-border flex items-center gap-2">
+                                        <div className="bg-secondary/30 px-4 py-2 border-b border-border flex items-center gap-2 no-print">
                                             <Eye className="w-4 h-4 text-primary" />
                                             <span className="text-xs font-semibold text-muted-foreground">
                                                 {t('معاينة مباشرة', 'Live Preview')}
@@ -639,14 +649,19 @@ export default function TemplatesManagement() {
                                             </span>
                                         </div>
                                         <div
-                                            className="p-6 bg-background text-foreground leading-relaxed text-base min-h-[80px]"
+                                            className={cn(
+                                                "p-6 bg-background text-foreground leading-relaxed text-base min-h-[80px] print-container",
+                                                selectedTemplate.type === 'certificate' && "is-certificate"
+                                            )}
                                             dir={activeTab === 'ar' ? 'rtl' : 'ltr'}
                                         >
-                                            {previewContent() || (
-                                                <span className="text-muted-foreground italic text-sm">
-                                                    {t('المحتوى فارغ', 'Content is empty')}
-                                                </span>
-                                            )}
+                                            <div className="preview-content">
+                                                {previewContent() || (
+                                                    <span className="text-muted-foreground italic text-sm no-print">
+                                                        {t('المحتوى فارغ', 'Content is empty')}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )}

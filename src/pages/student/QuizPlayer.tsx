@@ -1,25 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Loader2, CheckCircle, XCircle, RefreshCw, Award } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, RefreshCw, Award, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useSettings } from '@/contexts/SettingsContext';
 import { LessonQuizQuestion } from '@/types/database';
+import { issueCertificate } from '@/lib/certificateGenerator';
 
 interface QuizPlayerProps {
     quizId?: string;
     lessonId?: string;
 }
 
-export default function QuizPlayer({ quizId: propQuizId }: QuizPlayerProps) {
+export default function QuizPlayer({ quizId: propQuizId, lessonId: propLessonId }: QuizPlayerProps) {
     const { t, direction } = useLanguage();
+    const { profile } = useAuth();
     const { get } = useSettings();
     const params = useParams<{ quizId: string }>();
     const quizId = propQuizId || params.quizId;
+    const [certificateIssued, setCertificateIssued] = useState(false);
+    const [issuingCert, setIssuingCert] = useState(false);
 
     const [questions, setQuestions] = useState<LessonQuizQuestion[]>([]);
     const [loading, setLoading] = useState(true);
@@ -54,7 +59,7 @@ export default function QuizPlayer({ quizId: propQuizId }: QuizPlayerProps) {
         setAnswers(prev => ({ ...prev, [questionId]: value }));
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (Object.keys(answers).length < questions.length) {
             toast.error(t('الرجاء الإجابة على جميع الأسئلة', 'Please answer all questions'));
             return;
@@ -67,8 +72,46 @@ export default function QuizPlayer({ quizId: propQuizId }: QuizPlayerProps) {
             }
         });
 
-        setScore(Math.round((correctCount / questions.length) * 100));
+        const finalScore = Math.round((correctCount / questions.length) * 100);
+        setScore(finalScore);
         setSubmitted(true);
+
+        // Auto-issue certificate if passed
+        const threshold = get('completion.certificate_threshold_percent', 70);
+        if (finalScore >= threshold && profile && propLessonId) {
+            setIssuingCert(true);
+            try {
+                // Fetch lesson + subject info for the certificate
+                const { data: lessonData } = await supabase
+                    .from('lessons')
+                    .select('title_ar, subject_id, subjects(title_ar)')
+                    .eq('id', propLessonId)
+                    .single() as any;
+
+                const courseName = lessonData?.title_ar || 'درس';
+                const subjectName = lessonData?.subjects?.title_ar || undefined;
+                const subjectId = lessonData?.subject_id || undefined;
+
+                const { certificate, error } = await issueCertificate({
+                    studentId: profile.id,
+                    studentName: profile.full_name || profile.email || 'طالب',
+                    lessonId: propLessonId,
+                    courseName,
+                    subjectName,
+                    subjectId,
+                    score: finalScore,
+                });
+
+                if (certificate) {
+                    setCertificateIssued(true);
+                    toast.success(t('🎉 تم إصدار شهادة الإتمام!', '🎉 Certificate issued!'));
+                }
+            } catch (err) {
+                console.error('Certificate issuance error:', err);
+            } finally {
+                setIssuingCert(false);
+            }
+        }
     };
 
     const handleRetry = () => {
@@ -126,10 +169,26 @@ export default function QuizPlayer({ quizId: propQuizId }: QuizPlayerProps) {
                     })}
                 </div>
 
-                <Button onClick={handleRetry} variant="outline">
-                    <RefreshCw className="w-4 h-4 me-2" />
-                    {t('إعادة المحاولة', 'Retry Quiz')}
-                </Button>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                    {certificateIssued && (
+                        <Link to="/student/certificates">
+                            <Button className="gap-2">
+                                <Download className="w-4 h-4" />
+                                {t('شهاداتي', 'My Certificates')}
+                            </Button>
+                        </Link>
+                    )}
+                    {issuingCert && (
+                        <Button disabled>
+                            <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                            {t('جاري إصدار الشهادة...', 'Issuing certificate...')}
+                        </Button>
+                    )}
+                    <Button onClick={handleRetry} variant="outline">
+                        <RefreshCw className="w-4 h-4 me-2" />
+                        {t('إعادة المحاولة', 'Retry Quiz')}
+                    </Button>
+                </div>
             </div>
         );
     }

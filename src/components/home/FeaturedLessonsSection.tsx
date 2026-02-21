@@ -175,7 +175,7 @@ export default function FeaturedLessonsSection() {
 
                 <div className="text-center mt-8">
                     <Link
-                        to="/stages"
+                        to="/lessons"
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                         {t('استعرض جميع الدروس', 'Browse All Lessons')}

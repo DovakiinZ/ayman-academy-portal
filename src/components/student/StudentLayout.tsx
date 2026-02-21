@@ -8,7 +8,8 @@ import {
     User,
     LogOut,
     Menu,
-    X
+    X,
+    Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -17,6 +18,7 @@ import logo from '@/assets/logo.png';
 const navItems = [
     { path: '/student', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
     { path: '/student/subjects', icon: BookOpen, label: { ar: 'موادي', en: 'My Subjects' } },
+    { path: '/student/certificates', icon: Award, label: { ar: 'شهاداتي', en: 'Certificates' } },
     { path: '/student/messages', icon: MessageSquare, label: { ar: 'الرسائل', en: 'Messages' } },
     { path: '/student/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },
 ];

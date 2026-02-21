@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { DndContext, DragEndEvent, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Lesson, LessonSection, LessonBlock } from '@/types/database';
@@ -29,8 +29,8 @@ export default function LessonEditor() {
 
     // Data State
     const [lesson, setLesson] = useState<Lesson | null>(null);
-    const [sections, setSections] = useState<LessonSection[]>([]);
-    const [blocks, setBlocks] = useState<LessonBlock[]>([]);
+    const [sections, setSections] = useState<any[]>([]);
+    const [blocks, setBlocks] = useState<any[]>([]);
 
     // UI State
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -71,28 +71,6 @@ export default function LessonEditor() {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [saveStatus]);
 
-    // In-app navigation blocker (react-router)
-    const blocker = useBlocker(
-        ({ currentLocation, nextLocation }) =>
-            (saveStatus === 'unsaved' || saveStatus === 'saving') &&
-            currentLocation.pathname !== nextLocation.pathname
-    );
-
-    useEffect(() => {
-        if (blocker.state === 'blocked') {
-            const leave = window.confirm(
-                t(
-                    'لديك تغييرات غير محفوظة. هل تريد مغادرة الصفحة؟',
-                    'You have unsaved changes. Are you sure you want to leave?'
-                )
-            );
-            if (leave) {
-                blocker.proceed();
-            } else {
-                blocker.reset();
-            }
-        }
-    }, [blocker.state, t]);
 
     const fetchLessonData = async () => {
         setLoading(true);

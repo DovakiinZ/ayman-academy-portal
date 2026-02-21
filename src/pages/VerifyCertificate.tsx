@@ -1,0 +1,174 @@
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/lib/supabase';
+import type { Certificate } from '@/types/database';
+import { Loader2, CheckCircle, XCircle, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import logo from '@/assets/logo.png';
+
+export default function VerifyCertificate() {
+    const { code } = useParams<{ code: string }>();
+    const { t, direction } = useLanguage();
+    const [certificate, setCertificate] = useState<Certificate | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [notFound, setNotFound] = useState(false);
+
+    useEffect(() => {
+        if (code) fetchCertificate();
+    }, [code]);
+
+    const fetchCertificate = async () => {
+        const { data, error } = await supabase
+            .from('certificates')
+            .select('*')
+            .eq('verification_code', code!)
+            .single() as any;
+
+        if (error || !data) {
+            setNotFound(true);
+        } else {
+            setCertificate(data as Certificate);
+        }
+        setLoading(false);
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    return (
+        <div dir={direction} className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex flex-col">
+            {/* Header */}
+            <header className="bg-white border-b border-border shadow-sm">
+                <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <Link to="/" className="flex items-center gap-2">
+                        <img src={logo} alt="Ayman Academy" className="h-10" />
+                    </Link>
+                    <div className="flex items-center gap-2 text-primary">
+                        <ShieldCheck className="w-5 h-5" />
+                        <span className="text-sm font-medium">
+                            {t('التحقق من الشهادة', 'Certificate Verification')}
+                        </span>
+                    </div>
+                </div>
+            </header>
+
+            {/* Content */}
+            <main className="flex-1 flex items-center justify-center px-4 py-12">
+                <div className="max-w-lg w-full">
+                    {notFound ? (
+                        <div className="bg-white rounded-2xl shadow-lg border border-border p-8 text-center">
+                            <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                                <XCircle className="w-8 h-8 text-red-500" />
+                            </div>
+                            <h1 className="text-xl font-bold text-foreground mb-2">
+                                {t('شهادة غير موجودة', 'Certificate Not Found')}
+                            </h1>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                {t(
+                                    'لم يتم العثور على شهادة بهذا الرمز. تأكد من صحة الرابط.',
+                                    'No certificate found with this code. Make sure the URL is correct.'
+                                )}
+                            </p>
+                            <Link to="/">
+                                <Button variant="outline" className="gap-2">
+                                    {t('العودة للرئيسية', 'Go to Home')}
+                                    <ArrowRight className="w-4 h-4" />
+                                </Button>
+                            </Link>
+                        </div>
+                    ) : certificate && (
+                        <div className="bg-white rounded-2xl shadow-lg border border-border overflow-hidden">
+                            {/* Status Banner */}
+                            <div className={`px-6 py-4 text-center ${certificate.status === 'valid'
+                                    ? 'bg-green-50 border-b border-green-100'
+                                    : 'bg-red-50 border-b border-red-100'
+                                }`}>
+                                <div className="flex items-center justify-center gap-2 mb-1">
+                                    {certificate.status === 'valid' ? (
+                                        <CheckCircle className="w-6 h-6 text-green-600" />
+                                    ) : (
+                                        <XCircle className="w-6 h-6 text-red-600" />
+                                    )}
+                                    <span className={`text-lg font-bold ${certificate.status === 'valid' ? 'text-green-700' : 'text-red-700'
+                                        }`}>
+                                        {certificate.status === 'valid'
+                                            ? t('شهادة صالحة ✓', 'Valid Certificate ✓')
+                                            : t('شهادة ملغاة ✗', 'Revoked Certificate ✗')
+                                        }
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    {t('رمز التحقق:', 'Verification Code:')} {code}
+                                </p>
+                            </div>
+
+                            {/* Certificate Details */}
+                            <div className="p-6 space-y-5">
+                                <DetailRow
+                                    label={t('اسم الطالب/ة', 'Student Name')}
+                                    value={certificate.student_name}
+                                />
+                                <DetailRow
+                                    label={t('الدورة / الدرس', 'Course / Lesson')}
+                                    value={certificate.course_name}
+                                />
+                                {certificate.subject_name && (
+                                    <DetailRow
+                                        label={t('المادة', 'Subject')}
+                                        value={certificate.subject_name}
+                                    />
+                                )}
+                                {certificate.score !== null && (
+                                    <DetailRow
+                                        label={t('الدرجة', 'Score')}
+                                        value={`${certificate.score}%`}
+                                    />
+                                )}
+                                <DetailRow
+                                    label={t('تاريخ الإصدار', 'Issue Date')}
+                                    value={new Date(certificate.issued_at).toLocaleDateString('ar-EG', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                    })}
+                                />
+                            </div>
+
+                            {/* Footer */}
+                            <div className="bg-slate-50 px-6 py-4 border-t border-border text-center">
+                                <p className="text-xs text-muted-foreground">
+                                    {t(
+                                        'تم إصدار هذه الشهادة من أكاديمية أيمن التعليمية',
+                                        'Issued by Ayman Academy'
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            {/* Footer */}
+            <footer className="bg-white border-t border-border py-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                    © {new Date().getFullYear()} {t('أكاديمية أيمن التعليمية', 'Ayman Academy')}
+                </p>
+            </footer>
+        </div>
+    );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex justify-between items-center border-b border-border/50 pb-3 last:border-b-0">
+            <span className="text-sm text-muted-foreground">{label}</span>
+            <span className="text-sm font-medium text-foreground">{value}</span>
+        </div>
+    );
+}

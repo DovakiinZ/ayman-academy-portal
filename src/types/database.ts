@@ -21,6 +21,7 @@ export interface Profile {
     show_on_home?: boolean;
     home_order?: number;
     expertise_tags_ar?: string[];
+    featured_stages?: string[];
     created_at: string;
     updated_at?: string;
 }
@@ -226,6 +227,23 @@ export interface AuditLog {
     entity_type: string;
     entity_id: string | null;
     metadata: Record<string, unknown> | null;
+    created_at: string;
+}
+
+export interface Certificate {
+    id: string;
+    student_id: string;
+    lesson_id: string | null;
+    subject_id: string | null;
+    template_id: string | null;
+    student_name: string;
+    course_name: string;
+    subject_name: string | null;
+    score: number | null;
+    issued_at: string;
+    verification_code: string;
+    pdf_url: string | null;
+    status: 'valid' | 'revoked';
     created_at: string;
 }
 

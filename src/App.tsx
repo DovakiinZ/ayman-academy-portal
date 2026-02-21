@@ -12,10 +12,14 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Stages from "./pages/Stages";
 import StageDetail from "./pages/StageDetail";
+import Instructors from "./pages/Instructors";
 import SubjectDetail from "./pages/SubjectDetail";
+import SubjectRedirect from "./pages/SubjectRedirect";
 import LessonPage from "./pages/LessonPage";
 import Plans from "./pages/Plans";
 import Account from "./pages/Account";
+import TeacherPublicProfile from "./pages/TeacherPublicProfile";
+import Lessons from "./pages/Lessons";
 import NotFound from "./pages/NotFound";
 
 // Auth pages
@@ -37,6 +41,7 @@ import StudentProfile from "./pages/student/StudentProfile";
 import Messages from "./pages/student/Messages";
 import LessonPlayer from "./pages/student/LessonPlayer";
 import QuizPlayer from "./pages/student/QuizPlayer";
+import MyCertificates from "./pages/student/MyCertificates";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -48,6 +53,7 @@ import LessonsManagement from "./pages/admin/LessonsManagement";
 import HomepageManagement from "./pages/admin/HomepageManagement";
 import TemplatesManagement from "./pages/admin/TemplatesManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
+import VerifyCertificate from "./pages/VerifyCertificate";
 
 import TeacherLayout from "./components/teacher/TeacherLayout";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
@@ -82,11 +88,15 @@ const App = () => (
                   {/* Public routes */}
                   <Route path="/" element={<Index />} />
                   <Route path="/stages" element={<Stages />} />
-                  <Route path="/stages/:stageId" element={<StageDetail />} />
-                  <Route path="/stages/:stageId/:subjectId" element={<SubjectDetail />} />
+                  <Route path="/stages/:slug" element={<StageDetail />} />
+                  <Route path="/stages/:slug/:subjectId" element={<SubjectDetail />} />
                   <Route path="/lesson/:lessonId" element={<LessonPage />} />
                   <Route path="/plans" element={<Plans />} />
                   <Route path="/account" element={<Account />} />
+                  <Route path="/teacher/:id" element={<TeacherPublicProfile />} />
+                  <Route path="/lessons" element={<Lessons />} />
+                  <Route path="/instructors" element={<Instructors />} />
+                  <Route path="/verify/:code" element={<VerifyCertificate />} />
 
                   {/* Auth routes */}
                   <Route path="/login" element={<Login />} />
@@ -142,6 +152,7 @@ const App = () => (
                     <Route path="profile" element={<StudentProfile />} />
                     <Route path="lesson/:id" element={<LessonPlayer />} />
                     <Route path="quiz/:quizId" element={<QuizPlayer />} />
+                    <Route path="certificates" element={<MyCertificates />} />
                   </Route>
 
                   {/* Catch-all */}

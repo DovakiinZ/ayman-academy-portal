@@ -262,3 +262,71 @@
     @apply transition-colors duration-150 ease-in-out;
   }
 }
+
+/* Print Styles for Templates & Certificates */
+@media print {
+
+  /* Hide standard UI elements */
+  nav,
+  aside,
+  header,
+  footer,
+  button,
+  .no-print,
+  [role="tablist"],
+  [role="search"],
+  .border-b,
+  .border-s {
+    display: none !important;
+  }
+
+  /* Reset layout for print */
+  body,
+  html,
+  #root {
+    background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Target the template preview */
+  .print-container {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 2cm !important;
+  }
+
+  /* Certificate specific styling */
+  .is-certificate {
+    padding: 0 !important;
+  }
+
+  .is-certificate .preview-content {
+    border: 10px double hsl(var(--academic-gold));
+    padding: 2rem;
+    min-height: 18cm;
+    /* A4 height approx */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background-color: transparent !important;
+  }
+
+  /* Ensure text is black and high contrast */
+  .preview-content {
+    color: black !important;
+    background: white !important;
+    font-size: 14pt !important;
+  }
+
+  /* Force landscape for certificates if needed - browser dependent */
+  @page {
+    margin: 0;
+  }
+}
