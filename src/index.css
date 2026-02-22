@@ -1,0 +1,278 @@
+@import "@fontsource/ibm-plex-sans-arabic/400.css";
+@import "@fontsource/ibm-plex-sans-arabic/500.css";
+@import "@fontsource/ibm-plex-sans-arabic/600.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ayman Academy Design System - Premium Academic Institution */
+
+@layer base {
+  :root {
+    /* Warm ivory background - not pure white */
+    --background: 42 30% 97%;
+    --foreground: 220 30% 12%;
+
+    /* Card surfaces */
+    --card: 42 25% 99%;
+    --card-foreground: 220 30% 12%;
+
+    /* Popover */
+    --popover: 42 25% 99%;
+    --popover-foreground: 220 30% 12%;
+
+    /* Deep Navy - Oxford inspired primary */
+    --primary: 215 55% 20%;
+    --primary-foreground: 42 25% 98%;
+
+    /* Subtle secondary */
+    --secondary: 42 15% 94%;
+    --secondary-foreground: 220 25% 18%;
+
+    /* Muted tones */
+    --muted: 42 12% 92%;
+    --muted-foreground: 220 12% 45%;
+
+    /* Muted warm gold accent - badges/dividers only */
+    --accent: 43 30% 55%;
+    --accent-foreground: 42 25% 98%;
+
+    /* Destructive */
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Warm gray borders */
+    --border: 42 12% 88%;
+    --input: 42 12% 88%;
+    --ring: 215 55% 20%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Academic style */
+    --sidebar-background: 42 20% 96%;
+    --sidebar-foreground: 220 25% 15%;
+    --sidebar-primary: 215 55% 20%;
+    --sidebar-primary-foreground: 42 25% 98%;
+    --sidebar-accent: 42 15% 92%;
+    --sidebar-accent-foreground: 220 25% 15%;
+    --sidebar-border: 42 12% 88%;
+    --sidebar-ring: 215 55% 20%;
+
+    /* Custom academic tokens */
+    --academic-gold: 43 35% 55%;
+    --academic-gold-muted: 43 20% 70%;
+    --paper: 42 30% 97%;
+    --paper-dark: 42 20% 93%;
+    --ink: 220 30% 12%;
+    --ink-light: 220 15% 40%;
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 42 15% 93%;
+
+    --card: 220 25% 10%;
+    --card-foreground: 42 15% 93%;
+
+    --popover: 220 25% 10%;
+    --popover-foreground: 42 15% 93%;
+
+    --primary: 215 45% 50%;
+    --primary-foreground: 220 25% 8%;
+
+    --secondary: 220 20% 14%;
+    --secondary-foreground: 42 15% 93%;
+
+    --muted: 220 20% 16%;
+    --muted-foreground: 42 12% 60%;
+
+    --accent: 43 35% 50%;
+    --accent-foreground: 220 25% 8%;
+
+    --destructive: 0 50% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 215 45% 50%;
+
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 42 15% 93%;
+    --sidebar-primary: 215 45% 50%;
+    --sidebar-primary-foreground: 220 25% 8%;
+    --sidebar-accent: 220 20% 14%;
+    --sidebar-accent-foreground: 42 15% 93%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 215 45% 50%;
+
+    --academic-gold: 43 40% 50%;
+    --academic-gold-muted: 43 25% 38%;
+    --paper: 220 25% 8%;
+    --paper-dark: 220 25% 11%;
+    --ink: 42 15% 93%;
+    --ink-light: 42 12% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
+  }
+
+  html[dir="rtl"] {
+    font-family: "IBM Plex Sans Arabic", system-ui, sans-serif;
+  }
+
+  html[dir="ltr"] {
+    font-family: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Academic headings - calmer, editorial */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-medium tracking-tight;
+  }
+
+  h1 {
+    @apply text-2xl md:text-3xl lg:text-4xl leading-tight;
+  }
+
+  h2 {
+    @apply text-xl md:text-2xl leading-snug;
+  }
+
+  h3 {
+    @apply text-lg md:text-xl;
+  }
+
+  /* Reading comfort - increased line height for Arabic */
+  p {
+    @apply leading-relaxed;
+    line-height: 1.85;
+  }
+
+  /* Arabic-specific adjustments */
+  html[dir="rtl"] p {
+    line-height: 2;
+  }
+}
+
+@layer components {
+
+  /* Academic card style - subtle */
+  .academic-card {
+    @apply bg-card border border-border rounded-lg p-6;
+  }
+
+  /* Institutional section */
+  .section-academic {
+    @apply py-12 md:py-16;
+  }
+
+  /* Container with academic proportions */
+  .container-academic {
+    @apply max-w-5xl mx-auto px-4 md:px-6;
+  }
+
+  /* Subtle divider */
+  .divider-academic {
+    @apply border-t border-border my-6;
+  }
+
+  /* Gold accent text */
+  .text-gold {
+    color: hsl(var(--academic-gold));
+  }
+
+  /* Lock indicator */
+  .lesson-locked {
+    @apply opacity-70;
+  }
+
+  /* Badge styles - subtle */
+  .badge-stage {
+    @apply inline-flex items-center px-2.5 py-1 text-xs font-medium rounded bg-secondary text-secondary-foreground border border-border;
+  }
+
+  .badge-gold {
+    @apply inline-flex items-center px-2.5 py-1 text-xs font-medium rounded;
+    background-color: hsl(var(--academic-gold-muted) / 0.15);
+    color: hsl(var(--academic-gold));
+    border: 1px solid hsl(var(--academic-gold-muted) / 0.25);
+  }
+
+  /* Eyebrow text */
+  .eyebrow {
+    @apply text-xs font-medium tracking-wide uppercase;
+    color: hsl(var(--academic-gold));
+  }
+}
+
+@layer utilities {
+
+  /* RTL/LTR aware margins and paddings */
+  .ms-auto {
+    margin-inline-start: auto;
+  }
+
+  .me-auto {
+    margin-inline-end: auto;
+  }
+
+  .ps-4 {
+    padding-inline-start: 1rem;
+  }
+
+  .pe-4 {
+    padding-inline-end: 1rem;
+  }
+
+  /* Text alignment */
+  .text-start {
+    text-align: start;
+  }
+
+  .text-end {
+    text-align: end;
+  }
+
+  /* Academic spacing */
+  .space-academic {
+    @apply space-y-5;
+  }
+
+  /* Subtle transition */
+  .transition-academic {
+    @apply transition-colors duration-150 ease-in-out;
+  }
+
+  /* Safe area insets for mobile devices (notch, home indicator) */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
