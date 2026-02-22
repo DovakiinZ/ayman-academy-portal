@@ -8,7 +8,8 @@ import {
     LogOut,
     Menu,
     X,
-    ClipboardList
+    ClipboardList,
+    BookMarked
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -16,6 +17,7 @@ import logo from '@/assets/logo.png';
 
 const navItems = [
     { path: '/teacher', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
+    { path: '/teacher/courses', icon: BookMarked, label: { ar: 'دوراتي', en: 'My Courses' } },
     { path: '/teacher/lessons', icon: BookOpen, label: { ar: 'دروسي', en: 'My Lessons' } },
     { path: '/teacher/quizzes', icon: ClipboardList, label: { ar: 'الاختبارات', en: 'Quizzes' } },
     { path: '/teacher/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },

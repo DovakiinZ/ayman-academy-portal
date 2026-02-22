@@ -275,7 +275,7 @@ export default function Lessons() {
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                         />
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                                            <div className="w-12 h-12 rounded-full bg-background/90 flex items-center justify-center">
                                                 <Play className="w-5 h-5 text-primary fill-current ms-1" />
                                             </div>
                                         </div>

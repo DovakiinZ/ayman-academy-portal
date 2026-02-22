@@ -15,7 +15,7 @@ export function ProtectedRoute({
     allowedRoles,
     redirectTo = '/login'
 }: ProtectedRouteProps) {
-    const { isAuthenticated, isLoading, profileLoading, role, error, retryProfileFetch } = useAuth();
+    const { isAuthenticated, isLoading, profileLoading, role, profile, error, retryProfileFetch } = useAuth();
     const location = useLocation();
 
     // Initial auth loading
@@ -69,6 +69,11 @@ export function ProtectedRoute({
                 <p className="text-sm text-muted-foreground">جاري تحميل الصلاحيات...</p>
             </div>
         );
+    }
+
+    // Onboarding guard — students must complete onboarding
+    if (role === 'student' && profile && !profile.student_stage && location.pathname !== '/onboarding') {
+        return <Navigate to="/onboarding" replace />;
     }
 
     // Role-based access control

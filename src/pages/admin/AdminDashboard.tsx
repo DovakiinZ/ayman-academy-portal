@@ -12,6 +12,7 @@ interface AdminStats {
     stages: number;
     subjects: number;
     lessons: number;
+    students: number;
     pendingInvites: number;
 }
 
@@ -20,6 +21,7 @@ const initialStats: AdminStats = {
     stages: 0,
     subjects: 0,
     lessons: 0,
+    students: 0,
     pendingInvites: 0,
 };
 
@@ -45,7 +47,14 @@ export default function AdminDashboard() {
 
         try {
             // Fetch all counts in parallel
-            const [teachersResult, stagesResult, subjectsResult, lessonsResult, invitesResult] = await Promise.all([
+            const [
+                teachersResult,
+                stagesResult,
+                subjectsResult,
+                lessonsResult,
+                studentsResult,
+                invitesResult
+            ] = await Promise.all([
                 safeFetchSimple(
                     async () => {
                         const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'teacher');
@@ -80,6 +89,14 @@ export default function AdminDashboard() {
                 ),
                 safeFetchSimple(
                     async () => {
+                        const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student');
+                        return { data: { count: count ?? 0 }, error };
+                    },
+                    { count: 0 },
+                    'admin-students-count'
+                ),
+                safeFetchSimple(
+                    async () => {
                         const { count, error } = await supabase.from('teacher_invites').select('*', { count: 'exact', head: true }).eq('status', 'pending');
                         return { data: { count: count ?? 0 }, error };
                     },
@@ -91,23 +108,23 @@ export default function AdminDashboard() {
             if (!mountedRef.current) return;
 
             setStats({
-                teachers: (teachersResult.data as { count?: number }).count ?? 0,
-                stages: (stagesResult.data as { count?: number }).count ?? 0,
-                subjects: (subjectsResult.data as { count?: number }).count ?? 0,
-                lessons: (lessonsResult.data as { count?: number }).count ?? 0,
-                pendingInvites: (invitesResult.data as { count?: number }).count ?? 0,
+                teachers: (teachersResult.data as any).count ?? 0,
+                stages: (stagesResult.data as any).count ?? 0,
+                subjects: (subjectsResult.data as any).count ?? 0,
+                lessons: (lessonsResult.data as any).count ?? 0,
+                students: (studentsResult.data as any).count ?? 0,
+                pendingInvites: (invitesResult.data as any).count ?? 0,
             });
 
-            // Show error only if all failed
-            const errors = [teachersResult.error, stagesResult.error, subjectsResult.error, lessonsResult.error, invitesResult.error].filter(Boolean);
-            if (errors.length === 5) {
-                setError(errors[0] || 'Failed to fetch data');
+            // Show error only if all crucial fetches failed
+            const crucialErrors = [teachersResult.error, stagesResult.error, subjectsResult.error, lessonsResult.error].filter(Boolean);
+            if (crucialErrors.length === 4) {
+                setError(crucialErrors[0] || 'Failed to fetch dashboard data');
             }
         } catch (err) {
             if (!mountedRef.current) return;
             setError(err instanceof Error ? err.message : 'Unknown error');
             setStats(initialStats);
-
         } finally {
             if (mountedRef.current) {
                 setLoading(false);
@@ -158,6 +175,13 @@ export default function AdminDashboard() {
             icon: PlayCircle,
             color: 'bg-purple-100 text-purple-600',
             link: '/admin/lessons',
+        },
+        {
+            title: t('الطلاب', 'Students'),
+            value: stats.students,
+            icon: GraduationCap,
+            color: 'bg-orange-100 text-orange-600',
+            link: '/admin/enrollments',
         },
     ];
 

@@ -4,6 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
+import CertificateRulesConfig from '@/components/admin/CertificateRulesConfig';
 import type { Stage, Subject } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -709,6 +710,14 @@ export default function SubjectsManagement() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Certificate Rules — only when editing existing subject */}
+                        {editingSubject && (
+                            <div className="border-t pt-4 mt-4">
+                                <CertificateRulesConfig subjectId={editingSubject.id} />
+                            </div>
+                        )}
+
                         <div className="flex gap-2 pt-4">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
                                 {t('إلغاء', 'Cancel')}

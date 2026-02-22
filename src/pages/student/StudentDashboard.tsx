@@ -6,13 +6,17 @@
  * 2. My Subjects with progress bars
  * 3. Recent Lessons
  * 4. Progress Summary stats
+ *
+ * Uses React Query for cached data — instantly hydrated from localStorage.
  */
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { STALE_TIMES } from '@/lib/queryConfig';
 import { Lesson, Subject, Stage, LessonProgress } from '@/types/database';
 import {
     BookOpen,
@@ -25,7 +29,12 @@ import {
     BookMarked,
     Award,
     Loader2,
+    Trophy,
+    GraduationCap,
+    RefreshCw,
 } from 'lucide-react';
+import XPProgressBar from '@/components/student/XPProgressBar';
+import StudentCoachWidget from '@/components/student/StudentCoachWidget';
 import { Button } from '@/components/ui/button';
 
 interface ContinueItem {
@@ -63,25 +72,14 @@ export default function StudentDashboard() {
     const { profile } = useAuth();
     const navigate = useNavigate();
 
-    const [continueItem, setContinueItem] = useState<ContinueItem | null>(null);
-    const [subjectProgress, setSubjectProgress] = useState<SubjectProgress[]>([]);
-    const [recentLessons, setRecentLessons] = useState<RecentLesson[]>([]);
-    const [stats, setStats] = useState({ completed: 0, inProgress: 0, totalSubjects: 0 });
-    const [loading, setLoading] = useState(true);
-
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
-    useEffect(() => {
-        if (profile?.id) {
-            fetchDashboardData();
-        }
-    }, [profile?.id]);
+    // Single cached query for all dashboard data
+    const { data: dashData, isLoading, isFetching } = useQuery<any>({
+        queryKey: ['student-dashboard-full', profile?.id],
+        queryFn: async () => {
+            const userId = profile!.id;
 
-    const fetchDashboardData = async () => {
-        if (!profile?.id) return;
-        setLoading(true);
-
-        try {
             // 1. Fetch all progress for this user
             const { data: allProgress } = await supabase
                 .from('lesson_progress')
@@ -95,7 +93,7 @@ export default function StudentDashboard() {
                         )
                     )
                 `)
-                .eq('user_id', profile.id)
+                .eq('user_id', userId)
                 .order('updated_at', { ascending: false });
 
             const progressItems = (allProgress || []) as any[];
@@ -104,76 +102,70 @@ export default function StudentDashboard() {
             const lastIncomplete = progressItems.find(
                 p => !p.completed_at && p.progress_percent > 0 && p.lesson
             );
-            if (lastIncomplete) {
-                setContinueItem({
-                    progress: lastIncomplete,
-                    lesson: lastIncomplete.lesson,
-                    videoUrl: lastIncomplete.lesson.video_url ||
-                        lastIncomplete.lesson.full_video_url ||
-                        lastIncomplete.lesson.preview_video_url,
-                });
-            }
+            const continueItem: ContinueItem | null = lastIncomplete ? {
+                progress: lastIncomplete,
+                lesson: lastIncomplete.lesson,
+                videoUrl: lastIncomplete.lesson.video_url ||
+                    lastIncomplete.lesson.full_video_url ||
+                    lastIncomplete.lesson.preview_video_url,
+            } : null;
 
-            // 3. Recent lessons (last 5 with lesson data)
-            const recent = progressItems
+            // 3. Recent lessons (last 5)
+            const recentLessons: RecentLesson[] = progressItems
                 .filter(p => p.lesson)
                 .slice(0, 5)
-                .map(p => ({
-                    lesson: p.lesson,
-                    progress: p,
-                }));
-            setRecentLessons(recent);
+                .map(p => ({ lesson: p.lesson, progress: p }));
 
-            // 4. Compute per-subject progress
+            // 4. Per-subject progress
             const { data: allSubjects } = await supabase
                 .from('subjects')
-                .select(`
-                    *,
-                    stage:stages(*),
-                    lessons(id)
-                `)
+                .select('*, stage:stages(*), lessons(id)')
                 .eq('is_active', true)
                 .order('sort_order');
 
-            if (allSubjects) {
-                const completedIds = new Set(
-                    progressItems.filter(p => p.completed_at).map(p => p.lesson_id)
-                );
+            const completedIds = new Set(
+                progressItems.filter(p => p.completed_at).map(p => p.lesson_id)
+            );
 
-                const spList: SubjectProgress[] = (allSubjects as any[])
-                    .map(s => {
-                        const lessonIds: string[] = (s.lessons || []).map((l: any) => l.id);
-                        const total = lessonIds.length;
-                        const completed = lessonIds.filter(id => completedIds.has(id)).length;
-                        return {
-                            subject: { ...s, lessons: undefined },
-                            totalLessons: total,
-                            completedLessons: completed,
-                            percent: total > 0 ? Math.round((completed / total) * 100) : 0,
-                        };
-                    })
-                    .filter(s => s.totalLessons > 0); // only show subjects with lessons
+            const subjectProgress: SubjectProgress[] = ((allSubjects || []) as any[])
+                .map(s => {
+                    const lessonIds: string[] = (s.lessons || []).map((l: any) => l.id);
+                    const total = lessonIds.length;
+                    const completed = lessonIds.filter(id => completedIds.has(id)).length;
+                    return {
+                        subject: { ...s, lessons: undefined },
+                        totalLessons: total,
+                        completedLessons: completed,
+                        percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+                    };
+                })
+                .filter(s => s.totalLessons > 0);
 
-                setSubjectProgress(spList);
+            // 5. Stats
+            const completedCount = progressItems.filter(p => p.completed_at).length;
+            const inProgressCount = progressItems.filter(p => !p.completed_at && p.progress_percent > 0).length;
 
-                // 5. Stats
-                const completedCount = progressItems.filter(p => p.completed_at).length;
-                const inProgressCount = progressItems.filter(p => !p.completed_at && p.progress_percent > 0).length;
-
-                setStats({
+            return {
+                continueItem,
+                recentLessons,
+                subjectProgress,
+                stats: {
                     completed: completedCount,
                     inProgress: inProgressCount,
-                    totalSubjects: spList.length,
-                });
-            }
-        } catch (err) {
-            console.error('[StudentDashboard] Error:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+                    totalSubjects: subjectProgress.length,
+                },
+            };
+        },
+        enabled: !!profile?.id,
+        staleTime: STALE_TIMES.DYNAMIC,
+    });
 
-    if (loading) {
+    const continueItem = dashData?.continueItem ?? null;
+    const subjectProgress = dashData?.subjectProgress ?? [];
+    const recentLessons = dashData?.recentLessons ?? [];
+    const stats = dashData?.stats ?? { completed: 0, inProgress: 0, totalSubjects: 0 };
+
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -182,162 +174,199 @@ export default function StudentDashboard() {
     }
 
     return (
-        <div className="space-y-8 pb-12">
+        <div className="space-y-6 md:space-y-8 pb-12">
             {/* ===== WELCOME + CONTINUE LEARNING ===== */}
             {continueItem ? (
-                <section className="bg-gradient-to-br from-primary/5 via-primary/3 to-background border border-primary/10 rounded-2xl overflow-hidden">
-                    <div className="p-6 lg:p-8">
-                        <p className="text-sm text-muted-foreground mb-1">
-                            {t(`مرحباً ${profile?.full_name?.split(' ')[0] || ''}!`, `Hi ${profile?.full_name?.split(' ')[0] || ''}!`)}
+                <section className="premium-card bg-secondary/20 border-primary/10 overflow-hidden relative">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-primary/70" />
+                    <div className="p-8 lg:p-10">
+                        <p className="text-xs font-bold tracking-widest uppercase text-primary/70 mb-2">
+                            {t(`مرحباً ${profile?.full_name?.split(' ')[0] || ''}!`, `Welcome back, ${profile?.full_name?.split(' ')[0] || ''}!`)}
                         </p>
-                        <h2 className="text-xl font-bold text-foreground mb-4">
-                            {t('أكمل ما بدأته', 'Continue where you left off')}
+                        <h2 className="text-2xl font-black text-foreground mb-8">
+                            {t('أكمل رحلتك التعليمية', 'Continue Your Learning Journey')}
                         </h2>
 
-                        <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex flex-col lg:flex-row gap-8">
                             {/* Thumbnail */}
                             {continueItem.videoUrl && (
                                 <Link
                                     to={`/student/lesson/${continueItem.lesson.id}`}
-                                    className="relative aspect-video sm:w-64 bg-black rounded-xl overflow-hidden flex-shrink-0 group"
+                                    className="relative aspect-video lg:w-80 bg-secondary/20 rounded-2xl overflow-hidden flex-shrink-0 group shadow-lg ring-1 ring-border transition-transform hover:scale-[1.02]"
                                 >
                                     {getYoutubeId(continueItem.videoUrl) ? (
                                         <img
                                             src={`https://img.youtube.com/vi/${getYoutubeId(continueItem.videoUrl)}/mqdefault.jpg`}
                                             alt=""
-                                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                            className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-500"
                                         />
                                     ) : (
-                                        <div className="w-full h-full bg-secondary flex items-center justify-center">
-                                            <Play className="w-10 h-10 text-muted-foreground/30" />
+                                        <div className="w-full h-full bg-secondary/20 flex items-center justify-center">
+                                            <Play className="w-12 h-12 text-muted-foreground/30" />
                                         </div>
                                     )}
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="w-12 h-12 rounded-full bg-primary/90 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                            <Play className="w-5 h-5 text-primary-foreground fill-current ms-0.5" />
-                                        </div>
-                                    </div>
-                                    {/* Progress bar at bottom */}
-                                    <div className="absolute bottom-0 inset-x-0 h-1 bg-black/40">
+                                    <div className="absolute inset-x-0 bottom-0 h-1 bg-secondary/50">
                                         <div
                                             className="h-full bg-primary"
                                             style={{ width: `${continueItem.progress.progress_percent}%` }}
                                         />
+                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/20">
+                                        <div className="w-14 h-14 rounded-full bg-background/95 flex items-center justify-center shadow-2xl">
+                                            <Play className="w-6 h-6 text-primary fill-primary ms-1" />
+                                        </div>
                                     </div>
                                 </Link>
                             )}
 
                             {/* Info */}
                             <div className="flex-1 flex flex-col justify-center min-w-0">
-                                <p className="text-xs text-muted-foreground mb-1">
-                                    {t(
-                                        continueItem.lesson.subject?.title_ar || '',
-                                        continueItem.lesson.subject?.title_en || continueItem.lesson.subject?.title_ar || ''
-                                    )}
-                                    {' • '}
-                                    {t(
-                                        continueItem.lesson.subject?.stage?.title_ar || '',
-                                        continueItem.lesson.subject?.stage?.title_en || ''
-                                    )}
-                                </p>
-                                <h3 className="text-lg font-semibold text-foreground mb-2 truncate">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="badge-premium">
+                                        {t(
+                                            continueItem.lesson.subject?.title_ar || '',
+                                            continueItem.lesson.subject?.title_en || continueItem.lesson.subject?.title_ar || ''
+                                        )}
+                                    </span>
+                                    <span className="w-1 h-1 rounded-full bg-border" />
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                        {t(
+                                            continueItem.lesson.subject?.stage?.title_ar || '',
+                                            continueItem.lesson.subject?.stage?.title_en || ''
+                                        )}
+                                    </span>
+                                </div>
+
+                                <h3 className="text-xl font-bold text-foreground mb-3 truncate leading-snug">
                                     {t(continueItem.lesson.title_ar, continueItem.lesson.title_en || continueItem.lesson.title_ar)}
                                 </h3>
-                                <div className="flex items-center gap-3 text-sm text-muted-foreground mb-4">
-                                    <span className="flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5" />
+
+                                <div className="flex items-center gap-4 text-sm font-semibold text-muted-foreground mb-8">
+                                    <span className="flex items-center gap-2">
+                                        <Clock className="w-4 h-4 text-muted-foreground/60" />
                                         {Math.floor(continueItem.progress.last_position_seconds / 60)} {t('دقيقة', 'min')}
                                     </span>
-                                    <span>{continueItem.progress.progress_percent}% {t('مكتمل', 'done')}</span>
+                                    <span className="w-1 h-1 rounded-full bg-border" />
+                                    <span className="text-primary">{continueItem.progress.progress_percent}% {t('مكتمل', 'done')}</span>
                                 </div>
-                                <Link to={`/student/lesson/${continueItem.lesson.id}`}>
-                                    <Button size="lg" className="gap-2">
-                                        <Play className="w-4 h-4 fill-current" />
-                                        {t('متابعة المشاهدة', 'Resume')}
-                                    </Button>
-                                </Link>
+
+                                <div className="flex flex-wrap gap-4">
+                                    <Link to={`/student/lesson/${continueItem.lesson.id}`}>
+                                        <Button size="lg" className="h-12 px-8 gap-3 rounded-xl shadow-premium bg-primary hover:bg-primary/90 font-bold">
+                                            <Play className="w-4 h-4 fill-current" />
+                                            {t('متابعة الدرس', 'Continue Lesson')}
+                                        </Button>
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </section>
             ) : (
                 /* Welcome banner for new students */
-                <section className="bg-gradient-to-br from-primary/8 to-primary/2 rounded-2xl p-8 lg:p-12 text-center border border-primary/10">
-                    <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-3">
-                        {t(
-                            `مرحباً ${profile?.full_name?.split(' ')[0] || ''} في أكاديمية أيمن!`,
-                            `Welcome ${profile?.full_name?.split(' ')[0] || ''} to Ayman Academy!`
-                        )}
-                    </h1>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        {t('ابدأ رحلتك التعليمية الآن باستعراض المواد المتاحة', 'Start your learning journey by browsing available subjects')}
-                    </p>
-                    <Link to="/student/subjects">
-                        <Button size="lg" className="px-8">{t('تصفح المواد', 'Browse Subjects')}</Button>
-                    </Link>
+                <section className="premium-card p-10 lg:p-16 text-center border-primary/10 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-primary/70" />
+                    <div className="relative z-10 max-w-2xl mx-auto">
+                        <div className="w-20 h-20 rounded-full bg-primary/5 border border-primary/10 flex items-center justify-center mx-auto mb-8">
+                            <GraduationCap className="w-10 h-10 text-primary/70" />
+                        </div>
+                        <h1 className="text-3xl font-black text-foreground mb-4">
+                            {t(
+                                `مرحباً بك، ${profile?.full_name?.split(' ')[0] || ''}`,
+                                `Welcome, ${profile?.full_name?.split(' ')[0] || ''}`
+                            )}
+                        </h1>
+                        <p className="text-lg text-muted-foreground mb-10 leading-relaxed font-medium">
+                            {t('ابدأ رحلتك التعليمية الآن باستعراض المواد المتاحة المصممة خصيصاً لمستواك الدراسي', 'Start your learning journey now by browsing subjects designed specifically for your level.')}
+                        </p>
+                        <Link to="/student/subjects">
+                            <Button size="lg" className="h-14 px-10 rounded-2xl shadow-premium text-lg font-bold bg-primary hover:bg-primary/90">
+                                {t('تصفح جميع المواد', 'Browse All Subjects')}
+                            </Button>
+                        </Link>
+                    </div>
                 </section>
             )}
 
             {/* ===== STATS SUMMARY ===== */}
-            <section className="grid grid-cols-3 gap-4">
-                <div className="bg-background border border-border rounded-xl p-4 text-center">
-                    <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 mx-auto flex items-center justify-center mb-2">
-                        <CheckCircle className="w-5 h-5" />
+            <section className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6">
+                <div className="premium-card p-6 text-center bg-card">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center mb-4 border border-emerald-500/20">
+                        <CheckCircle className="w-6 h-6" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
-                    <p className="text-xs text-muted-foreground">{t('دروس مكتملة', 'Completed')}</p>
+                    <p className="text-3xl font-black text-foreground mb-1">{stats.completed}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('دروس مكتملة', 'Completed')}</p>
                 </div>
-                <div className="bg-background border border-border rounded-xl p-4 text-center">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 mx-auto flex items-center justify-center mb-2">
-                        <TrendingUp className="w-5 h-5" />
+                <div className="premium-card p-6 text-center bg-card">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center mb-4 border border-blue-500/20">
+                        <TrendingUp className="w-6 h-6" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{stats.inProgress}</p>
-                    <p className="text-xs text-muted-foreground">{t('قيد التقدم', 'In Progress')}</p>
+                    <p className="text-3xl font-black text-foreground mb-1">{stats.inProgress}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('قيد المتابعة', 'In Progress')}</p>
                 </div>
-                <div className="bg-background border border-border rounded-xl p-4 text-center">
-                    <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 mx-auto flex items-center justify-center mb-2">
-                        <BookMarked className="w-5 h-5" />
+                <div className="premium-card p-6 text-center bg-card col-span-2 md:col-span-1 border-primary/5">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center mb-4 border border-primary/20">
+                        <BookMarked className="w-6 h-6" />
                     </div>
-                    <p className="text-2xl font-bold text-foreground">{stats.totalSubjects}</p>
-                    <p className="text-xs text-muted-foreground">{t('مواد', 'Subjects')}</p>
+                    <p className="text-3xl font-black text-foreground mb-1">{stats.totalSubjects}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t('المواد المسجلة', 'Registered')}</p>
                 </div>
             </section>
+
+            {/* ===== XP & AI COACH ===== */}
+            {profile?.id && (
+                <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <XPProgressBar studentId={profile.id} />
+                    <StudentCoachWidget />
+                </section>
+            )}
 
             {/* ===== MY SUBJECTS (top 6) ===== */}
             {subjectProgress.length > 0 && (
                 <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-foreground">{t('موادي', 'My Subjects')}</h2>
-                        <Link to="/student/subjects" className="text-sm text-primary hover:underline flex items-center gap-1">
-                            {t('عرض الكل', 'View All')}
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-2xl font-black text-foreground">{t('موادي الأكاديمية', 'Academic Subjects')}</h2>
+                        <Link to="/student/subjects" className="text-sm font-bold text-primary hover:text-primary/70 flex items-center gap-1 transition-colors">
+                            {t('عرض جميع المواد', 'View All Subjects')}
                             <ChevronIcon className="w-4 h-4" />
                         </Link>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {subjectProgress.slice(0, 6).map(sp => {
                             const isComplete = sp.percent === 100;
                             return (
                                 <Link
                                     key={sp.subject.id}
                                     to={`/student/subjects/${sp.subject.id}`}
-                                    className="group bg-background border border-border rounded-xl p-4 hover:border-primary/40 hover:shadow-md transition-all"
+                                    className="premium-card p-6 flex flex-col group bg-card"
                                 >
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h3 className="font-medium text-foreground group-hover:text-primary transition-colors truncate text-sm">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-foreground group-hover:text-primary transition-colors truncate text-base">
                                             {t(sp.subject.title_ar, sp.subject.title_en || sp.subject.title_ar)}
                                         </h3>
-                                        {isComplete && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                                        {isComplete ? (
+                                            <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                                                <CheckCircle className="w-4 h-4 text-emerald-500" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center border border-border">
+                                                <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden mb-1.5">
-                                        <div
-                                            className={`h-full rounded-full transition-all ${isComplete ? 'bg-green-500' : 'bg-primary'}`}
-                                            style={{ width: `${sp.percent}%` }}
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                        <span>{sp.completedLessons}/{sp.totalLessons} {t('درس', 'lessons')}</span>
-                                        <span className="font-medium">{sp.percent}%</span>
+
+                                    <div className="mt-auto">
+                                        <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden mb-3">
+                                            <div
+                                                className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-emerald-500' : 'bg-primary/80'}`}
+                                                style={{ width: `${sp.percent}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                                            <span>{sp.completedLessons}/{sp.totalLessons} {t('درس مكتمل', 'lessons')}</span>
+                                            <span className={isComplete ? 'text-emerald-600' : 'text-primary'}>{sp.percent}%</span>
+                                        </div>
                                     </div>
                                 </Link>
                             );
@@ -349,38 +378,39 @@ export default function StudentDashboard() {
             {/* ===== RECENT LESSONS ===== */}
             {recentLessons.length > 0 && (
                 <section>
-                    <h2 className="text-xl font-bold text-foreground mb-4">{t('آخر الدروس', 'Recent Lessons')}</h2>
-                    <div className="space-y-2">
+                    <div className="flex items-center justify-between mb-8 mt-4">
+                        <h2 className="text-2xl font-black text-foreground">{t('آخر الدروس المتابعة', 'Recent Lessons')}</h2>
+                    </div>
+
+                    <div className="grid gap-3">
                         {recentLessons.map(({ lesson, progress }) => {
                             const isCompleted = !!progress.completed_at;
                             return (
                                 <Link
                                     key={lesson.id}
                                     to={`/student/lesson/${lesson.id}`}
-                                    className="flex items-center gap-4 p-3 bg-background border border-border rounded-lg hover:border-primary/40 transition-colors group"
+                                    className="premium-card p-4 flex items-center gap-5 hover:border-primary/20 bg-card transition-all group"
                                 >
-                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-10 h-10 rounded-xl bg-secondary border border-border flex items-center justify-center flex-shrink-0 group-hover:bg-primary/5 transition-colors">
                                         {isCompleted ? (
-                                            <CheckCircle className="w-5 h-5 text-green-500" />
+                                            <CheckCircle className="w-5 h-5 text-emerald-500" />
                                         ) : (
-                                            <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center">
-                                                <Play className="w-2.5 h-2.5 text-primary fill-current ms-px" />
-                                            </div>
+                                            <Play className="w-4 h-4 text-primary fill-primary ms-0.5" />
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                                        <p className="text-[15px] font-bold text-foreground group-hover:text-primary transition-colors truncate mb-0.5">
                                             {t(lesson.title_ar, lesson.title_en || lesson.title_ar)}
                                         </p>
-                                        <p className="text-[11px] text-muted-foreground truncate">
+                                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
                                             {t(lesson.subject?.title_ar || '', lesson.subject?.title_en || '')}
                                         </p>
                                     </div>
-                                    <div className="text-xs text-muted-foreground flex-shrink-0">
+                                    <div className="text-xs font-black text-muted-foreground flex-shrink-0">
                                         {isCompleted ? (
-                                            <span className="text-green-600">{t('مكتمل', 'Done')}</span>
+                                            <span className="text-emerald-600 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">{t('مُكتمل', 'Done')}</span>
                                         ) : (
-                                            <span>{progress.progress_percent}%</span>
+                                            <span className="text-primary">{progress.progress_percent}%</span>
                                         )}
                                     </div>
                                 </Link>

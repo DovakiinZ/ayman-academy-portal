@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -65,10 +65,12 @@ interface LessonWithSubject {
 export default function TeacherLessons() {
     const { t } = useLanguage();
     const { user } = useAuth();
+    const { courseId } = useParams<{ courseId: string }>();
     const navigate = useNavigate();
 
     const [lessons, setLessons] = useState<LessonWithSubject[]>([]);
     const [subjects, setSubjects] = useState<Subject[]>([]);
+    const [courses, setCourses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -77,6 +79,7 @@ export default function TeacherLessons() {
     const [submitting, setSubmitting] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<LessonWithSubject | null>(null);
     const [form, setForm] = useState({
+        course_id: courseId || '',
         subject_id: '',
         title_ar: '',
         title_en: '',
@@ -87,22 +90,32 @@ export default function TeacherLessons() {
         setLoading(true);
 
         try {
-            const [lessonsRes, subjectsRes] = await Promise.all([
-                supabase
-                    .from('lessons')
-                    .select('*, subject:subjects(id, title_ar, title_en)')
-                    .eq('created_by', user.id)
-                    .order('created_at', { ascending: false }),
+            let lessonsQuery = supabase
+                .from('lessons')
+                .select('*, subject:subjects(id, title_ar, title_en)')
+                .eq('created_by', user.id);
+
+            if (courseId) {
+                lessonsQuery = lessonsQuery.eq('course_id', courseId);
+            }
+
+            const [lessonsRes, subjectsRes, coursesRes] = await Promise.all([
+                lessonsQuery.order('created_at', { ascending: false }),
                 supabase
                     .from('subjects')
                     .select('id, title_ar, title_en')
                     .order('title_ar'),
+                supabase
+                    .from('courses')
+                    .select('id, title_ar, title_en')
+                    .eq('teacher_id', user.id)
             ]);
 
             setLessons((lessonsRes.data as LessonWithSubject[]) || []);
             setSubjects((subjectsRes.data as Subject[]) || []);
+            setCourses(coursesRes.data || []);
         } catch (err) {
-            toast.error(t('فشل في تحميل الدروس', 'Failed to load lessons'));
+            toast.error(t('فشل في تحميل البيانات', 'Failed to load data'));
         } finally {
             setLoading(false);
         }
@@ -110,7 +123,10 @@ export default function TeacherLessons() {
 
     useEffect(() => {
         fetchData();
-    }, [user]);
+        if (courseId) {
+            setForm(prev => ({ ...prev, course_id: courseId }));
+        }
+    }, [user, courseId]);
 
     const filteredLessons = lessons.filter(lesson => {
         if (!searchQuery.trim()) return true;
@@ -133,7 +149,8 @@ export default function TeacherLessons() {
             const { data, error } = await (supabase
                 .from('lessons') as any)
                 .insert({
-                    subject_id: form.subject_id,
+                    course_id: form.course_id || null,
+                    subject_id: form.subject_id || null,
                     title_ar: form.title_ar,
                     title_en: form.title_en || null,
                     slug,
@@ -149,7 +166,7 @@ export default function TeacherLessons() {
 
             toast.success(t('تم إنشاء الدرس', 'Lesson created'));
             setDialogOpen(false);
-            setForm({ subject_id: '', title_ar: '', title_en: '' });
+            setForm({ course_id: courseId || '', subject_id: '', title_ar: '', title_en: '' });
 
             // Navigate to block editor
             if (data) {
@@ -195,7 +212,7 @@ export default function TeacherLessons() {
                     <Button variant="outline" size="sm" onClick={fetchData}>
                         <RefreshCw className="w-4 h-4" />
                     </Button>
-                    <Button onClick={() => { setForm({ subject_id: '', title_ar: '', title_en: '' }); setDialogOpen(true); }}>
+                    <Button onClick={() => { setForm({ course_id: courseId || '', subject_id: '', title_ar: '', title_en: '' }); setDialogOpen(true); }}>
                         <Plus className="w-4 h-4 me-2" />
                         {t('درس جديد', 'New Lesson')}
                     </Button>
@@ -304,6 +321,19 @@ export default function TeacherLessons() {
                         <DialogTitle>{t('إنشاء درس جديد', 'Create New Lesson')}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleCreate} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                            <Label>{t('الدورة (اختياري)', 'Course (Optional)')}</Label>
+                            <Select value={form.course_id} onValueChange={(value) => setForm({ ...form, course_id: value })}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={t('اختر دورة', 'Select Course')} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {courses.map((c) => (
+                                        <SelectItem key={c.id} value={c.id}>{t(c.title_ar, c.title_en || c.title_ar)}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="space-y-2">
                             <Label>{t('المادة', 'Subject')} *</Label>
                             <Select value={form.subject_id} onValueChange={(value) => setForm({ ...form, subject_id: value })}>

@@ -85,38 +85,51 @@ export default function VerifyCertificate() {
                     ) : certificate && (
                         <div className="bg-white rounded-2xl shadow-lg border border-border overflow-hidden">
                             {/* Status Banner */}
-                            <div className={`px-6 py-4 text-center ${certificate.status === 'valid'
-                                    ? 'bg-green-50 border-b border-green-100'
+                            <div className={`px-6 py-4 text-center ${certificate.status === 'issued'
+                                ? 'bg-green-50 border-b border-green-100'
+                                : certificate.status === 'pending_approval'
+                                    ? 'bg-amber-50 border-b border-amber-100'
                                     : 'bg-red-50 border-b border-red-100'
                                 }`}>
                                 <div className="flex items-center justify-center gap-2 mb-1">
-                                    {certificate.status === 'valid' ? (
+                                    {certificate.status === 'issued' ? (
                                         <CheckCircle className="w-6 h-6 text-green-600" />
+                                    ) : certificate.status === 'pending_approval' ? (
+                                        <ShieldCheck className="w-6 h-6 text-amber-600" />
                                     ) : (
                                         <XCircle className="w-6 h-6 text-red-600" />
                                     )}
-                                    <span className={`text-lg font-bold ${certificate.status === 'valid' ? 'text-green-700' : 'text-red-700'
+                                    <span className={`text-lg font-bold ${certificate.status === 'issued' ? 'text-green-700'
+                                        : certificate.status === 'pending_approval' ? 'text-amber-700'
+                                            : 'text-red-700'
                                         }`}>
-                                        {certificate.status === 'valid'
+                                        {certificate.status === 'issued'
                                             ? t('شهادة صالحة ✓', 'Valid Certificate ✓')
-                                            : t('شهادة ملغاة ✗', 'Revoked Certificate ✗')
+                                            : certificate.status === 'pending_approval'
+                                                ? t('بانتظار الموافقة ⏳', 'Pending Approval ⏳')
+                                                : t('شهادة ملغاة ✗', 'Revoked Certificate ✗')
                                         }
                                     </span>
                                 </div>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     {t('رمز التحقق:', 'Verification Code:')} {code}
                                 </p>
+                                {certificate.version > 1 && (
+                                    <div className="mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        {t('الإصدار', 'Version')} {certificate.version}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Certificate Details */}
                             <div className="p-6 space-y-5">
                                 <DetailRow
                                     label={t('اسم الطالب/ة', 'Student Name')}
-                                    value={certificate.student_name}
+                                    value={certificate.snapshot_json?.student_name || certificate.student_name}
                                 />
                                 <DetailRow
                                     label={t('الدورة / الدرس', 'Course / Lesson')}
-                                    value={certificate.course_name}
+                                    value={certificate.snapshot_json?.course_name || certificate.course_name}
                                 />
                                 {certificate.subject_name && (
                                     <DetailRow
@@ -127,17 +140,23 @@ export default function VerifyCertificate() {
                                 {certificate.score !== null && (
                                     <DetailRow
                                         label={t('الدرجة', 'Score')}
-                                        value={`${certificate.score}%`}
+                                        value={`${certificate.snapshot_json?.score ?? certificate.score}%`}
                                     />
                                 )}
                                 <DetailRow
-                                    label={t('تاريخ الإصدار', 'Issue Date')}
-                                    value={new Date(certificate.issued_at).toLocaleDateString('ar-EG', {
+                                    label={t('تاريخ الإتمام', 'Completion Date')}
+                                    value={new Date(certificate.snapshot_json?.completion_date || certificate.issued_at).toLocaleDateString('ar-EG', {
                                         year: 'numeric',
                                         month: 'long',
                                         day: 'numeric',
                                     })}
                                 />
+                                {certificate.snapshot_json?.teacher_name && (
+                                    <DetailRow
+                                        label={t('المعلم', 'Teacher')}
+                                        value={certificate.snapshot_json.teacher_name}
+                                    />
+                                )}
                             </div>
 
                             {/* Footer */}

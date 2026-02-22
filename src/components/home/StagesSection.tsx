@@ -8,6 +8,8 @@ import { GraduationCap, BookOpen, School, ArrowLeft, ArrowRight, Layers } from '
 // Icon pool — cycles if more than 4 stages
 const stageIcons = [GraduationCap, BookOpen, School, Layers];
 
+import SectionTitle from '@/components/ui/SectionTitle';
+
 const StagesSection = () => {
   const { t, direction } = useLanguage();
   const ArrowIcon = direction === 'rtl' ? ArrowLeft : ArrowRight;
@@ -43,10 +45,10 @@ const StagesSection = () => {
   // Hide section if loading or no data
   if (loading) {
     return (
-      <section className="section-academic">
+      <section className="py-24">
         <div className="container-academic">
-          <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="flex items-center justify-center h-48 text-primary">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-current"></div>
           </div>
         </div>
       </section>
@@ -56,42 +58,42 @@ const StagesSection = () => {
   if (stages.length === 0) return null;
 
   return (
-    <section className="section-academic">
+    <section className="py-24 transition-colors">
       <div className="container-academic">
-        <div className="text-center mb-10">
-          <h2 className="text-foreground mb-3">
-            {t('المراحل الدراسية', 'Educational Stages')}
-          </h2>
-          <p className="text-muted-foreground text-sm max-w-lg mx-auto">
-            {t(
-              'منهج تعليمي متكامل يغطي جميع المراحل التأسيسية',
-              'A comprehensive curriculum covering all foundational stages'
-            )}
-          </p>
-        </div>
+        <SectionTitle
+          title={t('المراحل الدراسية', 'Educational Stages')}
+          subtitle={t(
+            'منهج تعليمي متكامل يغطي جميع المراحل التأسيسية من الابتدائي حتى الثانوي',
+            'A comprehensive curriculum covering all foundational stages from primary to high school'
+          )}
+          align="center"
+        />
 
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid md:grid-cols-3 gap-6">
           {stages.map((stage, index) => {
             const IconComponent = stageIcons[index % stageIcons.length];
             return (
               <Link
                 key={stage.id}
                 to={`/stages/${stage.slug || stage.id}`}
-                className="academic-card group hover:border-primary/20 transition-colors"
+                className="premium-card premium-card-accent p-8 flex flex-col group"
               >
-                <div className="w-10 h-10 rounded-lg bg-primary/8 flex items-center justify-center mb-4">
-                  <IconComponent className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                <div className="w-14 h-14 rounded-2xl bg-primary/[0.03] border border-primary/5 flex items-center justify-center mb-6 transition-colors group-hover:bg-primary/5">
+                  <IconComponent className="w-7 h-7 text-primary/80" strokeWidth={1.5} />
                 </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
+
+                <h3 className="text-xl font-bold text-foreground mb-3 group-hover:text-primary transition-colors">
                   {t(stage.title_ar, stage.title_en || stage.title_ar)}
                 </h3>
-                <p className="text-muted-foreground text-sm mb-4">
+
+                <p className="text-muted-foreground text-sm leading-relaxed mb-6">
                   {t(stage.description_ar || '', stage.description_en || stage.description_ar || '')}
                 </p>
-                <div className="flex items-center justify-end">
-                  <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors flex items-center gap-1">
-                    {t('عرض المواد', 'View Subjects')}
-                    <ArrowIcon className="w-3 h-3" />
+
+                <div className="flex items-center justify-start mt-auto">
+                  <span className="text-xs font-bold text-primary/70 group-hover:text-primary transition-colors flex items-center gap-1.5 uppercase tracking-wider">
+                    {t('استكشف المواد', 'Explore Subjects')}
+                    <ArrowIcon className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
                   </span>
                 </div>
               </Link>

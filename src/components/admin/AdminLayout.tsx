@@ -14,7 +14,8 @@ import {
     LogOut,
     Menu,
     X,
-    Type
+    Type,
+    Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -28,6 +29,8 @@ const navItems = [
     { path: '/admin/stages', icon: GraduationCap, label: { ar: 'المراحل', en: 'Stages' } },
     { path: '/admin/subjects', icon: BookMarked, label: { ar: 'المواد', en: 'Subjects' } },
     { path: '/admin/lessons', icon: FileText, label: { ar: 'الدروس', en: 'Lessons' } },
+    { path: '/admin/enrollments', icon: ClipboardList, label: { ar: 'مستكشف التسجيلات', en: 'Enrollments' } },
+    { path: '/admin/certificates', icon: Award, label: { ar: 'الشهادات', en: 'Certificates' } },
     { path: '/admin/settings', icon: Settings, label: { ar: 'الإعدادات', en: 'Settings' } },
 ];
 

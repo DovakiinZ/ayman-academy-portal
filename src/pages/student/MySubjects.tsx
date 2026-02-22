@@ -1,13 +1,13 @@
 /**
  * MySubjects — Browse all subjects across stages with progress tracking
- * Replaces the Stages→Subjects two-step flow
+ * Uses React Query for cached data — instantly hydrated from localStorage.
  */
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/lib/supabase';
+import { useMySubjects } from '@/hooks/useAcademyData';
 import { Stage, Subject } from '@/types/database';
 import {
     BookOpen,
@@ -15,98 +15,37 @@ import {
     ChevronRight,
     Loader2,
     CheckCircle,
-    Play,
+    RefreshCw,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface SubjectWithProgress extends Subject {
     stage?: Stage;
     total_lessons: number;
     completed_lessons: number;
     progress_percent: number;
-    last_lesson_id?: string;
 }
 
 export default function MySubjects() {
     const { t, direction } = useLanguage();
     const { profile } = useAuth();
-    const [subjects, setSubjects] = useState<SubjectWithProgress[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (profile?.id) fetchSubjects();
-    }, [profile?.id]);
-
-    const fetchSubjects = async () => {
-        try {
-            setLoading(true);
-
-            // Fetch subjects with stage and lesson count
-            const { data: subjectsData, error: subjectsError } = await supabase
-                .from('subjects')
-                .select(`
-                    *,
-                    stage:stages(*),
-                    lessons(id)
-                `)
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true });
-
-            if (subjectsError || !subjectsData) {
-                console.error('[MySubjects] Error:', subjectsError);
-                setSubjects([]);
-                return;
-            }
-
-            // Fetch all progress for this user
-            const { data: progressData } = await supabase
-                .from('lesson_progress')
-                .select('lesson_id, completed_at')
-                .eq('user_id', profile!.id);
-
-            const completedLessonIds = new Set(
-                ((progressData || []) as any[]).filter(p => p.completed_at).map(p => p.lesson_id)
-            );
-
-            const mapped: SubjectWithProgress[] = (subjectsData as any[]).map(s => {
-                const lessonIds: string[] = (s.lessons || []).map((l: any) => l.id);
-                const totalLessons = lessonIds.length;
-                const completedLessons = lessonIds.filter(id => completedLessonIds.has(id)).length;
-                const progressPercent = totalLessons > 0
-                    ? Math.round((completedLessons / totalLessons) * 100)
-                    : 0;
-
-                return {
-                    ...s,
-                    lessons: undefined,
-                    total_lessons: totalLessons,
-                    completed_lessons: completedLessons,
-                    progress_percent: progressPercent,
-                };
-            });
-
-            setSubjects(mapped);
-        } catch (err) {
-            console.error('[MySubjects] Exception:', err);
-            setSubjects([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { data: subjects = [], isLoading, isFetching } = useMySubjects(profile?.id);
 
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
     // Group by stage
-    const stages = new Map<string, { stage: Stage; subjects: SubjectWithProgress[] }>();
-    subjects.forEach(s => {
-        const stageId = s.stage_id;
-        if (!stages.has(stageId)) {
-            stages.set(stageId, { stage: s.stage!, subjects: [] });
-        }
-        stages.get(stageId)!.subjects.push(s);
-    });
+    const stages = useMemo(() => {
+        const map = new Map<string, { stage: Stage; subjects: SubjectWithProgress[] }>();
+        (subjects as SubjectWithProgress[]).forEach(s => {
+            const stageId = s.stage_id;
+            if (!map.has(stageId)) {
+                map.set(stageId, { stage: s.stage!, subjects: [] });
+            }
+            map.get(stageId)!.subjects.push(s);
+        });
+        return map;
+    }, [subjects]);
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -117,13 +56,21 @@ export default function MySubjects() {
     return (
         <div className="space-y-8 pb-8">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                    {t('موادي الدراسية', 'My Subjects')}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                    {t('تصفح جميع المواد المتاحة وتابع تقدمك', 'Browse all available subjects and track your progress')}
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">
+                        {t('موادي الدراسية', 'My Subjects')}
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        {t('تصفح جميع المواد المتاحة وتابع تقدمك', 'Browse all available subjects and track your progress')}
+                    </p>
+                </div>
+                {isFetching && !isLoading && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground animate-pulse">
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        {t('جاري التحديث...', 'Updating...')}
+                    </div>
+                )}
             </div>
 
             {/* Subjects grouped by stage */}
@@ -204,7 +151,7 @@ export default function MySubjects() {
             ))}
 
             {/* Empty State */}
-            {subjects.length === 0 && !loading && (
+            {subjects.length === 0 && !isLoading && (
                 <div className="bg-background rounded-xl border border-border p-12 text-center">
                     <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
                     <h3 className="font-medium text-foreground mb-2">

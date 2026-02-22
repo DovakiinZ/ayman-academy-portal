@@ -97,6 +97,11 @@ export default function TeachersManagement() {
         featured_stages: [] as string[],
     });
 
+    // Password reset state
+    const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+    const [passwordTarget, setPasswordTarget] = useState<Profile | null>(null);
+    const [newPassword, setNewPassword] = useState('');
+
     // --- Handlers ---
     const toggleStage = (stageId: string, formType: 'create' | 'edit') => {
         if (formType === 'create') {
@@ -446,6 +451,46 @@ export default function TeachersManagement() {
         }
     };
 
+    // --- Password Management ---
+    const handleOpenPasswordDialog = (teacher: Profile) => {
+        setPasswordTarget(teacher);
+        setNewPassword('');
+        setPasswordDialogOpen(true);
+    };
+
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!passwordTarget || !newPassword.trim()) return;
+
+        if (newPassword.length < 6) {
+            toast.error(t('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'Password must be at least 6 characters'));
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const { getSupabaseAdmin } = await import('@/lib/supabaseAdmin');
+            const supabaseAdmin = getSupabaseAdmin();
+
+            const { error: resetError } = await supabaseAdmin.auth.admin.updateUserById(
+                passwordTarget.id,
+                { password: newPassword.trim() }
+            );
+
+            if (resetError) throw resetError;
+
+            toast.success(t('تم تغيير كلمة المرور بنجاح', 'Password changed successfully'));
+            setPasswordDialogOpen(false);
+            setPasswordTarget(null);
+            setNewPassword('');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('فشل في تغيير كلمة المرور', 'Failed to change password'), { description: message });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     // --- Status Toggle ---
     const handleToggleStatus = async (teacher: Profile) => {
         const result = await verifiedUpdate(
@@ -728,6 +773,10 @@ export default function TeachersManagement() {
                                                     <DropdownMenuItem onClick={() => handleOpenEditDialog(teacher)}>
                                                         <Pencil className="w-4 h-4 me-2" />
                                                         {t('تعديل', 'Edit')}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenPasswordDialog(teacher)}>
+                                                        <RefreshCw className="w-4 h-4 me-2" />
+                                                        {t('تغيير كلمة المرور', 'Change Password')}
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleToggleStatus(teacher)}>
                                                         <UserX className="w-4 h-4 me-2" />
@@ -1029,6 +1078,41 @@ export default function TeachersManagement() {
                             </Button>
                             <Button type="submit" className="flex-1" disabled={submitting}>
                                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('إنشاء', 'Create')}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Password Reset Dialog */}
+            <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('تغيير كلمة المرور للمعلم', 'Change Teacher Password')}</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2">
+                        <p className="text-sm text-muted-foreground mb-4">
+                            {t('تغيير كلمة المرور للمعلم:', 'Change password for teacher:')} <strong>{passwordTarget?.full_name}</strong>
+                        </p>
+                    </div>
+                    <form onSubmit={handleResetPassword} className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="new_password">{t('كلمة المرور الجديدة', 'New Password')}</Label>
+                            <Input
+                                id="new_password"
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
+                        <div className="flex gap-2 pt-4">
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => setPasswordDialogOpen(false)}>
+                                {t('إلغاء', 'Cancel')}
+                            </Button>
+                            <Button type="submit" className="flex-1" disabled={submitting}>
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('حفظ كلمة المرور', 'Save Password')}
                             </Button>
                         </div>
                     </form>

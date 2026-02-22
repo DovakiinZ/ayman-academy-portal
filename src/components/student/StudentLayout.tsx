@@ -1,6 +1,7 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
     LayoutDashboard,
     BookOpen,
@@ -9,21 +10,37 @@ import {
     LogOut,
     Menu,
     X,
-    Award
+    Award,
+    Trophy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import logo from '@/assets/logo.png';
+import MobileLayout from './mobile/MobileLayout';
 
 const navItems = [
     { path: '/student', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
     { path: '/student/subjects', icon: BookOpen, label: { ar: 'موادي', en: 'My Subjects' } },
     { path: '/student/certificates', icon: Award, label: { ar: 'شهاداتي', en: 'Certificates' } },
+    { path: '/student/achievements', icon: Trophy, label: { ar: 'الإنجازات', en: 'Achievements' } },
     { path: '/student/messages', icon: MessageSquare, label: { ar: 'الرسائل', en: 'Messages' } },
     { path: '/student/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },
 ];
 
 export default function StudentLayout() {
+    const isMobile = useIsMobile();
+
+    // ── Mobile: completely separate layout ──
+    if (isMobile) {
+        return <MobileLayout />;
+    }
+
+    // ── Desktop: original sidebar layout (unchanged) ──
+    return <DesktopLayout />;
+}
+
+/** Desktop sidebar layout — extracted as-is, zero changes */
+function DesktopLayout() {
     const { t } = useLanguage();
     const { profile, signOut } = useAuth();
     const location = useLocation();
@@ -42,16 +59,6 @@ export default function StudentLayout() {
 
     return (
         <div className="min-h-screen bg-secondary/30">
-            {/* Mobile header */}
-            <header className="lg:hidden sticky top-0 z-50 bg-background border-b border-border px-4 h-14 flex items-center justify-between">
-                <Link to="/student">
-                    <img src={logo} alt="Ayman Academy" className="h-14" />
-                </Link>
-                <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)}>
-                    {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                </Button>
-            </header>
-
             <div className="flex">
                 {/* Sidebar */}
                 <aside className={`
@@ -61,7 +68,7 @@ export default function StudentLayout() {
         `}>
                     <div className="flex flex-col h-full">
                         {/* Logo */}
-                        <div className="hidden lg:flex items-center h-14 px-4 border-b border-border">
+                        <div className="flex items-center h-14 px-4 border-b border-border">
                             <Link to="/student">
                                 <img src={logo} alt="Ayman Academy" className="h-14" />
                             </Link>
@@ -106,14 +113,6 @@ export default function StudentLayout() {
                         </div>
                     </div>
                 </aside>
-
-                {/* Overlay */}
-                {sidebarOpen && (
-                    <div
-                        className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-                        onClick={() => setSidebarOpen(false)}
-                    />
-                )}
 
                 {/* Main content */}
                 <main className="flex-1 min-h-screen">

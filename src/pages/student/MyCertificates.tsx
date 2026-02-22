@@ -10,9 +10,15 @@ import {
 } from '@/lib/certificateGenerator';
 import CertificateTemplate from '@/components/certificate/CertificateTemplate';
 import type { Certificate } from '@/types/database';
-import { Loader2, Download, ExternalLink, Award, FileCheck, CalendarDays } from 'lucide-react';
+import { Loader2, Download, ExternalLink, Award, FileCheck, CalendarDays, Share2, Copy, Linkedin, Twitter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.png';
 
@@ -37,6 +43,7 @@ export default function MyCertificates() {
             .from('certificates')
             .select('*')
             .eq('student_id', profile!.id)
+            .neq('status', 'revoked') // Hide revoked by default
             .order('issued_at', { ascending: false }) as any;
 
         if (error) {
@@ -152,21 +159,39 @@ export default function MyCertificates() {
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-foreground truncate">
-                                            {cert.course_name}
+                                            {cert.snapshot_json?.course_name || cert.course_name}
                                         </h3>
-                                        {cert.subject_name && (
-                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                {cert.subject_name}
-                                            </p>
-                                        )}
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            {cert.subject_name && (
+                                                <p className="text-xs text-muted-foreground truncate">
+                                                    {cert.subject_name}
+                                                </p>
+                                            )}
+                                            {cert.version > 1 && (
+                                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                                                    v{cert.version}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <Badge
-                                        variant={cert.status === 'valid' ? 'default' : 'destructive'}
+                                        variant={
+                                            cert.status === 'issued' ? 'default'
+                                                : cert.status === 'pending_approval' ? 'secondary'
+                                                    : cert.status === 'revoked' ? 'destructive'
+                                                        : 'outline'
+                                        }
                                         className="shrink-0 ms-2"
                                     >
-                                        {cert.status === 'valid'
-                                            ? t('سارية', 'Valid')
-                                            : t('ملغاة', 'Revoked')
+                                        {cert.status === 'issued'
+                                            ? t('صادرة', 'Issued')
+                                            : cert.status === 'pending_approval'
+                                                ? t('بانتظار الموافقة', 'Pending')
+                                                : cert.status === 'revoked'
+                                                    ? t('ملغاة', 'Revoked')
+                                                    : cert.status === 'eligible'
+                                                        ? t('مؤهل', 'Eligible')
+                                                        : t('مسودة', 'Draft')
                                         }
                                     </Badge>
                                 </div>
@@ -195,7 +220,7 @@ export default function MyCertificates() {
                                         size="sm"
                                         className="flex-1 gap-1.5"
                                         onClick={() => handleDownload(cert)}
-                                        disabled={generating === cert.id}
+                                        disabled={generating === cert.id || cert.status === 'revoked'}
                                     >
                                         {generating === cert.id ? (
                                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -204,14 +229,58 @@ export default function MyCertificates() {
                                         )}
                                         {t('تحميل', 'Download')}
                                     </Button>
+
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button size="sm" variant="outline" className="gap-1.5">
+                                                <Share2 className="w-3.5 h-3.5" />
+                                                {t('مشاركة', 'Share')}
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/verify/${cert.verification_code}`;
+                                                    navigator.clipboard.writeText(url);
+                                                    toast.success(t('تم نسخ الرابط!', 'Link copied!'));
+                                                }}
+                                                className="gap-2"
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                                {t('نسخ رابط التحقق', 'Copy verification link')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/verify/${cert.verification_code}`;
+                                                    const text = t(`لقد حصلت للتو على شهادة في ${cert.course_name}!`, `I just earned a certificate in ${cert.course_name}!`);
+                                                    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
+                                                }}
+                                                className="gap-2"
+                                            >
+                                                <Linkedin className="w-4 h-4" />
+                                                {t('مشاركة على LinkedIn', 'Share on LinkedIn')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/verify/${cert.verification_code}`;
+                                                    const text = t(`لقد حصلت للتو على شهادة في ${cert.course_name}!`, `I just earned a certificate in ${cert.course_name}!`);
+                                                    window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+                                                }}
+                                                className="gap-2"
+                                            >
+                                                <Twitter className="w-4 h-4" />
+                                                {t('مشاركة على X', 'Share on X')}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+
                                     <Button
                                         size="sm"
-                                        variant="outline"
-                                        className="gap-1.5"
+                                        variant="ghost"
+                                        className="gap-1.5 px-2"
                                         onClick={() => window.open(`/verify/${cert.verification_code}`, '_blank')}
                                     >
                                         <ExternalLink className="w-3.5 h-3.5" />
-                                        {t('تحقق', 'Verify')}
                                     </Button>
                                 </div>
                             </div>
@@ -225,15 +294,16 @@ export default function MyCertificates() {
                 <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
                     <CertificateTemplate
                         ref={certRef}
-                        studentName={renderCert.student_name}
-                        courseName={renderCert.course_name}
+                        studentName={renderCert.snapshot_json?.student_name || renderCert.student_name}
+                        courseName={renderCert.snapshot_json?.course_name || renderCert.course_name}
                         subjectName={renderCert.subject_name || undefined}
-                        score={renderCert.score || undefined}
-                        issuedDate={renderCert.issued_at}
+                        score={renderCert.snapshot_json?.score ?? (renderCert.score || undefined)}
+                        issuedDate={renderCert.snapshot_json?.completion_date || renderCert.issued_at}
                         certificateId={renderCert.id}
                         verificationCode={renderCert.verification_code}
                         qrDataUrl={renderQR}
                         logoUrl={logo}
+                        signerName={renderCert.snapshot_json?.signer_name}
                     />
                 </div>
             )}
