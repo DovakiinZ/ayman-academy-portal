@@ -50,21 +50,39 @@ const ACTION_PROMPTS: Record<AIAction, string> = {
 };
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const HF_API_TOKEN = import.meta.env.VITE_HF_API_TOKEN;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const HF_API_URL = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3';
 
 /**
- * Process an AI request using Google Gemini API.
+ * Process an AI request with transparent fallback.
  */
 export async function processAIRequest(request: AIRequest): Promise<AIResponse> {
-    const prompt = ACTION_PROMPTS[request.action];
+    // 1. Try Gemini first if key exists
+    if (GEMINI_API_KEY) {
+        const geminiResult = await processGeminiRequest(request);
+        if (geminiResult.success) return geminiResult;
 
-    if (!GEMINI_API_KEY) {
-        return {
-            success: false,
-            result: '',
-            error: 'Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env file. Get a free key at https://aistudio.google.com/apikey',
-        };
+        // If it's a quota or auth error, fall through to HF
+        const isQuotaError = geminiResult.error?.toLowerCase().includes('quota') ||
+            geminiResult.error?.toLowerCase().includes('rate') ||
+            geminiResult.error?.toLowerCase().includes('429');
+
+        if (!isQuotaError) {
+            console.warn('Gemini failed with non-quota error, attempting fallback anyway:', geminiResult.error);
+        }
     }
+
+    // 2. Fallback to Hugging Face
+    console.log('Using Hugging Face fallback...');
+    return processHFRequest(request);
+}
+
+/**
+ * Internal: Process via Gemini
+ */
+async function processGeminiRequest(request: AIRequest): Promise<AIResponse> {
+    const prompt = ACTION_PROMPTS[request.action];
 
     try {
         const userMessage = request.context
@@ -98,12 +116,59 @@ export async function processAIRequest(request: AIRequest): Promise<AIResponse> 
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!text) {
-            return { success: false, result: '', error: 'No response from AI' };
+            return { success: false, result: '', error: 'No response from Gemini' };
         }
 
         return { success: true, result: text.trim() };
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
+        const message = err instanceof Error ? err.message : 'Unknown Gemini error';
+        return { success: false, result: '', error: message };
+    }
+}
+
+/**
+ * Internal: Process via Hugging Face
+ */
+async function processHFRequest(request: AIRequest): Promise<AIResponse> {
+    const prompt = ACTION_PROMPTS[request.action];
+
+    try {
+        const userMessage = `[INST] ${SYSTEM_INSTRUCTION}\n\n${prompt}\n\n${request.context ? `Context: ${request.context}\n\n` : ''}Content: ${request.content} [/INST]`;
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (HF_API_TOKEN) {
+            headers['Authorization'] = `Bearer ${HF_API_TOKEN}`;
+        }
+
+        const response = await fetch(HF_API_URL, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                inputs: userMessage,
+                parameters: {
+                    max_new_tokens: 1024,
+                    temperature: 0.7,
+                    return_full_text: false
+                }
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData?.error || errorData?.message || `HF API error: ${response.status}`;
+            return { success: false, result: '', error: typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage) };
+        }
+
+        const data = await response.json();
+        let text = Array.isArray(data) ? data[0]?.generated_text : data?.generated_text;
+
+        if (!text) {
+            return { success: false, result: '', error: 'No response from Hugging Face' };
+        }
+
+        return { success: true, result: text.trim() };
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown HF error';
         return { success: false, result: '', error: message };
     }
 }

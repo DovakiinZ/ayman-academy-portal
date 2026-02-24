@@ -7,10 +7,11 @@ import { supabase } from '@/lib/supabase';
 import { Profile, Message } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Send, User, MessageSquare } from 'lucide-react';
+import { Loader2, Send, User, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { toast } from 'sonner';
+import { useIsMobileLayout } from '@/hooks/use-mobile';
 
 interface Contact extends Profile {
     last_message?: string;
@@ -23,6 +24,7 @@ export default function Messages() {
     const { profile } = useAuth();
     const [searchParams] = useSearchParams();
     const queryClient = useQueryClient();
+    const isMobile = useIsMobileLayout();
 
     const isTeacher = profile?.role === 'teacher' || profile?.role === 'super_admin';
 
@@ -35,6 +37,7 @@ export default function Messages() {
     const [newMessage, setNewMessage] = useState('');
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
+    const [showChatOnMobile, setShowChatOnMobile] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -83,6 +86,7 @@ export default function Messages() {
     const handleSelectContact = async (contact: Contact) => {
         setSelectedContact(contact);
         setLoadingMessages(true);
+        if (isMobile) setShowChatOnMobile(true);
 
         // Fetch conversation
         const { data } = await supabase
@@ -105,7 +109,7 @@ export default function Messages() {
 
         await supabase
             .from('messages')
-            .update({ read_at: new Date().toISOString() })
+            .update({ read_at: new Date().toISOString() } as any)
             .eq('sender_id', senderId)
             .eq('receiver_id', profile.id)
             .is('read_at', null);
@@ -126,14 +130,14 @@ export default function Messages() {
                 sender_id: profile.id,
                 receiver_id: selectedContact.id,
                 content: newMessage.trim()
-            })
+            } as any)
             .select()
             .single();
 
         if (error) {
             toast.error(t('فشل في إرسال الرسالة', 'Failed to send message'));
         } else if (data) {
-            setMessages(prev => [...prev, data]);
+            setMessages(prev => [...prev, data as any]);
             setNewMessage('');
             scrollToBottom();
         }
@@ -148,9 +152,12 @@ export default function Messages() {
     };
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex bg-background rounded-lg border border-border overflow-hidden">
+        <div className="h-[calc(100vh-10rem)] lg:h-[calc(100vh-8rem)] flex bg-background rounded-lg border border-border overflow-hidden">
             {/* Contacts List */}
-            <div className="w-80 border-e border-border flex flex-col">
+            <div className={`
+                ${isMobile && showChatOnMobile ? 'hidden' : 'flex'} 
+                w-full lg:w-80 border-e border-border flex-col
+            `}>
                 <div className="p-4 border-b border-border bg-secondary/10">
                     <h2 className="font-semibold text-foreground">{t('المحادثات', 'Conversations')}</h2>
                 </div>
@@ -202,11 +209,24 @@ export default function Messages() {
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col bg-background">
+            <div className={`
+                ${isMobile && !showChatOnMobile ? 'hidden' : 'flex'} 
+                flex-1 flex-col bg-background
+            `}>
                 {selectedContact ? (
                     <>
                         {/* Header */}
-                        <div className="p-4 border-b border-border flex items-center gap-3 shadow-sm z-10">
+                        <div className="p-4 border-b border-border flex items-center gap-3 shadow-sm z-10 text-start">
+                            {isMobile && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="me-1"
+                                    onClick={() => setShowChatOnMobile(false)}
+                                >
+                                    {direction === 'rtl' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                                </Button>
+                            )}
                             <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
                                 {selectedContact.avatar_url ? (
                                     <img src={selectedContact.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -239,7 +259,7 @@ export default function Messages() {
                                             className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                                         >
                                             <div
-                                                className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm
+                                                className={`max-w-[85%] lg:max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm
                                                     ${isMe
                                                         ? 'bg-primary text-primary-foreground rounded-br-none'
                                                         : 'bg-secondary border border-border text-foreground rounded-bl-none'
@@ -286,7 +306,7 @@ export default function Messages() {
                         </form>
                     </>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground p-4 text-center">
                         <p>{isTeacher
                             ? t('اختر طالباً لبدء المحادثة', 'Select a student to start chatting')
                             : t('اختر معلماً لبدء المحادثة', 'Select a teacher to start chatting')
