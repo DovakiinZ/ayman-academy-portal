@@ -8,40 +8,44 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 interface RatingWidgetProps {
-    entityId: string;
-    entityType: 'course' | 'lesson';
+    lessonId: string;
     title?: string;
 }
 
-export default function RatingWidget({ entityId, entityType, title }: RatingWidgetProps) {
+export default function RatingWidget({ lessonId, title }: RatingWidgetProps) {
     const { t } = useLanguage();
     const { profile } = useAuth();
     const [rating, setRating] = useState(0);
     const [hoverRating, setHoverRating] = useState(0);
-    const [feedback, setFeedback] = useState('');
+    const [comment, setComment] = useState('');
     const [existingId, setExistingId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
-        if (profile?.id && entityId) {
+        if (profile?.id && lessonId) {
             fetchRating();
         }
-    }, [entityId, profile?.id]);
+    }, [lessonId, profile?.id]);
 
     const fetchRating = async () => {
-        const { data } = await supabase
-            .from('ratings')
+        const { data, error } = await supabase
+            .from('lesson_ratings')
             .select('*')
             .eq('user_id', profile!.id)
-            .eq('entity_type', entityType)
-            .eq('entity_id', entityId)
+            .eq('lesson_id', lessonId)
             .single();
 
         if (data) {
-            setRating(data.stars);
-            setFeedback(data.feedback || '');
+            setRating(data.rating);
+            setComment(data.comment || '');
             setExistingId(data.id);
+        }
+
+        if (error && error.code !== 'PGRST116') {
+            // PGRST116 is "not found" which is OK
+            console.error('Error fetching rating:', error);
+            toast.error(t('خطأ في تحميل التقييم', 'Error loading rating'));
         }
     };
 
@@ -49,31 +53,25 @@ export default function RatingWidget({ entityId, entityType, title }: RatingWidg
         if (!rating || !profile?.id) return;
         setSaving(true);
 
-        try {
-            const payload = {
-                user_id: profile.id,
-                entity_type: entityType,
-                entity_id: entityId,
-                stars: rating,
-                feedback: feedback.trim()
-            };
+        const payload = {
+            user_id: profile.id,
+            lesson_id: lessonId,
+            rating: rating,
+            comment: comment.trim() || null
+        };
 
-            const { error } = existingId
-                ? await supabase.from('ratings').update(payload).eq('id', existingId)
-                : await supabase.from('ratings').insert(payload);
+        const { error } = existingId
+            ? await supabase.from('lesson_ratings').update(payload).eq('id', existingId)
+            : await supabase.from('lesson_ratings').insert(payload);
 
-            if (error) {
-                console.error('Rating save error:', error);
-                toast.error(t('فشل في حفظ التقييم', 'Failed to save rating'));
-            } else {
-                toast.success(t('تم حفظ التقييم', 'Rating saved'));
-                setIsOpen(false);
-            }
-        } catch (err) {
-            console.error('Rating save exception:', err);
-            toast.error(t('حدث خطأ أثناء الحفظ', 'An error occurred while saving'));
-        } finally {
-            setSaving(false);
+        setSaving(false);
+
+        if (!error) {
+            toast.success(t('تم إرسال التقييم بنجاح', 'Rating submitted successfully'));
+            setIsOpen(false);
+        } else {
+            console.error('Error saving rating:', error);
+            toast.error(t('فشل في حفظ التقييم', 'Failed to save rating'));
         }
     };
 
@@ -108,8 +106,8 @@ export default function RatingWidget({ entityId, entityType, title }: RatingWidg
                     >
                         <Star
                             className={`w-8 h-8 ${star <= (hoverRating || rating)
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'text-muted-foreground'
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-muted-foreground'
                                 }`}
                         />
                     </button>
@@ -118,8 +116,8 @@ export default function RatingWidget({ entityId, entityType, title }: RatingWidg
 
             <div className="space-y-4">
                 <Textarea
-                    value={feedback}
-                    onChange={(e) => setFeedback(e.target.value)}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
                     placeholder={t('اكتب ملاحظاتك (اختياري)...', 'Write your feedback (optional)...')}
                     className="w-full"
                 />

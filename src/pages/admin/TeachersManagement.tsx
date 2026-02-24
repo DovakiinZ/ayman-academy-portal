@@ -3,8 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
-import { uploadAvatar, getAvatarUrl } from '@/lib/storage';
-import type { Profile, TeacherInvite, Stage } from '@/types/database';
+import type { Profile, TeacherInvite } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +34,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users, Beaker, Pencil, Home, PlusCircle } from 'lucide-react';
+import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users, Beaker, Pencil, Home } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -53,13 +52,24 @@ export default function TeachersManagement() {
     // Teachers & Invites state
     const [teachers, setTeachers] = useState<Profile[]>([]);
     const [invites, setInvites] = useState<TeacherInvite[]>([]);
-    const [allStages, setAllStages] = useState<Stage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     // Invite dialog state
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [inviteForm, setInviteForm] = useState({ full_name: '', email: '' });
+
+    // Create teacher dialog state
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        email: '',
+        full_name: '',
+        bio_ar: '',
+        bio_en: '',
+        show_on_home: false,
+        home_order: 0,
+        avatar_url: '',
+    });
 
     // Edit teacher dialog state
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -70,54 +80,12 @@ export default function TeachersManagement() {
         bio_en: '',
         show_on_home: false,
         home_order: 0,
-        avatar_url: '',
-        expertise_tags_ar: [] as string[],
-        expertise_tags_en: [] as string[],
-        featured_stages: [] as string[],
     });
-    const [avatarFile, setAvatarFile] = useState<File | null>(null);
-    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
     // Common UI state
     const [submitting, setSubmitting] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<{ type: 'teacher' | 'invite'; item: Profile | TeacherInvite } | null>(null);
-
-    // Create teacher dialog state
-    const [createDialogOpen, setCreateDialogOpen] = useState(false);
-    const [createForm, setCreateForm] = useState({
-        full_name: '',
-        email: '',
-        bio_ar: '',
-        bio_en: '',
-        is_active: true,
-        expertise_tags_ar: [] as string[],
-        expertise_tags_en: [] as string[],
-        avatar_url: '',
-        featured_stages: [] as string[],
-    });
-
-    // Password reset state
-    const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-    const [passwordTarget, setPasswordTarget] = useState<Profile | null>(null);
-    const [newPassword, setNewPassword] = useState('');
-
-    // --- Handlers ---
-    const toggleStage = (stageId: string, formType: 'create' | 'edit') => {
-        if (formType === 'create') {
-            const current = createForm.featured_stages;
-            const updated = current.includes(stageId)
-                ? current.filter(id => id !== stageId)
-                : [...current, stageId];
-            setCreateForm({ ...createForm, featured_stages: updated });
-        } else {
-            const current = editForm.featured_stages;
-            const updated = current.includes(stageId)
-                ? current.filter(id => id !== stageId)
-                : [...current, stageId];
-            setEditForm({ ...editForm, featured_stages: updated });
-        }
-    };
 
     // Fetch data
     const fetchData = async () => {
@@ -129,7 +97,7 @@ export default function TeachersManagement() {
         devLog('Fetching teachers and invites...');
 
         try {
-            const results = await Promise.all([
+            const [teachersResult, invitesResult] = await Promise.all([
                 supabase
                     .from('profiles')
                     .select('*')
@@ -139,37 +107,26 @@ export default function TeachersManagement() {
                     .from('teacher_invites')
                     .select('*')
                     .order('created_at', { ascending: false }),
-                supabase
-                    .from('stages')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('sort_order', { ascending: true }),
-            ]) as [any, any, any];
+            ]);
 
             if (!mountedRef.current) return;
 
-            const [teachersRes, invitesRes, stagesRes] = results;
-
-            if (teachersRes.error) {
-                devLog('Teachers fetch error', teachersRes.error);
-                toast.error('فشل في تحميل المعلمين', { description: teachersRes.error.message });
+            if (teachersResult.error) {
+                devLog('Teachers fetch error', teachersResult.error);
+                toast.error('فشل في تحميل المعلمين', { description: teachersResult.error.message });
             }
-            if (invitesRes.error) {
-                devLog('Invites fetch error', invitesRes.error);
-                toast.error('فشل في تحميل الدعوات', { description: invitesRes.error.message });
-            }
-            if (stagesRes.error) {
-                devLog('Stages fetch error', stagesRes.error);
+            if (invitesResult.error) {
+                devLog('Invites fetch error', invitesResult.error);
+                toast.error('فشل في تحميل الدعوات', { description: invitesResult.error.message });
             }
 
-            setTeachers((teachersRes.data as Profile[]) || []);
-            setInvites((invitesRes.data as TeacherInvite[]) || []);
-            setAllStages((stagesRes.data as Stage[]) || []);
+            setTeachers((teachersResult.data as Profile[]) || []);
+            setInvites((invitesResult.data as TeacherInvite[]) || []);
 
             const duration = Date.now() - startTime;
             devLog(`Data loaded in ${duration}ms`, {
-                teachers: teachersRes.data?.length || 0,
-                invites: invitesRes.data?.length || 0
+                teachers: teachersResult.data?.length || 0,
+                invites: invitesResult.data?.length || 0
             });
         } catch (err) {
             if (!mountedRef.current) return;
@@ -197,108 +154,6 @@ export default function TeachersManagement() {
 
     const handleRetry = () => {
         fetchData();
-    };
-
-    // --- Create Teacher (Manual) ---
-    const handleCreateTeacher = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!user?.id) {
-            toast.error(t('خطأ في المصادقة', 'Authentication error'));
-            return;
-        }
-
-        if (!createForm.full_name.trim() || !createForm.email.trim()) {
-            toast.error(t('الرجاء إدخال الاسم والبريد الإلكتروني', 'Please enter name and email'));
-            return;
-        }
-
-        setSubmitting(true);
-        devLog('Starting manual teacher creation...');
-
-        try {
-            // 1. Get admin client lazily
-            const { getSupabaseAdmin } = await import('@/lib/supabaseAdmin');
-            const supabaseAdmin = getSupabaseAdmin();
-
-            if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-                throw new Error(t(
-                    'مفتاح الخدمة (Service Role Key) مفقود. يرجى إضافته لملف .env',
-                    'Service Role Key is missing. Please add it to your .env file.'
-                ));
-            }
-
-            // 2. Create the auth user
-            const tempPassword = `Teacher_${Math.random().toString(36).slice(-8)}!`;
-            devLog('Creating auth user...');
-
-            const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-                email: createForm.email.trim(),
-                password: tempPassword,
-                email_confirm: true,
-                user_metadata: { full_name: createForm.full_name.trim() }
-            });
-
-            if (authError) {
-                devLog('Auth creation failed', authError);
-                throw authError;
-            }
-
-            if (!authData.user) {
-                throw new Error('No user data returned from auth creation');
-            }
-
-            devLog('Auth user created successfully', authData.user.id);
-
-            // 3. Create the profile using the new user ID
-            const result = await verifiedInsert(
-                'profiles',
-                {
-                    id: authData.user.id,
-                    full_name: createForm.full_name.trim(),
-                    email: createForm.email.trim(),
-                    bio_ar: createForm.bio_ar.trim() || null,
-                    bio_en: createForm.bio_en.trim() || null,
-                    expertise_tags_ar: createForm.expertise_tags_ar,
-                    expertise_tags_en: createForm.expertise_tags_en,
-                    avatar_url: createForm.avatar_url || null,
-                    featured_stages: createForm.featured_stages,
-                    role: 'teacher',
-                    is_active: createForm.is_active,
-                },
-                {
-                    successMessage: { ar: 'تم إنشاء حساب المعلم بنجاح', en: 'Teacher profile created successfully' },
-                    errorMessage: { ar: 'فشل في إنشاء ملف المعلم الشخصي', en: 'Failed to create teacher profile' },
-                }
-            );
-
-            if (result.success) {
-                setCreateDialogOpen(false);
-                setCreateForm({
-                    full_name: '',
-                    email: '',
-                    bio_ar: '',
-                    bio_en: '',
-                    is_active: true,
-                    expertise_tags_ar: [],
-                    expertise_tags_en: [],
-                    avatar_url: '',
-                    featured_stages: []
-                });
-                fetchData();
-
-                // Alert about password
-                toast.success(t(
-                    `كلمة السر المؤقتة: ${tempPassword}`,
-                    `Temporary Password: ${tempPassword}`
-                ), { duration: 10000 });
-            }
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            devLog('Create teacher exception', err);
-            toast.error(t('فشل في إنشاء حساب المعلم', 'Failed to create teacher profile'), { description: message });
-        } finally {
-            setSubmitting(false);
-        }
     };
 
     // --- Invite Handling ---
@@ -351,6 +206,67 @@ export default function TeachersManagement() {
         }
     };
 
+    const handleCreateTeacher = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user?.id) {
+            toast.error(t('خطأ في المصادقة', 'Authentication error'));
+            return;
+        }
+
+        if (!createForm.email.trim() || !createForm.full_name.trim()) {
+            toast.error(t('الرجاء ملء الحقول المطلوبة', 'Please fill required fields'));
+            return;
+        }
+
+        setSubmitting(true);
+
+        try {
+            const result = await verifiedInsert(
+                'profiles',
+                {
+                    email: createForm.email.trim(),
+                    full_name: createForm.full_name.trim(),
+                    bio_ar: createForm.bio_ar.trim() || null,
+                    bio_en: createForm.bio_en.trim() || null,
+                    role: 'teacher',
+                    is_active: true,
+                    show_on_home: createForm.show_on_home,
+                    home_order: createForm.home_order,
+                    avatar_url: createForm.avatar_url.trim() || null,
+                },
+                {
+                    successMessage: { ar: 'تم إنشاء المعلم بنجاح', en: 'Teacher created successfully' },
+                    errorMessage: { ar: 'فشل في إنشاء المعلم', en: 'Failed to create teacher' },
+                }
+            );
+
+            if (result.success) {
+                setCreateDialogOpen(false);
+                setCreateForm({
+                    email: '',
+                    full_name: '',
+                    bio_ar: '',
+                    bio_en: '',
+                    show_on_home: false,
+                    home_order: 0,
+                    avatar_url: '',
+                });
+                fetchData();
+
+                // Show instruction toast
+                toast.info(
+                    t('سيتمكن المعلم من التسجيل باستخدام البريد المدخل', 'Teacher can register using this email'),
+                    { duration: 5000 }
+                );
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('فشل في إنشاء المعلم', 'Failed to create teacher'), { description: message });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const copyInviteLink = (tokenHash: string) => {
         const link = `${window.location.origin}/invite/${tokenHash}`;
         navigator.clipboard.writeText(link);
@@ -386,13 +302,7 @@ export default function TeachersManagement() {
             bio_en: teacher.bio_en || '',
             show_on_home: teacher.show_on_home || false,
             home_order: teacher.home_order || 0,
-            avatar_url: teacher.avatar_url || '',
-            expertise_tags_ar: (teacher as any).expertise_tags_ar || [],
-            expertise_tags_en: (teacher as any).expertise_tags_en || [],
-            featured_stages: (teacher as any).featured_stages || [],
         });
-        setAvatarPreview(getAvatarUrl(teacher.avatar_url));
-        setAvatarFile(null);
         setEditDialogOpen(true);
     };
 
@@ -408,15 +318,6 @@ export default function TeachersManagement() {
         setSubmitting(true);
 
         try {
-            let finalAvatarUrl = editForm.avatar_url;
-
-            // Handle avatar upload if new file selected
-            if (avatarFile) {
-                const { url, error: uploadError } = await uploadAvatar(editingTeacher.id, avatarFile);
-                if (uploadError) throw uploadError;
-                if (url) finalAvatarUrl = url;
-            }
-
             const result = await verifiedUpdate(
                 'profiles',
                 editingTeacher.id,
@@ -424,10 +325,6 @@ export default function TeachersManagement() {
                     full_name: editForm.full_name,
                     bio_ar: editForm.bio_ar || null,
                     bio_en: editForm.bio_en || null,
-                    expertise_tags_ar: editForm.expertise_tags_ar,
-                    expertise_tags_en: editForm.expertise_tags_en,
-                    avatar_url: finalAvatarUrl || null,
-                    featured_stages: editForm.featured_stages,
                     show_on_home: editForm.show_on_home,
                     home_order: editForm.home_order,
                 },
@@ -440,52 +337,11 @@ export default function TeachersManagement() {
             if (result.success) {
                 setEditDialogOpen(false);
                 setEditingTeacher(null);
-                setAvatarFile(null);
                 fetchData();
             }
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    // --- Password Management ---
-    const handleOpenPasswordDialog = (teacher: Profile) => {
-        setPasswordTarget(teacher);
-        setNewPassword('');
-        setPasswordDialogOpen(true);
-    };
-
-    const handleResetPassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!passwordTarget || !newPassword.trim()) return;
-
-        if (newPassword.length < 6) {
-            toast.error(t('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'Password must be at least 6 characters'));
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            const { getSupabaseAdmin } = await import('@/lib/supabaseAdmin');
-            const supabaseAdmin = getSupabaseAdmin();
-
-            const { error: resetError } = await supabaseAdmin.auth.admin.updateUserById(
-                passwordTarget.id,
-                { password: newPassword.trim() }
-            );
-
-            if (resetError) throw resetError;
-
-            toast.success(t('تم تغيير كلمة المرور بنجاح', 'Password changed successfully'));
-            setPasswordDialogOpen(false);
-            setPasswordTarget(null);
-            setNewPassword('');
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            toast.error(t('فشل في تغيير كلمة المرور', 'Failed to change password'), { description: message });
         } finally {
             setSubmitting(false);
         }
@@ -593,8 +449,8 @@ export default function TeachersManagement() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
-                        <PlusCircle className="w-4 h-4 me-2" />
+                    <Button onClick={() => setCreateDialogOpen(true)} variant="outline">
+                        <UserPlus className="w-4 h-4 me-2" />
                         {t('إنشاء معلم', 'Create Teacher')}
                     </Button>
                     <Button onClick={() => setInviteDialogOpen(true)}>
@@ -732,15 +588,6 @@ export default function TeachersManagement() {
                                                 {teacher.bio_ar && (
                                                     <p className="text-xs text-muted-foreground line-clamp-1">{teacher.bio_ar}</p>
                                                 )}
-                                                {(teacher as any).expertise_tags_ar?.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {(teacher as any).expertise_tags_ar.map((tag: string, i: number) => (
-                                                            <Badge key={i} variant="outline" className="text-[10px] py-0 px-1">
-                                                                {tag}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
-                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell>{teacher.email}</TableCell>
@@ -774,10 +621,6 @@ export default function TeachersManagement() {
                                                         <Pencil className="w-4 h-4 me-2" />
                                                         {t('تعديل', 'Edit')}
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenPasswordDialog(teacher)}>
-                                                        <RefreshCw className="w-4 h-4 me-2" />
-                                                        {t('تغيير كلمة المرور', 'Change Password')}
-                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleToggleStatus(teacher)}>
                                                         <UserX className="w-4 h-4 me-2" />
                                                         {teacher.is_active ? t('تعطيل', 'Disable') : t('تفعيل', 'Enable')}
@@ -800,6 +643,96 @@ export default function TeachersManagement() {
                     )}
                 </div>
             </div>
+
+            {/* Create Teacher Dialog */}
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{t('إنشاء معلم جديد', 'Create New Teacher')}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateTeacher} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="create_email">{t('البريد الإلكتروني', 'Email')} *</Label>
+                            <Input
+                                id="create_email"
+                                type="email"
+                                value={createForm.email}
+                                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_name">{t('الاسم الكامل', 'Full Name')} *</Label>
+                            <Input
+                                id="create_name"
+                                value={createForm.full_name}
+                                onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_bio_ar">{t('السيرة الذاتية بالعربية', 'Arabic Bio')}</Label>
+                            <Textarea
+                                id="create_bio_ar"
+                                value={createForm.bio_ar}
+                                onChange={(e) => setCreateForm({ ...createForm, bio_ar: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_bio_en">{t('السيرة الذاتية بالإنجليزية', 'English Bio')}</Label>
+                            <Textarea
+                                id="create_bio_en"
+                                value={createForm.bio_en}
+                                onChange={(e) => setCreateForm({ ...createForm, bio_en: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_avatar">{t('رابط الصورة الشخصية', 'Avatar URL')}</Label>
+                            <Input
+                                id="create_avatar"
+                                type="url"
+                                value={createForm.avatar_url}
+                                onChange={(e) => setCreateForm({ ...createForm, avatar_url: e.target.value })}
+                                placeholder="https://example.com/avatar.jpg"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="create_show_home">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>
+                            <Switch
+                                id="create_show_home"
+                                checked={createForm.show_on_home}
+                                onCheckedChange={(checked) => setCreateForm({ ...createForm, show_on_home: checked })}
+                            />
+                        </div>
+                        {createForm.show_on_home && (
+                            <div className="space-y-2">
+                                <Label htmlFor="create_order">{t('ترتيب الظهور', 'Display Order')}</Label>
+                                <Input
+                                    id="create_order"
+                                    type="number"
+                                    value={createForm.home_order}
+                                    onChange={(e) => setCreateForm({ ...createForm, home_order: parseInt(e.target.value) || 0 })}
+                                    min={0}
+                                />
+                            </div>
+                        )}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                            <p>{t('ملاحظة: سيتمكن المعلم من التسجيل في المنصة باستخدام البريد الإلكتروني المدخل.',
+                                'Note: The teacher can register on the platform using the entered email.')}</p>
+                        </div>
+                        <div className="flex gap-2 pt-4">
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => setCreateDialogOpen(false)}>
+                                {t('إلغاء', 'Cancel')}
+                            </Button>
+                            <Button type="submit" className="flex-1" disabled={submitting}>
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('إنشاء', 'Create')}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* Invite Teacher Dialog */}
             <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
@@ -855,37 +788,6 @@ export default function TeachersManagement() {
                                 required
                             />
                         </div>
-
-                        {/* Avatar Upload */}
-                        <div className="space-y-2 pb-2">
-                            <Label>{t('الصورة الشخصية', 'Profile Picture')}</Label>
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 rounded-full bg-secondary overflow-hidden flex items-center justify-center border border-border">
-                                    {avatarPreview ? (
-                                        <img src={avatarPreview} alt="Avatar Preview" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <Users className="w-8 h-8 text-muted-foreground" />
-                                    )}
-                                </div>
-                                <div className="flex-1">
-                                    <Input
-                                        type="file"
-                                        accept="image/*"
-                                        className="text-xs"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                setAvatarFile(file);
-                                                setAvatarPreview(URL.createObjectURL(file));
-                                            }
-                                        }}
-                                    />
-                                    <p className="text-[10px] text-muted-foreground mt-1">
-                                        {t('يفضل استخدام صورة مربعة بحجم 400x400 بكسل', 'Prefer 400x400px square image')}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="edit_bio_ar">{t('السيرة الذاتية بالعربية', 'Arabic Bio')}</Label>
                             <Textarea
@@ -904,49 +806,14 @@ export default function TeachersManagement() {
                                 rows={3}
                             />
                         </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="edit_tags_ar">{t('التخصصات (بالعربية، مفصولة بفاصلة)', 'Expertise Tags (Arabic, comma separated)')}</Label>
-                            <Input
-                                id="edit_tags_ar"
-                                value={editForm.expertise_tags_ar.join(', ')}
-                                onChange={(e) => setEditForm({ ...editForm, expertise_tags_ar: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                                placeholder="رياضيات، فيزياء، كيمياء"
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="show_on_home">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>
+                            <Switch
+                                id="show_on_home"
+                                checked={editForm.show_on_home}
+                                onCheckedChange={(checked) => setEditForm({ ...editForm, show_on_home: checked })}
                             />
                         </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="edit_tags_en">{t('التخصصات (بالإنجليزية، مفصولة بفاصلة)', 'Expertise Tags (English, comma separated)')}</Label>
-                            <Input
-                                id="edit_tags_en"
-                                value={editForm.expertise_tags_en.join(', ')}
-                                onChange={(e) => setEditForm({ ...editForm, expertise_tags_en: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                                placeholder="Math, Physics, Chemistry"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>{t('المراحل الدراسية', 'Educational Stages')}</Label>
-                            <div className="grid grid-cols-2 gap-2 border p-3 rounded-md">
-                                {allStages.map(stage => (
-                                    <div key={stage.id} className="flex items-center space-x-2 space-x-reverse">
-                                        <Switch
-                                            id={`stage-edit-${stage.id}`}
-                                            checked={editForm.featured_stages.includes(stage.id)}
-                                            onCheckedChange={() => toggleStage(stage.id, 'edit')}
-                                        />
-                                        <Label htmlFor={`stage-edit-${stage.id}`} className="text-xs cursor-pointer">
-                                            {t(stage.title_ar, stage.title_en || stage.title_ar)}
-                                        </Label>
-                                    </div>
-                                ))}
-                                {allStages.length === 0 && (
-                                    <p className="text-xs text-muted-foreground col-span-2">
-                                        {t('لا توجد مراحل متاحة', 'No stages available')}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
                         <div className="border-t pt-4 mt-4">
                             <h3 className="font-medium mb-3">{t('إعدادات الصفحة الرئيسية', 'Homepage Settings')}</h3>
                             <div className="space-y-4">
@@ -981,138 +848,6 @@ export default function TeachersManagement() {
                             </Button>
                             <Button type="submit" className="flex-1" disabled={submitting}>
                                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('حفظ', 'Save')}
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Create Teacher Dialog */}
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{t('إنشاء حساب معلم', 'Create Teacher Profile')}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateTeacher} className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="create_name">{t('الاسم الكامل', 'Full Name')} *</Label>
-                            <Input
-                                id="create_name"
-                                value={createForm.full_name}
-                                onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="create_email">{t('البريد الإلكتروني', 'Email')}</Label>
-                            <Input
-                                id="create_email"
-                                type="email"
-                                value={createForm.email}
-                                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="create_bio_ar">{t('السيرة الذاتية بالعربية', 'Arabic Bio')}</Label>
-                            <Textarea
-                                id="create_bio_ar"
-                                value={createForm.bio_ar}
-                                onChange={(e) => setCreateForm({ ...createForm, bio_ar: e.target.value })}
-                                rows={3}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="create_bio_en">{t('السيرة الذاتية بالإنجليزية', 'English Bio')}</Label>
-                            <Textarea
-                                id="create_bio_en"
-                                value={createForm.bio_en}
-                                onChange={(e) => setCreateForm({ ...createForm, bio_en: e.target.value })}
-                                rows={3}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>{t('المراحل الدراسية', 'Educational Stages')}</Label>
-                            <div className="grid grid-cols-2 gap-2 border p-3 rounded-md">
-                                {allStages.map(stage => (
-                                    <div key={stage.id} className="flex items-center space-x-2 space-x-reverse">
-                                        <Switch
-                                            id={`stage-create-${stage.id}`}
-                                            checked={createForm.featured_stages.includes(stage.id)}
-                                            onCheckedChange={() => toggleStage(stage.id, 'create')}
-                                        />
-                                        <Label htmlFor={`stage-create-${stage.id}`} className="text-xs cursor-pointer">
-                                            {t(stage.title_ar, stage.title_en || stage.title_ar)}
-                                        </Label>
-                                    </div>
-                                ))}
-                                {allStages.length === 0 && (
-                                    <p className="text-xs text-muted-foreground col-span-2">
-                                        {t('لا توجد مراحل متاحة', 'No stages available')}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="create_active">{t('حالة الحساب', 'Account Status')}</Label>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">
-                                    {createForm.is_active ? t('نشط', 'Active') : t('معلق', 'Pending')}
-                                </span>
-                                <Switch
-                                    id="create_active"
-                                    checked={createForm.is_active}
-                                    onCheckedChange={(checked) => setCreateForm({ ...createForm, is_active: checked })}
-                                />
-                            </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground bg-secondary/30 p-3 rounded-lg">
-                            {t(
-                                'ملاحظة: هذا ينشئ ملف المعلم فقط. سيحتاج المعلم للتسجيل بشكل منفصل لتسجيل الدخول.',
-                                'Note: This creates a teacher profile only. The teacher will still need to register separately to log in.'
-                            )}
-                        </p>
-                        <div className="flex gap-2 pt-4">
-                            <Button type="button" variant="outline" className="flex-1" onClick={() => setCreateDialogOpen(false)}>
-                                {t('إلغاء', 'Cancel')}
-                            </Button>
-                            <Button type="submit" className="flex-1" disabled={submitting}>
-                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('إنشاء', 'Create')}
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Password Reset Dialog */}
-            <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{t('تغيير كلمة المرور للمعلم', 'Change Teacher Password')}</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-2">
-                        <p className="text-sm text-muted-foreground mb-4">
-                            {t('تغيير كلمة المرور للمعلم:', 'Change password for teacher:')} <strong>{passwordTarget?.full_name}</strong>
-                        </p>
-                    </div>
-                    <form onSubmit={handleResetPassword} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="new_password">{t('كلمة المرور الجديدة', 'New Password')}</Label>
-                            <Input
-                                id="new_password"
-                                type="password"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="••••••••"
-                                required
-                            />
-                        </div>
-                        <div className="flex gap-2 pt-4">
-                            <Button type="button" variant="outline" className="flex-1" onClick={() => setPasswordDialogOpen(false)}>
-                                {t('إلغاء', 'Cancel')}
-                            </Button>
-                            <Button type="submit" className="flex-1" disabled={submitting}>
-                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('حفظ كلمة المرور', 'Save Password')}
                             </Button>
                         </div>
                     </form>

@@ -1,56 +1,14 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/lib/supabase';
-import { Profile } from '@/types/database';
+import { useStudentTeachers } from '@/hooks/useQueryHooks';
 import { User, BookOpen, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-interface TeacherWithLessons extends Profile {
-    lessons_count: number;
-}
 
 export default function StudentTeachers() {
     const { t, direction } = useLanguage();
     const { profile } = useAuth();
-    const [teachers, setTeachers] = useState<TeacherWithLessons[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (profile?.id) {
-            fetchTeachers();
-        }
-    }, [profile?.id]);
-
-    const fetchTeachers = async () => {
-        if (!profile?.id) return;
-
-        // Get accessible teacher IDs from RPC (assumes it returns teacher_id)
-        // Note: Arg name must match Database type definition (student_uuid)
-        const { data: teacherIds } = await supabase.rpc('get_student_teachers', { student_uuid: profile.id });
-
-        if (teacherIds && teacherIds.length > 0) {
-            const { data: teachersData } = await supabase
-                .from('profiles')
-                .select(`
-                    *,
-                    lessons(count)
-                `)
-                .in('id', teacherIds.map((t: { teacher_id: string }) => t.teacher_id))
-                .eq('role', 'teacher')
-                .eq('is_active', true);
-
-            if (teachersData) {
-                setTeachers((teachersData as any[]).map(t => ({
-                    ...t,
-                    lessons_count: t.lessons?.[0]?.count || 0
-                })) as unknown as TeacherWithLessons[]);
-            }
-        }
-
-        setLoading(false);
-    };
+    const { data: teachers = [], isLoading: loading } = useStudentTeachers(profile?.id);
 
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
@@ -85,7 +43,7 @@ export default function StudentTeachers() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {teachers.map((teacher) => (
+                    {teachers.map((teacher: any) => (
                         <div
                             key={teacher.id}
                             className="bg-background rounded-lg border border-border p-6"

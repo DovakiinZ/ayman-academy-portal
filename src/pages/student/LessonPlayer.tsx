@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { supabase } from '@/lib/supabase';
 import { useLessonProgress } from '@/hooks/useLessonProgress';
+import { useLesson } from '@/hooks/useQueryHooks';
 import { Lesson, Subject, LessonContentItem, LessonSection, LessonBlock } from '@/types/database';
 import { Loader2, ChevronRight, ChevronLeft, FileText, Download, CheckCircle, BrainCircuit, Video as VideoIcon, Image as ImageIcon, Lightbulb, AlertTriangle, ArrowRight, ArrowLeft, Trophy, PartyPopper, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,12 +38,17 @@ export default function LessonPlayer() {
     const { profile } = useAuth();
     const navigate = useNavigate();
 
-    const [lesson, setLesson] = useState<LessonWithDetails | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+    const { data: lessonData, isLoading: loading } = useLesson(id);
+    const lesson = (lessonData?.lesson || null) as LessonWithDetails | null;
+    const quizId = lessonData?.quizId || null;
+    const nextLesson = lessonData?.nextLesson || null;
+
+    const currentVideoUrl = useMemo(() => {
+        if (!lesson) return null;
+        return lesson.video_url || lesson.full_video_url || lesson.preview_video_url || null;
+    }, [lesson]);
+
     const [activeTab, setActiveTab] = useState('overview');
-    const [quizId, setQuizId] = useState<string | null>(null);
-    const [nextLesson, setNextLesson] = useState<Lesson | null>(null);
     const [showCongrats, setShowCongrats] = useState(false);
     const [completing, setCompleting] = useState(false);
 
@@ -53,12 +58,6 @@ export default function LessonPlayer() {
 
     // Use the custom hook for progress
     const { progress, updateProgress, isCompleted } = useLessonProgress(id || '');
-
-    useEffect(() => {
-        if (id && profile?.id) {
-            fetchLesson();
-        }
-    }, [id, profile?.id]);
 
     // Sync scroll progress to database (debounced)
     const progressSyncRef = useRef<NodeJS.Timeout | null>(null);
@@ -75,81 +74,6 @@ export default function LessonPlayer() {
             if (progressSyncRef.current) clearTimeout(progressSyncRef.current);
         };
     }, [scrollProgress, isCompleted]);
-
-    const fetchLesson = async () => {
-        setLoading(true);
-
-        const { data: lessonData, error } = await supabase
-            .from('lessons')
-            .select(`
-                *,
-                subject:subjects(*),
-                content_items:lesson_content_items(*),
-                sections:lesson_sections(*),
-                blocks:lesson_blocks(*)
-            `)
-            .eq('id', id!)
-            .eq('is_published', true)
-            .single();
-
-        if (error || !lessonData) {
-            console.error('Error fetching lesson:', error);
-            setLoading(false);
-            return;
-        }
-
-        const data = lessonData as any;
-        const sortedSections = (data.sections || []).sort((a: any, b: any) => a.order_index - b.order_index);
-        const sortedBlocks = (data.blocks || []).sort((a: any, b: any) => a.order_index - b.order_index);
-
-        const typedLesson = {
-            ...data,
-            sections: sortedSections,
-            blocks: sortedBlocks
-        } as unknown as LessonWithDetails;
-
-        setLesson(typedLesson);
-
-        // Video detection
-        if (typedLesson.video_url) {
-            setCurrentVideoUrl(typedLesson.video_url);
-        } else if (typedLesson.full_video_url) {
-            setCurrentVideoUrl(typedLesson.full_video_url);
-        } else if (typedLesson.preview_video_url) {
-            setCurrentVideoUrl(typedLesson.preview_video_url);
-        }
-
-        // Check for quiz
-        const { data: quizData } = await supabase
-            .from('lesson_quizzes')
-            .select('id')
-            .eq('lesson_id', id!)
-            .single();
-
-        if (quizData) {
-            setQuizId((quizData as unknown as { id: string }).id);
-        }
-
-        // Fetch next lesson
-        await fetchNextLesson(data as any);
-        setLoading(false);
-    };
-
-    const fetchNextLesson = async (currentLesson: any) => {
-        const { data: nextData } = await supabase
-            .from('lessons')
-            .select('*')
-            .eq('subject_id', currentLesson.subject_id)
-            .eq('is_published', true)
-            .gt('order_index', currentLesson.order_index)
-            .order('order_index', { ascending: true })
-            .limit(1)
-            .single();
-
-        if (nextData) {
-            setNextLesson(nextData as Lesson);
-        }
-    };
 
     // Called by LessonContentRenderer when a block comes into view
     const handleBlockSeen = useCallback((blockId: string) => {
@@ -324,7 +248,7 @@ export default function LessonPlayer() {
                     )}
 
                     {/* Tabs */}
-                    <div className="border-b border-border sticky top-0 bg-background z-[5] px-4">
+                    <div className="border-b border-border sticky top-0 bg-background z-10 px-4">
                         <div className="flex gap-6 overflow-x-auto">
                             {['overview', 'quiz', 'qa', 'notes', 'reviews'].map((tab) => {
                                 if (tab === 'quiz' && !quizId) return null;
@@ -460,7 +384,7 @@ export default function LessonPlayer() {
 
                         {activeTab === 'qa' && <LessonComments lessonId={lesson.id} />}
                         {activeTab === 'notes' && <LessonNotes lessonId={lesson.id} currentTime={0} />}
-                        {activeTab === 'reviews' && <RatingWidget entityId={lesson.id} entityType="lesson" title={t('تقييم الدرس', 'Rate this Lesson')} />}
+                        {activeTab === 'reviews' && <RatingWidget lessonId={lesson.id} title={t('تقييم الدرس', 'Rate this Lesson')} />}
                     </div>
                 </div>
 

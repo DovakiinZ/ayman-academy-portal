@@ -1,51 +1,27 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useIsMobile } from '@/hooks/use-mobile';
-import {
-    LayoutDashboard,
-    BookOpen,
-    MessageSquare,
-    User,
-    LogOut,
-    Menu,
-    X,
-    Award,
-    Trophy
-} from 'lucide-react';
+import { LogOut, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useIsMobileLayout } from '@/hooks/use-mobile';
+import MobileLayout from '@/layouts/MobileLayout';
 import logo from '@/assets/logo.png';
-import MobileLayout from './mobile/MobileLayout';
+import { roleNavItems } from '@/config/nav';
+import { useDarkMode } from '@/hooks/useDarkMode';
 
-const navItems = [
-    { path: '/student', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
-    { path: '/student/subjects', icon: BookOpen, label: { ar: 'موادي', en: 'My Subjects' } },
-    { path: '/student/certificates', icon: Award, label: { ar: 'شهاداتي', en: 'Certificates' } },
-    { path: '/student/achievements', icon: Trophy, label: { ar: 'الإنجازات', en: 'Achievements' } },
-    { path: '/student/messages', icon: MessageSquare, label: { ar: 'الرسائل', en: 'Messages' } },
-    { path: '/student/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },
-];
+const navItems = roleNavItems.student;
 
 export default function StudentLayout() {
-    const isMobile = useIsMobile();
-
-    // ── Mobile: completely separate layout ──
-    if (isMobile) {
-        return <MobileLayout />;
-    }
-
-    // ── Desktop: original sidebar layout (unchanged) ──
-    return <DesktopLayout />;
-}
-
-/** Desktop sidebar layout — extracted as-is, zero changes */
-function DesktopLayout() {
     const { t } = useLanguage();
     const { profile, signOut } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const isMobile = useIsMobileLayout();
+    const { isDark, toggle: toggleDarkMode } = useDarkMode();
+
+    if (isMobile) {
+        return <MobileLayout role="student" />;
+    }
 
     const isActive = (path: string, exact?: boolean) => {
         if (exact) return location.pathname === path;
@@ -60,34 +36,27 @@ function DesktopLayout() {
     return (
         <div className="min-h-screen bg-secondary/30">
             <div className="flex">
-                {/* Sidebar */}
-                <aside className={`
-          fixed lg:sticky top-0 lg:top-0 z-40 h-screen w-64 bg-background border-e border-border
-          transform transition-transform lg:transform-none
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}>
+                {/* Desktop Sidebar */}
+                <aside className="sticky top-0 z-40 h-screen w-64 bg-background border-e border-border">
                     <div className="flex flex-col h-full">
-                        {/* Logo */}
                         <div className="flex items-center h-14 px-4 border-b border-border">
                             <Link to="/student">
                                 <img src={logo} alt="Ayman Academy" className="h-14" />
                             </Link>
                         </div>
 
-                        {/* Navigation */}
                         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
                             {navItems.map((item) => (
                                 <Link
                                     key={item.path}
                                     to={item.path}
-                                    onClick={() => setSidebarOpen(false)}
                                     className={`
-                    flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors
-                    ${isActive(item.path, item.exact)
+                                        flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors
+                                        ${isActive(item.path, item.exact)
                                             ? 'bg-primary text-primary-foreground'
                                             : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                                         }
-                  `}
+                                    `}
                                 >
                                     <item.icon className="w-4 h-4" />
                                     {t(item.label.ar, item.label.en)}
@@ -95,11 +64,18 @@ function DesktopLayout() {
                             ))}
                         </nav>
 
-                        {/* User section */}
                         <div className="p-3 border-t border-border">
-                            <div className="px-3 py-2 mb-2">
-                                <p className="text-sm font-medium text-foreground truncate">{profile?.full_name || profile?.email}</p>
-                                <p className="text-xs text-muted-foreground">{t('طالب', 'Student')}</p>
+                            <div className="px-3 py-2 mb-2 flex items-center justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium text-foreground truncate">{profile?.full_name || profile?.email}</p>
+                                    <p className="text-xs text-muted-foreground">{t('طالب', 'Student')}</p>
+                                </div>
+                                <button
+                                    onClick={toggleDarkMode}
+                                    className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-secondary flex-shrink-0"
+                                >
+                                    {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                                </button>
                             </div>
                             <Button
                                 variant="ghost"
@@ -114,7 +90,6 @@ function DesktopLayout() {
                     </div>
                 </aside>
 
-                {/* Main content */}
                 <main className="flex-1 min-h-screen">
                     <div className="p-4 lg:p-6">
                         <Outlet />

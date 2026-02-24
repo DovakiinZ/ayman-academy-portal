@@ -31,9 +31,10 @@ import {
     FileText,
     Eye,
     EyeOff,
+    Layers,
 } from 'lucide-react';
 
-type TabType = 'teachers' | 'subjects' | 'lessons';
+type TabType = 'stages' | 'teachers' | 'subjects' | 'lessons';
 
 export default function HomepageManagement() {
     const { t } = useLanguage();
@@ -41,6 +42,7 @@ export default function HomepageManagement() {
     const [loading, setLoading] = useState(true);
 
     // State for each tab
+    const [stages, setStages] = useState<any[]>([]);
     const [teachers, setTeachers] = useState<Profile[]>([]);
     const [featuredSubjects, setFeaturedSubjects] = useState<any[]>([]);
     const [featuredLessons, setFeaturedLessons] = useState<any[]>([]);
@@ -50,6 +52,7 @@ export default function HomepageManagement() {
     const [allLessons, setAllLessons] = useState<Lesson[]>([]);
 
     // Edit dialogs
+    const [editingStage, setEditingStage] = useState<any | null>(null);
     const [editingTeacher, setEditingTeacher] = useState<Profile | null>(null);
     const [editingSubject, setEditingSubject] = useState<any | null>(null);
     const [editingLesson, setEditingLesson] = useState<any | null>(null);
@@ -63,7 +66,9 @@ export default function HomepageManagement() {
     const fetchData = async () => {
         setLoading(true);
 
-        if (activeTab === 'teachers') {
+        if (activeTab === 'stages') {
+            await fetchStages();
+        } else if (activeTab === 'teachers') {
             await fetchTeachers();
         } else if (activeTab === 'subjects') {
             await fetchFeaturedSubjects();
@@ -74,6 +79,19 @@ export default function HomepageManagement() {
         }
 
         setLoading(false);
+    };
+
+    const fetchStages = async () => {
+        const { data, error } = await supabase
+            .from('stages')
+            .select('*')
+            .order('home_order', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching stages:', error);
+            toast.error(t('خطأ في جلب المراحل', 'Error fetching stages'));
+        }
+        setStages(data || []);
     };
 
     const fetchTeachers = async () => {
@@ -166,6 +184,54 @@ export default function HomepageManagement() {
         await supabase.from('profiles').update({ home_order: currentIndex } as any).eq('id', otherTeacher.id);
 
         fetchTeachers();
+    };
+
+    // Stage functions
+    const toggleStageVisibility = async (stage: any) => {
+        const newValue = !stage.show_on_home;
+        const { error } = await supabase
+            .from('stages')
+            .update({ show_on_home: newValue })
+            .eq('id', stage.id);
+
+        if (error) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        } else {
+            toast.success(newValue ? t('تم الإظهار', 'Now visible') : t('تم الإخفاء', 'Now hidden'));
+            fetchStages();
+        }
+    };
+
+    const moveStage = async (stage: any, direction: 'up' | 'down') => {
+        const currentIndex = stages.findIndex(s => s.id === stage.id);
+        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+        if (newIndex < 0 || newIndex >= stages.length) return;
+
+        const otherStage = stages[newIndex];
+
+        await supabase.from('stages').update({ home_order: newIndex }).eq('id', stage.id);
+        await supabase.from('stages').update({ home_order: currentIndex }).eq('id', otherStage.id);
+
+        fetchStages();
+    };
+
+    const saveStage = async () => {
+        if (!editingStage) return;
+
+        const { error } = await supabase
+            .from('stages')
+            .update({
+                teaser_ar: editingStage.teaser_ar || null,
+                teaser_en: editingStage.teaser_en || null,
+            })
+            .eq('id', editingStage.id);
+
+        if (!error) {
+            toast.success(t('تم الحفظ', 'Saved'));
+            setEditingStage(null);
+            fetchStages();
+        }
     };
 
     const saveTeacher = async () => {
@@ -346,6 +412,7 @@ export default function HomepageManagement() {
     };
 
     const tabs = [
+        { id: 'stages' as TabType, icon: Layers, label: { ar: 'المراحل', en: 'Stages' } },
         { id: 'teachers' as TabType, icon: User, label: { ar: 'المعلمون', en: 'Teachers' } },
         { id: 'subjects' as TabType, icon: BookOpen, label: { ar: 'المواد', en: 'Subjects' } },
         { id: 'lessons' as TabType, icon: FileText, label: { ar: 'الدروس', en: 'Lessons' } },
@@ -390,6 +457,73 @@ export default function HomepageManagement() {
                 </div>
             ) : (
                 <>
+                    {/* Stages Tab */}
+                    {activeTab === 'stages' && (
+                        <div className="space-y-4">
+                            <p className="text-sm text-muted-foreground">
+                                {t('فعّل الظهور للمراحل التي تريد عرضها في الصفحة الرئيسية',
+                                    'Enable visibility for stages you want to show on the homepage')}
+                            </p>
+                            <div className="bg-background border border-border rounded-lg divide-y divide-border">
+                                {stages.map((stage, index) => (
+                                    <div key={stage.id} className="flex items-center gap-4 p-4">
+                                        {/* Reorder */}
+                                        <div className="flex flex-col gap-1">
+                                            <button
+                                                onClick={() => moveStage(stage, 'up')}
+                                                disabled={index === 0}
+                                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                            >
+                                                <ChevronUp className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => moveStage(stage, 'down')}
+                                                disabled={index === stages.length - 1}
+                                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                            >
+                                                <ChevronDown className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Icon */}
+                                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                            <Layers className="w-5 h-5 text-primary" />
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="flex-1">
+                                            <p className="font-medium">{t(stage.title_ar, stage.title_en || stage.title_ar)}</p>
+                                            <p className="text-xs text-muted-foreground truncate max-w-xs">
+                                                {t(stage.teaser_ar || stage.description_ar || '', stage.teaser_en || stage.description_en || '')}
+                                            </p>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <Button variant="ghost" size="sm" onClick={() => setEditingStage(stage)}>
+                                            <Edit className="w-4 h-4" />
+                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            {stage.show_on_home ? (
+                                                <Eye className="w-4 h-4 text-green-600" />
+                                            ) : (
+                                                <EyeOff className="w-4 h-4 text-muted-foreground" />
+                                            )}
+                                            <Switch
+                                                checked={stage.show_on_home || false}
+                                                onCheckedChange={() => toggleStageVisibility(stage)}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                                {stages.length === 0 && (
+                                    <div className="p-8 text-center text-muted-foreground">
+                                        {t('لا توجد مراحل', 'No stages')}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Teachers Tab */}
                     {activeTab === 'teachers' && (
                         <div className="space-y-4">
@@ -614,6 +748,46 @@ export default function HomepageManagement() {
                     )}
                 </>
             )}
+
+            {/* Edit Stage Dialog */}
+            <Dialog open={!!editingStage} onOpenChange={() => setEditingStage(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('تعديل بيانات المرحلة', 'Edit Stage Info')}</DialogTitle>
+                    </DialogHeader>
+                    {editingStage && (
+                        <div className="space-y-4 mt-4">
+                            <div>
+                                <label className="text-sm font-medium">{t('الوصف المختصر (عربي)', 'Teaser (Arabic)')}</label>
+                                <Textarea
+                                    value={editingStage.teaser_ar || ''}
+                                    onChange={(e) => setEditingStage({ ...editingStage, teaser_ar: e.target.value })}
+                                    rows={2}
+                                    placeholder={t('وصف مختصر للصفحة الرئيسية', 'Short description for homepage')}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">{t('الوصف المختصر (إنجليزي)', 'Teaser (English)')}</label>
+                                <Textarea
+                                    value={editingStage.teaser_en || ''}
+                                    onChange={(e) => setEditingStage({ ...editingStage, teaser_en: e.target.value })}
+                                    rows={2}
+                                    placeholder={t('وصف مختصر للصفحة الرئيسية', 'Short description for homepage')}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setEditingStage(null)}>
+                                    {t('إلغاء', 'Cancel')}
+                                </Button>
+                                <Button onClick={saveStage}>
+                                    <Save className="w-4 h-4 me-2" />
+                                    {t('حفظ', 'Save')}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* Edit Teacher Dialog */}
             <Dialog open={!!editingTeacher} onOpenChange={() => setEditingTeacher(null)}>

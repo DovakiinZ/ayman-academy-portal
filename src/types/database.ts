@@ -2,12 +2,10 @@
 // AYMAN ACADEMY - DATABASE TYPES
 // ============================================
 
-export type UserRole = 'super_admin' | 'teacher' | 'student' | 'parent';
+export type UserRole = 'super_admin' | 'teacher' | 'student';
 export type LanguagePref = 'ar' | 'en';
 export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
 export type ContentItemType = 'video' | 'article' | 'image' | 'file' | 'link';
-export type StudentGender = 'male' | 'female' | 'unspecified';
-export type StudentStage = 'primary' | 'middle' | 'high';
 
 export interface Profile {
     id: string;
@@ -23,11 +21,6 @@ export interface Profile {
     show_on_home?: boolean;
     home_order?: number;
     expertise_tags_ar?: string[];
-    featured_stages?: string[];
-    // Student onboarding fields
-    gender?: StudentGender;
-    student_stage?: StudentStage | null;
-    grade?: number | null;
     created_at: string;
     updated_at?: string;
 }
@@ -137,26 +130,6 @@ export interface SystemSetting {
     updated_at: string;
 }
 
-export interface Course {
-    id: string;
-    teacher_id: string;
-    level_id: string;
-    subject_id: string | null;
-    slug: string;
-    title_ar: string;
-    title_en: string | null;
-    description_ar: string | null;
-    description_en: string | null;
-    thumbnail_url?: string | null; // UI uses this
-    cover_image_url?: string | null; // DB uses this
-    is_published: boolean;
-    is_paid: boolean;
-    price_amount?: number;
-    price_currency?: string;
-    created_at: string;
-    updated_at: string;
-}
-
 export interface ContentTemplate {
     id?: string;
     key: string;
@@ -238,9 +211,9 @@ export interface LessonNote {
 export interface Message {
     id: string;
     sender_id: string;
-    recipient_id: string | null;
+    receiver_id: string;
     content: string;
-    is_read: boolean;
+    read_at: string | null;
     created_at: string;
     sender?: Profile;
     receiver?: Profile;
@@ -253,70 +226,6 @@ export interface AuditLog {
     entity_type: string;
     entity_id: string | null;
     metadata: Record<string, unknown> | null;
-    created_at: string;
-}
-
-// ── Certificate Rule Types ──────────────────
-
-export type CertificateStatus = 'draft' | 'eligible' | 'pending_approval' | 'issued' | 'revoked';
-
-export interface ProgressRule { type: 'progress'; minPercent: number }
-export interface FinalExamRule { type: 'final_exam'; minScore: number }
-export interface AssignmentRule { type: 'assignment_approved'; required: boolean }
-export interface AndRule { type: 'AND'; rules: RuleNode[] }
-export interface OrRule { type: 'OR'; rules: RuleNode[] }
-
-export type RuleNode = AndRule | OrRule | ProgressRule | FinalExamRule | AssignmentRule;
-
-export interface CertificateRule {
-    id: string;
-    subject_id: string;
-    enabled: boolean;
-    rule_json: RuleNode;
-    requires_manual_approval: boolean;
-    created_at: string;
-    updated_at?: string;
-}
-
-export interface MissingRequirement {
-    type: 'progress' | 'final_exam' | 'assignment_approved';
-    current: number;
-    required: number;
-}
-
-export interface EligibilityResult {
-    eligible: boolean;
-    missingRequirements: MissingRequirement[];
-}
-
-export interface CertificateSnapshot {
-    student_name: string;
-    gender: StudentGender;
-    course_name: string;
-    score: number | null;
-    completion_date: string;
-    teacher_name: string;
-    signer_name: string;
-    template_version: string;
-}
-
-export interface Certificate {
-    id: string;
-    student_id: string;
-    lesson_id: string | null;
-    subject_id: string | null;
-    template_id: string | null;
-    student_name: string;
-    course_name: string;
-    subject_name: string | null;
-    score: number | null;
-    issued_at: string;
-    verification_code: string;
-    pdf_url: string | null;
-    status: CertificateStatus;
-    version: number;
-    reissued_from_id: string | null;
-    snapshot_json: CertificateSnapshot | null;
     created_at: string;
 }
 
@@ -410,108 +319,6 @@ export interface HomeFeaturedLesson {
     lesson?: Lesson;
 }
 
-// ============================================
-// GAMIFICATION TYPES
-// ============================================
-
-export type XPEventType = 'lesson_complete' | 'quiz_pass' | 'streak_day' | 'assignment_submit' | 'certificate_earned' | 'badge_earned';
-export type StudentLevelName = 'beginner' | 'learner' | 'scholar' | 'expert';
-
-export interface StudentXP {
-    id: string;
-    student_id: string;
-    event_type: XPEventType;
-    points: number;
-    source_id: string | null;
-    created_at: string;
-}
-
-export interface StudentLevel {
-    student_id: string;
-    total_xp: number;
-    current_level: StudentLevelName;
-    streak_days: number;
-    last_activity_date: string | null;
-    updated_at: string;
-}
-
-export interface Badge {
-    id: string;
-    key: string;
-    name_ar: string;
-    name_en: string;
-    description_ar: string | null;
-    description_en: string | null;
-    icon: string;
-    criteria_type: 'streak' | 'score' | 'courses_completed' | 'speed' | 'xp_total' | 'custom';
-    criteria_value: number;
-    sort_order: number;
-    created_at: string;
-}
-
-export interface StudentBadge {
-    id: string;
-    student_id: string;
-    badge_id: string;
-    earned_at: string;
-    badge?: Badge;
-}
-
-// ============================================
-// PARENT TYPES
-// ============================================
-
-export interface ParentLink {
-    id: string;
-    parent_id: string;
-    student_id: string;
-    linked_at: string;
-    student?: Profile;
-}
-
-// ============================================
-// EVALUATION & COACH TYPES
-// ============================================
-
-export interface TeacherEvaluation {
-    id: string;
-    subject_id: string;
-    quality_score: number;
-    difficulty_balance_score: number;
-    engagement_score: number;
-    dropout_risk: number;
-    detected_issues: string[];
-    recommendations: string[];
-    evaluated_at: string;
-}
-
-export interface CourseQualityReport {
-    qualityScore: number;
-    difficultyBalanceScore: number;
-    engagementScore: number;
-    dropoutRisk: number;
-    detectedIssues: string[];
-    recommendations: string[];
-}
-
-export interface StudentCoachReport {
-    riskScore: number;
-    strengths: string[];
-    weaknesses: string[];
-    suggestedLessons: { id: string; title: string }[];
-    motivationalMessage: string;
-}
-
-export interface ParentStudentReport {
-    progressPercent: number;
-    weeklyLessonsCompleted: number;
-    avgScore: number;
-    timeSpentMinutes: number;
-    strengths: string[];
-    weaknesses: string[];
-    comparisonToClassAverage: number;
-}
-
 // Database helper type
 export type Database = {
     public: {
@@ -520,11 +327,6 @@ export type Database = {
                 Row: Profile;
                 Insert: Partial<Profile>;
                 Update: Partial<Profile>;
-            };
-            courses: {
-                Row: Course;
-                Insert: Partial<Course>;
-                Update: Partial<Course>;
             };
             stages: {
                 Row: Stage;
@@ -625,46 +427,6 @@ export type Database = {
                 Row: Template;
                 Insert: Partial<Template>;
                 Update: Partial<Template>;
-            };
-            certificate_rules: {
-                Row: CertificateRule;
-                Insert: Partial<CertificateRule>;
-                Update: Partial<CertificateRule>;
-            };
-            student_xp: {
-                Row: StudentXP;
-                Insert: Partial<StudentXP>;
-                Update: Partial<StudentXP>;
-            };
-            student_levels: {
-                Row: StudentLevel;
-                Insert: Partial<StudentLevel>;
-                Update: Partial<StudentLevel>;
-            };
-            badges: {
-                Row: Badge;
-                Insert: Partial<Badge>;
-                Update: Partial<Badge>;
-            };
-            student_badges: {
-                Row: StudentBadge;
-                Insert: Partial<StudentBadge>;
-                Update: Partial<StudentBadge>;
-            };
-            parent_links: {
-                Row: ParentLink;
-                Insert: Partial<ParentLink>;
-                Update: Partial<ParentLink>;
-            };
-            certificates: {
-                Row: Certificate;
-                Insert: Partial<Certificate>;
-                Update: Partial<Certificate>;
-            };
-            teacher_evaluations: {
-                Row: TeacherEvaluation;
-                Insert: Partial<TeacherEvaluation>;
-                Update: Partial<TeacherEvaluation>;
             };
         };
         Functions: {

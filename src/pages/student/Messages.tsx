@@ -2,12 +2,15 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useMessageContacts, useTeacherMessageContacts } from '@/hooks/useQueryHooks';
 import { supabase } from '@/lib/supabase';
 import { Profile, Message } from '@/types/database';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Using Input for simple text, or Textarea
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, User, MessageSquare } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import { toast } from 'sonner';
 
 interface Contact extends Profile {
     last_message?: string;
@@ -19,23 +22,32 @@ export default function Messages() {
     const { t, direction } = useLanguage();
     const { profile } = useAuth();
     const [searchParams] = useSearchParams();
+    const queryClient = useQueryClient();
 
-    const [contacts, setContacts] = useState<Contact[]>([]);
+    const isTeacher = profile?.role === 'teacher' || profile?.role === 'super_admin';
+
+    const studentContacts = useMessageContacts(!isTeacher ? profile?.id : undefined);
+    const teacherContacts = useTeacherMessageContacts(isTeacher ? profile?.id : undefined);
+
+    const { data: contacts = [], isLoading: loadingContacts } = isTeacher ? teacherContacts : studentContacts;
     const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
-    const [loadingContacts, setLoadingContacts] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Initial load
+    // Pre-select teacher from URL param when contacts load
     useEffect(() => {
-        if (profile?.id) {
-            fetchContacts();
+        if (contacts.length > 0 && !selectedContact) {
+            const teacherIdParam = searchParams.get('teacher');
+            if (teacherIdParam) {
+                const target = contacts.find((c: any) => c.id === teacherIdParam);
+                if (target) handleSelectContact(target);
+            }
         }
-    }, [profile?.id]);
+    }, [contacts]);
 
     // Setup real-time subscription for new messages
     useEffect(() => {
@@ -57,8 +69,8 @@ export default function Messages() {
                     scrollToBottom();
                     markAsRead(newMsg.sender_id);
                 } else {
-                    // Refresh contacts to update unread count/last message
-                    fetchContacts();
+                    // Refresh contacts to update unread count
+                    queryClient.invalidateQueries({ queryKey: queryKeys.messages.contacts(profile.id) });
                 }
             })
             .subscribe();
@@ -67,64 +79,6 @@ export default function Messages() {
             sub.unsubscribe();
         };
     }, [profile?.id, selectedContact]);
-
-    const fetchContacts = async () => {
-        if (!profile?.id) return;
-
-        // 1. Get accessible teachers
-        const { data: teacherIds } = await supabase.rpc('get_student_teachers', { p_user_id: profile.id });
-
-        if (!teacherIds) {
-            setLoadingContacts(false);
-            return;
-        }
-
-        const ids = teacherIds.map((t: { teacher_id: string }) => t.teacher_id);
-
-        if (ids.length === 0) {
-            setLoadingContacts(false);
-            return;
-        }
-
-        // 2. Get teacher profiles
-        const { data: teachers } = await supabase
-            .from('profiles')
-            .select('*')
-            .in('id', ids);
-
-        if (!teachers) return;
-
-        // 3. Get last message stats (simplified for now, expensive query in real world)
-        // ideally we'd have a view or simplified query. For V1 we'll just show the list.
-        // We can check "messages" table for unread counts
-
-        const contactsWithMeta: Contact[] = [];
-
-        for (const teacher of teachers) {
-            // Get unread count
-            const { count } = await supabase
-                .from('messages')
-                .select('id', { count: 'exact' })
-                .eq('sender_id', teacher.id)
-                .eq('receiver_id', profile.id)
-                .is('read_at', null);
-
-            contactsWithMeta.push({
-                ...teacher,
-                unread_count: count || 0
-            });
-        }
-
-        setContacts(contactsWithMeta);
-        setLoadingContacts(false);
-
-        // Pre-select teacher if in URL
-        const teacherIdParam = searchParams.get('teacher');
-        if (teacherIdParam && !selectedContact) {
-            const target = contactsWithMeta.find(c => c.id === teacherIdParam);
-            if (target) handleSelectContact(target);
-        }
-    };
 
     const handleSelectContact = async (contact: Contact) => {
         setSelectedContact(contact);
@@ -156,10 +110,8 @@ export default function Messages() {
             .eq('receiver_id', profile.id)
             .is('read_at', null);
 
-        // Update local badge
-        setContacts(prev => prev.map(c =>
-            c.id === senderId ? { ...c, unread_count: 0 } : c
-        ));
+        // Invalidate contacts cache to update unread badges
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages.contacts(profile.id) });
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
@@ -178,7 +130,9 @@ export default function Messages() {
             .select()
             .single();
 
-        if (data && !error) {
+        if (error) {
+            toast.error(t('فشل في إرسال الرسالة', 'Failed to send message'));
+        } else if (data) {
             setMessages(prev => [...prev, data]);
             setNewMessage('');
             scrollToBottom();
@@ -211,7 +165,7 @@ export default function Messages() {
                             {t('لا توجد جهات اتصال متاحة', 'No accessible contacts')}
                         </div>
                     ) : (
-                        contacts.map(contact => (
+                        contacts.map((contact: any) => (
                             <button
                                 key={contact.id}
                                 onClick={() => handleSelectContact(contact)}
@@ -238,7 +192,7 @@ export default function Messages() {
                                         {contact.full_name}
                                     </h3>
                                     <p className="text-xs text-muted-foreground truncate">
-                                        {t('معلم', 'Teacher')}
+                                        {isTeacher ? t('طالب', 'Student') : t('معلم', 'Teacher')}
                                     </p>
                                 </div>
                             </button>
@@ -288,7 +242,7 @@ export default function Messages() {
                                                 className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm
                                                     ${isMe
                                                         ? 'bg-primary text-primary-foreground rounded-br-none'
-                                                        : 'bg-card border border-border text-foreground rounded-bl-none'
+                                                        : 'bg-secondary border border-border text-foreground rounded-bl-none'
                                                     }
                                                 `}
                                             >
@@ -333,7 +287,10 @@ export default function Messages() {
                     </>
                 ) : (
                     <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                        <p>{t('اختر معلماً لبدء المحادثة', 'Select a teacher to start chatting')}</p>
+                        <p>{isTeacher
+                            ? t('اختر طالباً لبدء المحادثة', 'Select a student to start chatting')
+                            : t('اختر معلماً لبدء المحادثة', 'Select a teacher to start chatting')
+                        }</p>
                     </div>
                 )}
             </div>

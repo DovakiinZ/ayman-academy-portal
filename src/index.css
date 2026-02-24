@@ -13,70 +13,112 @@
 
 @layer base {
   :root {
-    /* Warm ivory background - premium off-white */
-    --background: 45 15% 97.5%;
-    /* #FAFAF8 approx */
+    /* Warm ivory background - not pure white */
+    --background: 42 30% 97%;
     --foreground: 220 30% 12%;
 
     /* Card surfaces */
-    --card: 0 0% 100%;
+    --card: 42 25% 99%;
     --card-foreground: 220 30% 12%;
 
-    /* Deep Navy - Academy Blue Accent */
-    --primary: 215 90% 25%;
-    /* More vibrant Academy Blue */
-    --primary-foreground: 0 0% 100%;
+    /* Popover */
+    --popover: 42 25% 99%;
+    --popover-foreground: 220 30% 12%;
+
+    /* Deep Navy - Oxford inspired primary */
+    --primary: 215 55% 20%;
+    --primary-foreground: 42 25% 98%;
 
     /* Subtle secondary */
-    --secondary: 215 20% 96%;
-    --secondary-foreground: 215 90% 25%;
+    --secondary: 42 15% 94%;
+    --secondary-foreground: 220 25% 18%;
 
-    /* Warm gray borders - as requested rgba(15,23,42,0.08) */
-    --border: 222 47% 11% / 0.08;
-    --input: 222 47% 11% / 0.08;
-    --ring: 215 90% 25%;
+    /* Muted tones */
+    --muted: 42 12% 92%;
+    --muted-foreground: 220 12% 45%;
 
-    --radius: 0.75rem;
+    /* Muted warm gold accent - badges/dividers only */
+    --accent: 43 30% 55%;
+    --accent-foreground: 42 25% 98%;
 
-    /* Custom shadow variable */
-    --shadow-premium: 0 4px 6px -1px rgba(15, 23, 42, 0.04), 0 2px 4px -2px rgba(15, 23, 42, 0.02);
+    /* Destructive */
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    /* Academic tokens */
+    /* Warm gray borders */
+    --border: 42 12% 88%;
+    --input: 42 12% 88%;
+    --ring: 215 55% 20%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Academic style */
+    --sidebar-background: 42 20% 96%;
+    --sidebar-foreground: 220 25% 15%;
+    --sidebar-primary: 215 55% 20%;
+    --sidebar-primary-foreground: 42 25% 98%;
+    --sidebar-accent: 42 15% 92%;
+    --sidebar-accent-foreground: 220 25% 15%;
+    --sidebar-border: 42 12% 88%;
+    --sidebar-ring: 215 55% 20%;
+
+    /* Custom academic tokens */
     --academic-gold: 43 35% 55%;
     --academic-gold-muted: 43 20% 70%;
+    --paper: 42 30% 97%;
+    --paper-dark: 42 20% 93%;
+    --ink: 220 30% 12%;
+    --ink-light: 220 15% 40%;
   }
 
   .dark {
-    /* Premium Navy Theme */
-    --background: 222 47% 7%;
-    /* #0A1020 deep navy */
-    --foreground: 210 40% 96%;
-    /* off-white, not pure white */
+    --background: 220 25% 8%;
+    --foreground: 42 15% 93%;
 
-    --card: 222 47% 11%;
-    /* #0F1930 */
-    --card-foreground: 210 40% 96%;
+    --card: 220 25% 10%;
+    --card-foreground: 42 15% 93%;
 
-    --primary: 217 91% 65%;
-    /* #5B9BFF */
-    --primary-foreground: 222 47% 7%;
+    --popover: 220 25% 10%;
+    --popover-foreground: 42 15% 93%;
 
-    --secondary: 222 35% 16%;
-    --secondary-foreground: 210 40% 96%;
+    --primary: 215 45% 50%;
+    --primary-foreground: 220 25% 8%;
 
-    --muted: 222 47% 13%;
-    --muted-foreground: 215 20% 72%;
+    --secondary: 220 20% 14%;
+    --secondary-foreground: 42 15% 93%;
 
-    --border: 215 25% 22%;
-    /* soft border */
-    --input: 215 25% 22%;
-    --ring: 217 91% 65%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 42 12% 60%;
 
-    --shadow-premium: 0 4px 20px -4px rgba(0, 0, 0, 0.5);
-    --academic-gold: 43 50% 62%;
-    --academic-gold-muted: 43 25% 58%;
+    --accent: 43 35% 50%;
+    --accent-foreground: 220 25% 8%;
+
+    --destructive: 0 50% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 215 45% 50%;
+
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 42 15% 93%;
+    --sidebar-primary: 215 45% 50%;
+    --sidebar-primary-foreground: 220 25% 8%;
+    --sidebar-accent: 220 20% 14%;
+    --sidebar-accent-foreground: 42 15% 93%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 215 45% 50%;
+
+    --academic-gold: 43 40% 50%;
+    --academic-gold-muted: 43 25% 38%;
+    --paper: 220 25% 8%;
+    --paper-dark: 220 25% 11%;
+    --ink: 42 15% 93%;
+    --ink-light: 42 12% 65%;
   }
+}
 
+@layer base {
   * {
     @apply border-border;
   }
@@ -125,74 +167,47 @@
     line-height: 1.85;
   }
 
-  /* Arabic-specific adjustments - airy and premium */
+  /* Arabic-specific adjustments */
   html[dir="rtl"] p {
-    line-height: 1.85;
-  }
-
-  /* Global section spacing */
-  section {
-    @apply py-16 md:py-24;
+    line-height: 2;
   }
 }
 
 @layer components {
 
-  /* Premium card style - with subtle accent and hover effect */
-  .premium-card {
-    @apply bg-card border border-border rounded-xl shadow-sm transition-all duration-300;
-    box-shadow: var(--shadow-premium);
+  /* Academic card style - subtle */
+  .academic-card {
+    @apply bg-card border border-border rounded-lg p-6;
   }
 
-  .dark .premium-card {
-    box-shadow: 0 16px 40px -26px rgba(91, 155, 255, 0.18);
+  /* Institutional section */
+  .section-academic {
+    @apply py-12 md:py-16;
   }
 
-  .premium-card:hover {
-    @apply -translate-y-1 shadow-md;
-    border-color: hsl(var(--primary) / 0.15);
+  /* Container with academic proportions */
+  .container-academic {
+    @apply max-w-5xl mx-auto px-4 md:px-6;
   }
 
-  .dark .premium-card:hover {
-    box-shadow: 0 20px 50px -26px rgba(91, 155, 255, 0.28);
-    border-color: hsl(var(--primary) / 0.25);
+  /* Subtle divider */
+  .divider-academic {
+    @apply border-t border-border my-6;
   }
 
-  /* Top accent line variant */
-  .premium-card-accent {
-    @apply relative overflow-hidden;
+  /* Gold accent text */
+  .text-gold {
+    color: hsl(var(--academic-gold));
   }
 
-  .premium-card-accent::before {
-    content: '';
-    @apply absolute top-0 left-0 right-0 h-[2px] z-10;
-    background: hsl(var(--primary) / 0.6);
+  /* Lock indicator */
+  .lesson-locked {
+    @apply opacity-70;
   }
 
-  /* Premium glow button */
-  .btn-glow {
-    box-shadow: 0 10px 30px -12px hsl(var(--primary) / 0.35);
-    transition: all 0.3s ease;
-  }
-
-  .btn-glow:hover {
-    box-shadow: 0 14px 40px -12px hsl(var(--primary) / 0.45);
-  }
-
-  /* Premium section title underline */
-  .section-accent-line {
-    @apply mt-3 h-1 w-16 rounded-full mx-auto;
-    background: hsl(var(--primary) / 0.7);
-  }
-
-  .section-divider {
-    @apply mt-6 h-px w-full;
-    background: hsl(var(--border) / 0.7);
-  }
-
-  /* Badge styles - modernized */
-  .badge-premium {
-    @apply inline-flex items-center px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-full bg-primary/5 text-primary border border-primary/10;
+  /* Badge styles - subtle */
+  .badge-stage {
+    @apply inline-flex items-center px-2.5 py-1 text-xs font-medium rounded bg-secondary text-secondary-foreground border border-border;
   }
 
   .badge-gold {
@@ -206,33 +221,6 @@
   .eyebrow {
     @apply text-xs font-medium tracking-wide uppercase;
     color: hsl(var(--academic-gold));
-  }
-
-  /* ── Mobile-specific utilities ── */
-  @media (max-width: 767px) {
-    .mobile-card {
-      @apply w-full rounded-2xl border border-border bg-card;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-    }
-
-    .mobile-stat-grid {
-      @apply grid grid-cols-2 gap-3;
-    }
-
-    .mobile-progress-bar {
-      height: 8px;
-      @apply rounded-full;
-    }
-
-    .mobile-btn {
-      min-height: 44px;
-      @apply rounded-xl;
-    }
-  }
-
-  /* Academic Container - Unified Alignment */
-  .container-academic {
-    @apply max-w-7xl mx-auto px-6 w-full;
   }
 }
 
@@ -273,27 +261,18 @@
   .transition-academic {
     @apply transition-colors duration-150 ease-in-out;
   }
-}
 
-/* Print Styles */
-@media print {
-
-  nav,
-  aside,
-  header,
-  footer,
-  button,
-  .no-print {
-    display: none !important;
+  /* Safe area insets for mobile devices (notch, home indicator) */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
-  body,
-  html,
-  #root {
-    background: white !important;
-    overflow: visible !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }

@@ -16,8 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Save, Trash2, Globe, BookOpen, CreditCard } from 'lucide-react';
-import { toast } from 'sonner';
+import { Loader2, Save, Trash2 } from 'lucide-react';
 
 export default function CourseEditor() {
     const { t } = useLanguage();
@@ -26,66 +25,40 @@ export default function CourseEditor() {
     const { courseId } = useParams<{ courseId: string }>();
     const isEditing = courseId && courseId !== 'new';
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(isEditing);
     const [submitting, setSubmitting] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [stages, setStages] = useState<any[]>([]);
-    const [subjects, setSubjects] = useState<any[]>([]);
     const [form, setForm] = useState({
         title_ar: '',
         title_en: '',
         description_ar: '',
         description_en: '',
-        level_id: '',
-        subject_id: '',
+        stage_id: '',
         is_published: false,
-        is_paid: false,
-        price_amount: 0,
     });
 
     useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
-
-            // Fetch stages and subjects
-            const [stagesRes, subjectsRes] = await Promise.all([
-                supabase.from('stages').select('*').order('sort_order'),
-                supabase.from('subjects').select('*').order('title_ar')
-            ]);
-
-            if (stagesRes.data) setStages(stagesRes.data);
-            if (subjectsRes.data) setSubjects(subjectsRes.data);
-
-            // Fetch course if editing
-            if (isEditing && courseId) {
-                const { data, error } = await supabase
-                    .from('courses')
-                    .select('*')
-                    .eq('id', courseId)
-                    .eq('teacher_id', user?.id)
-                    .single();
-
-                if (error) {
-                    toast.error(t('فشل في تحميل بيانات الدورة', 'Failed to load course data'));
-                } else if (data) {
-                    const d = data as any;
-                    setForm({
-                        title_ar: d.title_ar || '',
-                        title_en: d.title_en || '',
-                        description_ar: d.description_ar || '',
-                        description_en: d.description_en || '',
-                        level_id: d.level_id || '',
-                        subject_id: d.subject_id || '',
-                        is_published: d.is_published || false,
-                        is_paid: d.is_paid || false,
-                        price_amount: d.price_amount || 0,
-                    });
-                }
-            }
-            setLoading(false);
+        if (isEditing && courseId) {
+            supabase
+                .from('courses')
+                .select('*')
+                .eq('id', courseId)
+                .eq('teacher_id', user?.id)
+                .single()
+                .then(({ data }) => {
+                    if (data) {
+                        setForm({
+                            title_ar: data.title_ar || '',
+                            title_en: data.title_en || '',
+                            description_ar: data.description_ar || '',
+                            description_en: data.description_en || '',
+                            stage_id: data.stage_id || '',
+                            is_published: data.is_published || false,
+                        });
+                    }
+                    setLoading(false);
+                });
         }
-
-        fetchData();
     }, [courseId, isEditing, user]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -93,46 +66,32 @@ export default function CourseEditor() {
         if (!user) return;
         setSubmitting(true);
 
-        const courseData = {
-            title_ar: form.title_ar,
-            title_en: form.title_en || null,
-            description_ar: form.description_ar || null,
-            description_en: form.description_en || null,
-            level_id: form.level_id,
-            subject_id: form.subject_id || null,
-            is_published: form.is_published,
-            is_paid: form.is_paid,
-            price_amount: form.is_paid ? form.price_amount : 0,
-            updated_at: new Date().toISOString(),
-        };
-
-        try {
-            if (isEditing) {
-                const { error } = await (supabase
-                    .from('courses') as any)
-                    .update(courseData)
-                    .eq('id', courseId);
-                if (error) throw error;
-                toast.success(t('تم تحديث الدورة بنجاح', 'Course updated successfully'));
-            } else {
-                const slug = form.title_ar.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0621-\u064A-]/g, '');
-                const { error } = await (supabase.from('courses') as any).insert({
-                    ...courseData,
-                    slug,
-                    teacher_id: user.id,
-                    created_at: new Date().toISOString(),
-                });
-                if (error) throw error;
-                toast.success(t('تم إنشاء الدورة بنجاح', 'Course created successfully'));
-            }
-            navigate('/teacher/courses');
-        } catch (error: any) {
-            toast.error(t('فشل في حفظ التغييرات', 'Failed to save changes'), {
-                description: error.message
+        if (isEditing) {
+            await supabase
+                .from('courses')
+                .update({
+                    title_ar: form.title_ar,
+                    title_en: form.title_en || null,
+                    description_ar: form.description_ar || null,
+                    description_en: form.description_en || null,
+                    stage_id: form.stage_id,
+                    is_published: form.is_published,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', courseId);
+        } else {
+            await supabase.from('courses').insert({
+                title_ar: form.title_ar,
+                title_en: form.title_en || null,
+                description_ar: form.description_ar || null,
+                description_en: form.description_en || null,
+                stage_id: form.stage_id,
+                teacher_id: user.id,
+                is_published: form.is_published,
             });
-        } finally {
-            setSubmitting(false);
         }
+
+        navigate('/teacher/courses');
     };
 
     const handleDelete = async () => {
@@ -140,19 +99,15 @@ export default function CourseEditor() {
             return;
         }
         setDeleting(true);
-        try {
-            const { error } = await supabase.from('courses').delete().eq('id', courseId);
-            if (error) throw error;
-            toast.success(t('تم حذف الدورة بنجاح', 'Course deleted successfully'));
-            navigate('/teacher/courses');
-        } catch (error: any) {
-            toast.error(t('فشل في حذف الدورة', 'Failed to delete course'), {
-                description: error.message
-            });
-        } finally {
-            setDeleting(false);
-        }
+        await supabase.from('courses').delete().eq('id', courseId);
+        navigate('/teacher/courses');
     };
+
+    const stages = [
+        { value: 'tamhidi', label: { ar: 'تمهيدي', en: 'Preparatory' } },
+        { value: 'ibtidai', label: { ar: 'ابتدائي', en: 'Primary' } },
+        { value: 'mutawasit', label: { ar: 'متوسط', en: 'Middle' } },
+    ];
 
     if (loading) {
         return (
@@ -202,87 +157,37 @@ export default function CourseEditor() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="level_id">{t('المرحلة الدراسية', 'Educational Stage')} *</Label>
-                        <Select value={form.level_id} onValueChange={(value) => setForm({ ...form, level_id: value })}>
+                        <Label htmlFor="stage_id">{t('المرحلة الدراسية', 'Educational Stage')} *</Label>
+                        <Select value={form.stage_id} onValueChange={(value) => setForm({ ...form, stage_id: value })}>
                             <SelectTrigger>
                                 <SelectValue placeholder={t('اختر المرحلة', 'Select stage')} />
                             </SelectTrigger>
                             <SelectContent>
                                 {stages.map((stage) => (
-                                    <SelectItem key={stage.id} value={stage.id}>
-                                        {t(stage.title_ar, stage.title_en || stage.title_ar)}
+                                    <SelectItem key={stage.value} value={stage.value}>
+                                        {t(stage.label.ar, stage.label.en)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="subject_id">{t('المادة الدراسية', 'Subject')} *</Label>
-                        <Select value={form.subject_id} onValueChange={(value) => setForm({ ...form, subject_id: value })}>
-                            <SelectTrigger>
-                                <SelectValue placeholder={t('اختر المادة', 'Select subject')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {subjects.map((subject) => (
-                                    <SelectItem key={subject.id} value={subject.id}>
-                                        {t(subject.title_ar, subject.title_en || subject.title_ar)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="border-t border-border pt-4 mt-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <CreditCard className="w-4 h-4 text-muted-foreground" />
-                                <div>
-                                    <Label>{t('دورة مدفوعة', 'Paid Course')}</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        {t('إتاحة الدورة كمتوفرة للشراء', 'Make this course available for purchase')}
-                                    </p>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={form.is_paid}
-                                onCheckedChange={(checked) => setForm({ ...form, is_paid: checked })}
-                            />
+                    <div className="flex items-center justify-between pt-2">
+                        <div>
+                            <Label>{t('نشر الدورة', 'Publish Course')}</Label>
+                            <p className="text-xs text-muted-foreground">
+                                {t('الدورات المنشورة تظهر للطلاب', 'Published courses are visible to students')}
+                            </p>
                         </div>
-
-                        {form.is_paid && (
-                            <div className="space-y-2">
-                                <Label htmlFor="price_amount">{t('سعر الدورة', 'Course Price')}</Label>
-                                <Input
-                                    id="price_amount"
-                                    type="number"
-                                    value={form.price_amount}
-                                    onChange={(e) => setForm({ ...form, price_amount: parseFloat(e.target.value) || 0 })}
-                                    className="max-w-[200px]"
-                                />
-                            </div>
-                        )}
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Globe className="w-4 h-4 text-muted-foreground" />
-                                <div>
-                                    <Label>{t('نشر الدورة', 'Publish Course')}</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        {t('الدورات المنشورة تظهر للطلاب', 'Published courses are visible to students')}
-                                    </p>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={form.is_published}
-                                onCheckedChange={(checked) => setForm({ ...form, is_published: checked })}
-                            />
-                        </div>
+                        <Switch
+                            checked={form.is_published}
+                            onCheckedChange={(checked) => setForm({ ...form, is_published: checked })}
+                        />
                     </div>
                 </div>
 
                 <div className="flex gap-3">
-                    <Button type="submit" disabled={submitting || !form.title_ar || !form.level_id || !form.subject_id}>
+                    <Button type="submit" disabled={submitting || !form.title_ar || !form.stage_id}>
                         {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 me-2" />}
                         {isEditing ? t('حفظ التغييرات', 'Save Changes') : t('إنشاء الدورة', 'Create Course')}
                     </Button>

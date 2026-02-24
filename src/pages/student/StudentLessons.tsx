@@ -2,16 +2,12 @@
  * StudentLessons — Subject detail page with lesson list + progress
  * Shows subject title, overall progress bar, and ordered lesson list
  * with completion checkmarks and progress indicators.
- *
- * Uses React Query for cached data — instantly hydrated from localStorage.
  */
 
-import { useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useSubjectDetail, useSubjectLessons, useSubjectTeachers } from '@/hooks/useAcademyData';
-import { Lesson, LessonProgress } from '@/types/database';
+import { useLessons } from '@/hooks/useQueryHooks';
 import {
     Play,
     FileText,
@@ -23,16 +19,9 @@ import {
     AlertCircle,
     BookOpen,
     CheckCircle,
-    RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import ProgressMotivationBanner from '@/components/course/ProgressMotivationBanner';
-import CertificateRequirements from '@/components/student/CertificateRequirements';
-
-interface LessonWithProgress extends Lesson {
-    progress?: LessonProgress;
-}
 
 export default function StudentLessons() {
     const { subjectId } = useParams<{ subjectId: string }>();
@@ -40,21 +29,9 @@ export default function StudentLessons() {
     const { t, direction } = useLanguage();
     const { profile } = useAuth();
 
-    // Cached queries
-    const { data: subject, isLoading: subjectLoading } = useSubjectDetail(subjectId);
-    const { data: lessonData, isLoading: lessonsLoading, isFetching } = useSubjectLessons(subjectId, profile?.id);
-    const { data: teachers = [] } = useSubjectTeachers(subjectId);
-
-    const isLoading = subjectLoading || lessonsLoading;
-
-    // Merge lessons with progress
-    const lessons: LessonWithProgress[] = useMemo(() => {
-        if (!lessonData) return [];
-        return lessonData.lessons.map((l: any) => ({
-            ...l,
-            progress: lessonData.progress.find((p: any) => p.lesson_id === l.id),
-        }));
-    }, [lessonData]);
+    const { data, isLoading: loading, error } = useLessons(subjectId, profile?.id);
+    const subject = data?.subject || null;
+    const lessons = data?.lessons || [];
 
     const BackIcon = direction === 'rtl' ? ArrowRight : ArrowLeft;
 
@@ -65,16 +42,16 @@ export default function StudentLessons() {
     };
 
     // Compute progress
-    const completedCount = lessons.filter(l => l.progress?.completed_at).length;
+    const completedCount = lessons.filter((l: any) => l.progress?.completed_at).length;
     const totalCount = lessons.length;
     const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    // Find "Continue" lesson
-    const continueLesson = lessons.find(l => l.progress && !l.progress.completed_at && l.progress.progress_percent > 0)
-        || lessons.find(l => !l.progress?.completed_at)
+    // Find "Continue" lesson — first incomplete or first lesson
+    const continueLesson = lessons.find((l: any) => l.progress && !l.progress.completed_at && l.progress.progress_percent > 0)
+        || lessons.find((l: any) => !l.progress?.completed_at)
         || lessons[0];
 
-    if (isLoading) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -118,79 +95,48 @@ export default function StudentLessons() {
                         {t(subject.title_ar, subject.title_en || subject.title_ar)}
                     </h1>
                 </div>
-                {isFetching && !isLoading && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground animate-pulse">
-                        <RefreshCw className="w-3 h-3 animate-spin" />
-                        {t('جاري التحديث...', 'Updating...')}
+            </div>
+
+            {/* Progress Card */}
+            <div className="bg-background border border-border rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                    <div>
+                        <p className="text-sm text-muted-foreground">
+                            {completedCount}/{totalCount} {t('دروس مكتملة', 'lessons completed')}
+                        </p>
+                    </div>
+                    <span className="text-sm font-bold text-primary">{progressPercent}%</span>
+                </div>
+                <div className="w-full h-2.5 bg-secondary rounded-full overflow-hidden mb-4">
+                    <div
+                        className={`h-full rounded-full transition-all duration-500 ${progressPercent === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                        style={{ width: `${progressPercent}%` }}
+                    />
+                </div>
+                {continueLesson && progressPercent < 100 && (
+                    <Link to={`/student/lesson/${continueLesson.id}`}>
+                        <Button className="gap-2">
+                            <Play className="w-4 h-4 fill-current" />
+                            {continueLesson.progress?.progress_percent
+                                ? t('متابعة', 'Continue')
+                                : t('ابدأ الآن', 'Start Now')}
+                        </Button>
+                    </Link>
+                )}
+                {progressPercent === 100 && (
+                    <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
+                        <CheckCircle className="w-4 h-4" />
+                        {t('أكملت جميع الدروس!', 'All lessons completed!')}
                     </div>
                 )}
             </div>
-
-            {/* Motivational Progress Banner */}
-            {totalCount > 0 && (
-                <>
-                    <ProgressMotivationBanner
-                        progressPercent={progressPercent}
-                        isCompleted={progressPercent === 100}
-                        completedLessons={completedCount}
-                        totalLessons={totalCount}
-                        subjectId={subjectId}
-                        onContinue={() => {
-                            if (continueLesson) {
-                                navigate(`/student/lesson/${continueLesson.id}`);
-                            }
-                        }}
-                    />
-
-                    {/* Teacher Info */}
-                    {teachers.length > 0 && (
-                        <div className="bg-background border border-border rounded-xl p-6 mb-6">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">
-                                {t('المعلمون', 'Teachers')}
-                            </h3>
-                            <div className="flex flex-wrap gap-6">
-                                {(teachers as any[]).map(teacher => (
-                                    <div key={teacher.id} className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border">
-                                            {teacher.avatar_url ? (
-                                                <img src={teacher.avatar_url} alt={teacher.full_name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <BookOpen className="w-5 h-5 text-muted-foreground" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-foreground">{teacher.full_name}</p>
-                                            <Link
-                                                to={`/student/messages?teacher=${teacher.id}`}
-                                                className="text-xs font-bold text-primary hover:underline"
-                                            >
-                                                {t('إرسال رسالة', 'Send Message')}
-                                            </Link>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Certificate Requirements Checklist */}
-                    {subjectId && subject && (
-                        <div id="certificate-requirements">
-                            <CertificateRequirements
-                                subjectId={subjectId}
-                                subjectName={t(subject.title_ar, subject.title_en || subject.title_ar)}
-                            />
-                        </div>
-                    )}
-                </>
-            )}
 
             {/* Lessons List */}
             <div className="space-y-2">
                 <h2 className="text-lg font-semibold text-foreground mb-3">
                     {t('الدروس', 'Lessons')}
                 </h2>
-                {lessons.map((lesson, index) => {
+                {lessons.map((lesson: any, index: number) => {
                     const isCompleted = !!lesson.progress?.completed_at;
                     const hasProgress = (lesson.progress?.progress_percent || 0) > 0;
                     const isCurrent = continueLesson?.id === lesson.id && !isCompleted;
@@ -275,7 +221,7 @@ export default function StudentLessons() {
             </div>
 
             {/* Empty State */}
-            {lessons.length === 0 && !isLoading && (
+            {lessons.length === 0 && !loading && (
                 <div className="bg-background rounded-xl border border-border p-8 text-center">
                     <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
                     <h3 className="font-medium text-foreground mb-2">

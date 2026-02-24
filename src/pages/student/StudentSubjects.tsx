@@ -1,11 +1,8 @@
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useSubjects } from '@/hooks/useAcademyData';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { useStage, useSubjects } from '@/hooks/useQueryHooks';
 import { Subject } from '@/types/database';
-import { STALE_TIMES } from '@/lib/queryConfig';
-import { BookOpen, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface SubjectWithLessons extends Subject {
@@ -17,46 +14,42 @@ export default function StudentSubjects() {
     const navigate = useNavigate();
     const { t, direction } = useLanguage();
 
-    // Fetch stage info (cached)
-    const { data: stage, isLoading: stageLoading } = useQuery<any>({
-        queryKey: ['stage', stageId],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('stages')
-                .select('*')
-                .eq('id', stageId!)
-                .single();
-            if (error) throw error;
-            return data as any;
-        },
-        enabled: !!stageId,
-        staleTime: STALE_TIMES.STATIC,
-    });
+    const { data: stage, isLoading: stageLoading } = useStage(stageId);
+    const { data: subjects = [], isLoading: subjectsLoading } = useSubjects(stageId);
 
-    // Fetch subjects for this stage (cached)
-    const { data: subjects = [], isLoading: subjectsLoading, isFetching } = useSubjects(stageId);
-
-    const isLoading = stageLoading || subjectsLoading;
+    const loading = stageLoading || subjectsLoading;
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
     const BackIcon = direction === 'rtl' ? ArrowRight : ArrowLeft;
 
+    // Subject icons
     const getSubjectIcon = (subject: SubjectWithLessons) => {
         const icons: Record<string, string> = {
-            'arabic': '📝', 'اللغة العربية': '📝',
-            'math': '🔢', 'الرياضيات': '🔢',
-            'science': '🔬', 'العلوم': '🔬',
-            'english': '🇬🇧', 'اللغة الإنجليزية': '🇬🇧',
-            'physics': '⚛️', 'الفيزياء': '⚛️',
-            'chemistry': '🧪', 'الكيمياء': '🧪',
-            'biology': '🧬', 'الأحياء': '🧬',
-            'history': '📜', 'التاريخ': '📜',
-            'geography': '🌍', 'الجغرافيا': '🌍',
-            'pe': '⚽', 'التربية البدنية': '⚽',
+            'arabic': '📝',
+            'اللغة العربية': '📝',
+            'math': '🔢',
+            'الرياضيات': '🔢',
+            'science': '🔬',
+            'العلوم': '🔬',
+            'english': '🇬🇧',
+            'اللغة الإنجليزية': '🇬🇧',
+            'physics': '⚛️',
+            'الفيزياء': '⚛️',
+            'chemistry': '🧪',
+            'الكيمياء': '🧪',
+            'biology': '🧬',
+            'الأحياء': '🧬',
+            'history': '📜',
+            'التاريخ': '📜',
+            'geography': '🌍',
+            'الجغرافيا': '🌍',
+            'pe': '⚽',
+            'التربية البدنية': '⚽',
         };
+        // Use regex to match parts of strings if needed, or just titles
         return icons[subject.title_en?.toLowerCase() || ''] || icons[subject.title_ar] || '📖';
     };
 
-    if (isLoading) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -100,17 +93,11 @@ export default function StudentSubjects() {
                         {t('اختر المادة للوصول إلى الدروس', 'Choose a subject to access lessons')}
                     </p>
                 </div>
-                {isFetching && !isLoading && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground animate-pulse">
-                        <RefreshCw className="w-3 h-3 animate-spin" />
-                        {t('جاري التحديث...', 'Updating...')}
-                    </div>
-                )}
             </div>
 
             {/* Subjects Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {(subjects as SubjectWithLessons[]).map((subject) => (
+                {subjects.map((subject: any) => (
                     <Link
                         key={subject.id}
                         to={`/student/subjects/${subject.id}`}
@@ -133,7 +120,7 @@ export default function StudentSubjects() {
             </div>
 
             {/* Empty State */}
-            {subjects.length === 0 && !isLoading && (
+            {subjects.length === 0 && !loading && (
                 <div className="bg-background rounded-lg border border-border p-8 text-center">
                     <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                     <h3 className="font-medium text-foreground mb-2">

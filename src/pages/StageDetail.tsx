@@ -1,108 +1,57 @@
-import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Layout from '@/components/layout/Layout';
-import { supabase } from '@/lib/supabase';
-import { Calculator, BookOpen, Beaker, Globe, Palette, Music, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Calculator, BookOpen, Beaker, Globe, Palette, Music, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
-// Icon mapping helper
-const getSubjectIcon = (title: string) => {
-  const t = title.toLowerCase();
-  if (t.includes('عربي') || t.includes('arabic')) return BookOpen;
-  if (t.includes('رياضيات') || t.includes('math')) return Calculator;
-  if (t.includes('علوم') || t.includes('science')) return Beaker;
-  if (t.includes('انجليزي') || t.includes('english')) return Globe;
-  if (t.includes('فنون') || t.includes('art')) return Palette;
-  if (t.includes('موسيقى') || t.includes('music')) return Music;
-  return BookOpen;
+const stagesData = {
+  kindergarten: {
+    title: { ar: 'رياض الأطفال', en: 'Kindergarten' },
+    subjects: [
+      { id: 'arabic-kg', icon: BookOpen, title: { ar: 'اللغة العربية', en: 'Arabic' }, lessons: 24 },
+      { id: 'math-kg', icon: Calculator, title: { ar: 'الحساب', en: 'Mathematics' }, lessons: 20 },
+      { id: 'english-kg', icon: Globe, title: { ar: 'اللغة الإنجليزية', en: 'English' }, lessons: 18 },
+      { id: 'science-kg', icon: Beaker, title: { ar: 'اكتشاف العالم', en: 'Exploring the World' }, lessons: 16 },
+      { id: 'art-kg', icon: Palette, title: { ar: 'الفنون', en: 'Arts' }, lessons: 14 },
+      { id: 'music-kg', icon: Music, title: { ar: 'الأناشيد', en: 'Songs & Rhymes' }, lessons: 12 },
+    ],
+  },
+  primary: {
+    title: { ar: 'المرحلة الابتدائية', en: 'Primary Stage' },
+    subjects: [
+      { id: 'arabic-primary', icon: BookOpen, title: { ar: 'اللغة العربية', en: 'Arabic' }, lessons: 48 },
+      { id: 'math-primary', icon: Calculator, title: { ar: 'الرياضيات', en: 'Mathematics' }, lessons: 56 },
+      { id: 'science-primary', icon: Beaker, title: { ar: 'العلوم', en: 'Science' }, lessons: 42 },
+      { id: 'english-primary', icon: Globe, title: { ar: 'اللغة الإنجليزية', en: 'English' }, lessons: 45 },
+      { id: 'islamic-primary', icon: BookOpen, title: { ar: 'التربية الإسلامية', en: 'Islamic Studies' }, lessons: 32 },
+      { id: 'social-primary', icon: Globe, title: { ar: 'الدراسات الاجتماعية', en: 'Social Studies' }, lessons: 28 },
+    ],
+  },
+  middle: {
+    title: { ar: 'المرحلة المتوسطة', en: 'Middle School' },
+    subjects: [
+      { id: 'arabic-middle', icon: BookOpen, title: { ar: 'اللغة العربية', en: 'Arabic' }, lessons: 60 },
+      { id: 'math-middle', icon: Calculator, title: { ar: 'الرياضيات', en: 'Mathematics' }, lessons: 72 },
+      { id: 'science-middle', icon: Beaker, title: { ar: 'العلوم', en: 'Science' }, lessons: 65 },
+      { id: 'physics-middle', icon: Beaker, title: { ar: 'الفيزياء', en: 'Physics' }, lessons: 45 },
+      { id: 'chemistry-middle', icon: Beaker, title: { ar: 'الكيمياء', en: 'Chemistry' }, lessons: 42 },
+      { id: 'english-middle', icon: Globe, title: { ar: 'اللغة الإنجليزية', en: 'English' }, lessons: 55 },
+    ],
+  },
 };
 
 const StageDetail = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { stageId } = useParams();
   const { t, direction } = useLanguage();
   const ArrowIcon = direction === 'rtl' ? ArrowLeft : ArrowRight;
   const BackIcon = direction === 'rtl' ? ChevronRight : ChevronLeft;
 
-  const [stage, setStage] = useState<any>(null);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const stage = stagesData[stageId as keyof typeof stagesData];
 
-  useEffect(() => {
-    const fetchStageData = async () => {
-      if (!slug) return;
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Fetch stage by slug or ID fallback
-        let { data: stageData, error: stageError } = await supabase
-          .from('stages')
-          .select('*')
-          .eq('slug', slug)
-          .maybeSingle();
-
-        // Fallback to ID if not found by slug (handles un-migrated stages)
-        if (!stageData && slug && slug.length > 20) {
-          const { data: idData, error: idError } = await supabase
-            .from('stages')
-            .select('*')
-            .eq('id', slug)
-            .maybeSingle();
-          stageData = idData;
-          stageError = idError;
-        }
-
-        if (stageError || !stageData) {
-          console.error('Stage fetch error:', stageError || 'No data');
-          setError(stageError?.message || 'Stage not found');
-          return;
-        }
-
-        setStage(stageData);
-
-        // Fetch subjects for this stage
-        const { data: subjectsData, error: subjectsError } = await supabase
-          .from('subjects')
-          .select('*')
-          .eq('stage_id', (stageData as any).id)
-          .eq('is_active', true)
-          .order('sort_order', { ascending: true });
-
-        if (subjectsError) {
-          console.error('Subjects fetch error:', subjectsError);
-        } else {
-          setSubjects(subjectsData || []);
-        }
-      } catch (err: any) {
-        console.error('Unexpected error:', err);
-        setError(err.message || 'An unexpected error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStageData();
-  }, [slug]);
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="container-academic py-20 flex justify-center items-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error || !stage) {
+  if (!stage) {
     return (
       <Layout>
         <div className="container-academic py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">{t('المرحلة غير موجودة', 'Stage Not Found')}</h1>
-          <Link to="/stages" className="text-primary hover:underline">
-            {t('العودة لجميع المراحل', 'Back to all stages')}
-          </Link>
+          <h1>{t('المرحلة غير موجودة', 'Stage Not Found')}</h1>
         </div>
       </Layout>
     );
@@ -121,12 +70,12 @@ const StageDetail = () => {
             {t('جميع المراحل', 'All Stages')}
           </Link>
           <h1 className="text-foreground mb-4">
-            {t(stage.title_ar, stage.title_en || stage.title_ar)}
+            {t(stage.title.ar, stage.title.en)}
           </h1>
           <p className="text-muted-foreground max-w-2xl">
             {t(
-              stage.description_ar || 'اختر المادة الدراسية للوصول إلى الدروس والمحتوى التعليمي',
-              stage.description_en || stage.description_ar || 'Select a subject to access lessons and educational content'
+              'اختر المادة الدراسية للوصول إلى الدروس والمحتوى التعليمي',
+              'Select a subject to access lessons and educational content'
             )}
           </p>
         </div>
@@ -135,37 +84,28 @@ const StageDetail = () => {
       {/* Subjects Grid */}
       <section className="section-academic">
         <div className="container-academic">
-          {subjects.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              {t('لا توجد مواد دراسية متوفرة حالياً لهذه المرحلة', 'No subjects available for this stage yet')}
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {subjects.map((subject) => {
-                const Icon = getSubjectIcon(subject.title_en || subject.title_ar);
-                return (
-                  <Link
-                    key={subject.id}
-                    to={`/stages/${slug}/${subject.id}`}
-                    className="academic-card hover:shadow-md transition-all group"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                        <Icon className="w-6 h-6 text-primary" />
-                      </div>
-                      <ArrowIcon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      {t(subject.title_ar, subject.title_en || subject.title_ar)}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {t('عرض الدروس', 'View Lessons')}
-                    </p>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {stage.subjects.map((subject) => (
+              <Link
+                key={subject.id}
+                to={`/stages/${stageId}/${subject.id}`}
+                className="academic-card hover:shadow-md transition-all group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+                    <subject.icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <ArrowIcon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  {t(subject.title.ar, subject.title.en)}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {t(`${subject.lessons} درساً`, `${subject.lessons} Lessons`)}
+                </p>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     </Layout>

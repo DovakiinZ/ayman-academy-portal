@@ -30,14 +30,14 @@ interface QuizEditorProps {
 
 interface Question {
     id?: string;
-    question_ar: string;
-    question_en: string;
-    type: 'mcq' | 'true_false';
+    question_text_ar: string;
+    question_text_en: string;
+    question_type: 'mcq' | 'true_false';
     options: string[];
-    correct_answer: number;
+    correct_option_index: number;
     explanation_ar: string;
     explanation_en: string;
-    order_index: number;
+    sort_order: number;
 }
 
 export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProps) {
@@ -56,12 +56,12 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
     const fetchQuiz = async () => {
         setLoading(true);
         try {
-            // Get Quiz Data
+            // Get Quiz ID
             const { data: quiz } = await supabase
                 .from('lesson_quizzes')
                 .select('id')
                 .eq('lesson_id', lessonId)
-                .single() as any;
+                .single();
 
             if (quiz) {
                 setQuizId(quiz.id);
@@ -70,7 +70,7 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
                     .from('lesson_quiz_questions')
                     .select('*')
                     .eq('quiz_id', quiz.id)
-                    .order('order_index', { ascending: true }) as any;
+                    .order('sort_order', { ascending: true });
 
                 setQuestions(qData || []);
             } else {
@@ -90,12 +90,7 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
         try {
             const result = await verifiedInsert(
                 'lesson_quizzes',
-                {
-                    lesson_id: lessonId,
-                    is_enabled: true,
-                    passing_score: 50,
-                    unlock_after_percent: 100
-                },
+                { lesson_id: lessonId, title_ar: 'Quiz', title_en: 'Quiz' },
                 { successMessage: { ar: 'تم إنشاء الاختبار', en: 'Quiz created' } }
             );
 
@@ -111,14 +106,14 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
         setQuestions([
             ...questions,
             {
-                question_ar: '',
-                question_en: '',
-                type: 'mcq',
+                question_text_ar: '',
+                question_text_en: '',
+                question_type: 'mcq',
                 options: ['', '', '', ''],
-                correct_answer: 0,
+                correct_option_index: 0,
                 explanation_ar: '',
                 explanation_en: '',
-                order_index: questions.length + 1
+                sort_order: questions.length + 1
             }
         ]);
     };
@@ -139,34 +134,29 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
         if (!quizId) return;
         const q = questions[index];
 
-        if (!q.question_ar) {
+        if (!q.question_text_ar) {
             toast.error(t('الرجاء إدخال نص السؤال', 'Please enter question text'));
             return;
         }
 
         setSaving(true);
         try {
-            const payload = {
-                quiz_id: quizId,
-                lesson_id: lessonId,
-                type: q.type,
-                question_ar: q.question_ar,
-                question_en: q.question_en,
-                options: q.options,
-                correct_answer: q.correct_answer,
-                explanation_ar: q.explanation_ar,
-                explanation_en: q.explanation_en,
-                order_index: q.order_index
-            };
-
             if (q.id) {
-                await verifiedUpdate('lesson_quiz_questions', q.id, payload, {
-                    successMessage: { ar: 'تم تحديث السؤال', en: 'Question updated' }
-                });
+                await verifiedUpdate('lesson_quiz_questions', q.id, {
+                    question_text_ar: q.question_text_ar,
+                    question_text_en: q.question_text_en,
+                    question_type: q.question_type,
+                    options: q.options,
+                    correct_option_index: q.correct_option_index,
+                    explanation_ar: q.explanation_ar,
+                    explanation_en: q.explanation_en,
+                }, { successMessage: { ar: 'تم تحديث السؤال', en: 'Question updated' } });
             } else {
-                const result = await verifiedInsert('lesson_quiz_questions', payload, {
-                    successMessage: { ar: 'تم إضافة السؤال', en: 'Question added' }
-                });
+                const result = await verifiedInsert('lesson_quiz_questions', {
+                    quiz_id: quizId,
+                    lesson_id: lessonId,
+                    ...q
+                }, { successMessage: { ar: 'تم إضافة السؤال', en: 'Question added' } });
 
                 if (result.success && result.data) {
                     const updated = [...questions];
@@ -221,18 +211,18 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
                                 <AccordionItem key={q.id || `new-${idx}`} value={`item-${idx}`}>
                                     <AccordionTrigger className="hover:no-underline">
                                         <span className="truncate max-w-[200px] text-start">
-                                            {q.question_ar || t('سؤال جديد', 'New Question')}
+                                            {q.question_text_ar || t('سؤال جديد', 'New Question')}
                                         </span>
                                     </AccordionTrigger>
                                     <AccordionContent className="p-4 bg-secondary/10 rounded-md space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <Label>{t('السؤال (عربي)', 'Question (AR)')}</Label>
-                                                <Input value={q.question_ar} onChange={(e) => handleUpdateQuestion(idx, 'question_ar', e.target.value)} />
+                                                <Input value={q.question_text_ar} onChange={(e) => handleUpdateQuestion(idx, 'question_text_ar', e.target.value)} />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label>{t('السؤال (إنجليزي)', 'Question (EN)')}</Label>
-                                                <Input value={q.question_en} onChange={(e) => handleUpdateQuestion(idx, 'question_en', e.target.value)} />
+                                                <Input value={q.question_text_en} onChange={(e) => handleUpdateQuestion(idx, 'question_text_en', e.target.value)} />
                                             </div>
                                         </div>
 
@@ -243,8 +233,8 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
                                                     <input
                                                         type="radio"
                                                         name={`correct-${idx}`}
-                                                        checked={q.correct_answer === optIdx}
-                                                        onChange={() => handleUpdateQuestion(idx, 'correct_answer', optIdx)}
+                                                        checked={q.correct_option_index === optIdx}
+                                                        onChange={() => handleUpdateQuestion(idx, 'correct_option_index', optIdx)}
                                                         className="w-4 h-4"
                                                     />
                                                     <Input

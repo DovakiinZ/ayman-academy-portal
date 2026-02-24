@@ -1,10 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
 import type { Stage } from '@/types/database';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,12 +43,53 @@ interface StageWithSubjectCount extends Stage {
 export default function TaxonomyManagement() {
     const { t } = useLanguage();
     const navigate = useNavigate();
-    const mountedRef = useRef(true);
+    const queryClient = useQueryClient();
 
-    // State
-    const [stages, setStages] = useState<StageWithSubjectCount[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // Fetch stages with subject counts via useQuery
+    const { data: stages = [], isLoading: loading, error: queryError, refetch } = useQuery({
+        queryKey: queryKeys.stages.all,
+        queryFn: async (): Promise<StageWithSubjectCount[]> => {
+            devLog('Fetching stages...');
+            const startTime = Date.now();
+
+            const { data: stagesData, error: stagesError } = await supabase
+                .from('stages')
+                .select('*')
+                .order('sort_order', { ascending: true });
+
+            if (stagesError) {
+                devLog('Stages fetch error', stagesError);
+                toast.error('فشل في تحميل المراحل', { description: stagesError.message });
+                throw new Error(stagesError.message);
+            }
+
+            if (!stagesData || stagesData.length === 0) {
+                devLog('No stages found in database');
+                return [];
+            }
+
+            // Add subject counts
+            const stagesWithCounts: StageWithSubjectCount[] = [];
+            for (const stage of stagesData as Stage[]) {
+                const { count } = await supabase
+                    .from('subjects')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('stage_id', stage.id);
+
+                stagesWithCounts.push({
+                    ...stage,
+                    subjectCount: count || 0,
+                });
+            }
+
+            const duration = Date.now() - startTime;
+            devLog(`Stages loaded in ${duration}ms`, { count: stagesWithCounts.length });
+            return stagesWithCounts;
+        },
+        staleTime: 2 * 60 * 1000, // 2 minutes
+    });
+
+    const error = queryError ? (queryError instanceof Error ? queryError.message : 'Unknown error') : null;
 
     // Modal states
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -65,82 +108,12 @@ export default function TaxonomyManagement() {
         is_active: true,
     });
 
-    // Fetch stages with subject counts
-    const fetchData = async () => {
-        if (!mountedRef.current) return;
-
-        setLoading(true);
-        setError(null);
-        const startTime = Date.now();
-        devLog('Fetching stages...');
-
-        try {
-            const { data: stagesData, error: stagesError } = await supabase
-                .from('stages')
-                .select('*')
-                .order('sort_order', { ascending: true });
-
-            if (!mountedRef.current) return;
-
-            if (stagesError) {
-                devLog('Stages fetch error', stagesError);
-                setError(stagesError.message);
-                toast.error('فشل في تحميل المراحل', { description: stagesError.message });
-                setStages([]);
-                return;
-            }
-
-            // If no data but no error, it's real (just empty)
-            if (!stagesData || stagesData.length === 0) {
-                devLog('No stages found in database');
-                setStages([]);
-                return;
-            }
-
-            // Add subject counts
-            const stagesWithCounts: StageWithSubjectCount[] = [];
-            for (const stage of stagesData as Stage[]) {
-                const { count } = await supabase
-                    .from('subjects')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('stage_id', stage.id);
-
-                stagesWithCounts.push({
-                    ...stage,
-                    subjectCount: count || 0,
-                });
-            }
-
-            if (mountedRef.current) {
-                setStages(stagesWithCounts);
-                const duration = Date.now() - startTime;
-                devLog(`Stages loaded in ${duration}ms`, { count: stagesWithCounts.length });
-            }
-        } catch (err) {
-            if (!mountedRef.current) return;
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            devLog('Stages fetch exception', err);
-            setError(message);
-            toast.error('حدث خطأ', { description: message });
-            setStages([]);
-        } finally {
-            if (mountedRef.current) {
-                setLoading(false);
-            }
-        }
+    const invalidateStages = () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.stages.all });
     };
 
-    useEffect(() => {
-        mountedRef.current = true;
-        fetchData();
-
-        return () => {
-            mountedRef.current = false;
-        };
-    }, []);
-
     const handleRetry = () => {
-        fetchData();
+        refetch();
     };
 
     // Open add dialog
@@ -206,7 +179,7 @@ export default function TaxonomyManagement() {
 
                 if (result.success) {
                     setDialogOpen(false);
-                    fetchData();
+                    invalidateStages();
                 }
                 // Error toast is handled by verifiedUpdate
             } else {
@@ -232,7 +205,7 @@ export default function TaxonomyManagement() {
 
                 if (result.success) {
                     setDialogOpen(false);
-                    fetchData();
+                    invalidateStages();
                 }
                 // Error toast is handled by verifiedInsert
             }
@@ -260,7 +233,7 @@ export default function TaxonomyManagement() {
             );
 
             if (result.success) {
-                fetchData();
+                invalidateStages();
             }
             // Error toast is handled by verifiedDelete
         } catch (err) {
@@ -558,4 +531,3 @@ export default function TaxonomyManagement() {
         </div>
     );
 }
-

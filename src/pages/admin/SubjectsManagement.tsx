@@ -1,11 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
-import CertificateRulesConfig from '@/components/admin/CertificateRulesConfig';
 import type { Stage, Subject } from '@/types/database';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,14 +60,7 @@ export default function SubjectsManagement() {
     const params = useParams<{ stageId?: string; levelId?: string }>();
     const stageId = params.stageId || params.levelId;
     const navigate = useNavigate();
-    const mountedRef = useRef(true);
-
-    // Data
-    const [stage, setStage] = useState<Stage | null>(null);
-    const [allStages, setAllStages] = useState<Stage[]>([]);
-    const [subjects, setSubjects] = useState<SubjectWithJoins[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
     // Filters (for global view)
     const [filterStage, setFilterStage] = useState<string>('all');
@@ -95,23 +89,20 @@ export default function SubjectsManagement() {
         teaser_en: '',
     });
 
-    // ─── Fetch Data ─────────────────────────────────────────────────────────
+    // ─── Fetch Data via useQuery ─────────────────────────────────────────────
 
-    const fetchData = async () => {
-        if (!mountedRef.current) return;
-        setLoading(true);
-        setError(null);
+    const subjectsQueryKey = stageId ? queryKeys.subjects.byStage(stageId) : queryKeys.subjects.all;
 
-        try {
+    const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
+        queryKey: subjectsQueryKey,
+        queryFn: async () => {
             // Always fetch all stages for dropdown
             const { data: stagesData } = await supabase
                 .from('stages')
                 .select('*')
                 .order('sort_order');
 
-            if (mountedRef.current && stagesData) {
-                setAllStages(stagesData);
-            }
+            let currentStage: Stage | null = null;
 
             // Build subjects query — always fetch with stage join + lesson count
             let query = supabase
@@ -125,40 +116,41 @@ export default function SubjectsManagement() {
 
                 // Also set the stage info
                 const matchedStage = (stagesData as any[])?.find(s => s.id === stageId);
-                if (mountedRef.current && matchedStage) {
-                    setStage(matchedStage as Stage);
+                if (matchedStage) {
+                    currentStage = matchedStage as Stage;
                 }
             }
 
             const { data: subjectsData, error: subjectsError } = await query;
 
-            if (!mountedRef.current) return;
-
             if (subjectsError) {
                 devLog('Subjects fetch error', subjectsError);
-                setError(subjectsError.message);
                 toast.error(t('فشل في تحميل المواد', 'Failed to load subjects'), { description: subjectsError.message });
-                setSubjects([]);
-            } else {
-                setSubjects((subjectsData as SubjectWithJoins[]) || []);
-                devLog(`Loaded ${subjectsData?.length || 0} subjects`);
+                throw new Error(subjectsError.message);
             }
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            if (mountedRef.current) {
-                setError(message);
-                toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
-            }
-        } finally {
-            if (mountedRef.current) setLoading(false);
+
+            devLog(`Loaded ${subjectsData?.length || 0} subjects`);
+
+            return {
+                allStages: (stagesData || []) as Stage[],
+                stage: currentStage,
+                subjects: (subjectsData as SubjectWithJoins[]) || [],
+            };
+        },
+        staleTime: 2 * 60 * 1000, // 2 minutes
+    });
+
+    const allStages = queryData?.allStages || [];
+    const stage = queryData?.stage || null;
+    const subjects = queryData?.subjects || [];
+    const error = queryError ? (queryError instanceof Error ? queryError.message : 'Unknown error') : null;
+
+    const invalidateSubjects = () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.subjects.all });
+        if (stageId) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.subjects.byStage(stageId) });
         }
     };
-
-    useEffect(() => {
-        mountedRef.current = true;
-        fetchData();
-        return () => { mountedRef.current = false; };
-    }, [stageId]);
 
     // ─── Filtered Subjects ──────────────────────────────────────────────────
 
@@ -268,7 +260,7 @@ export default function SubjectsManagement() {
                 );
                 if (result.success) {
                     setDialogOpen(false);
-                    fetchData();
+                    invalidateSubjects();
                 }
             } else {
                 const slug = form.slug || form.title_ar.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0621-\u064A-]/g, '');
@@ -295,7 +287,7 @@ export default function SubjectsManagement() {
                 );
                 if (result.success) {
                     setDialogOpen(false);
-                    fetchData();
+                    invalidateSubjects();
                 }
             }
         } catch (err) {
@@ -319,7 +311,7 @@ export default function SubjectsManagement() {
                     errorMessage: { ar: 'فشل في حذف المادة', en: 'Failed to delete subject' },
                 }
             );
-            if (result.success) fetchData();
+            if (result.success) invalidateSubjects();
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
@@ -382,7 +374,7 @@ export default function SubjectsManagement() {
                             )}
                         </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={fetchData}>
+                    <Button variant="outline" size="sm" onClick={() => refetch()}>
                         <RefreshCw className="w-4 h-4" />
                     </Button>
                     <Button onClick={handleAdd}>
@@ -441,7 +433,7 @@ export default function SubjectsManagement() {
                             <p className="text-sm font-medium text-destructive">{t('حدث خطأ', 'An error occurred')}</p>
                             <p className="text-xs text-destructive/80">{error}</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={fetchData}>
+                        <Button variant="outline" size="sm" onClick={() => refetch()}>
                             <RefreshCw className="w-4 h-4 me-2" />
                             {t('إعادة المحاولة', 'Retry')}
                         </Button>
@@ -710,14 +702,6 @@ export default function SubjectsManagement() {
                                 )}
                             </div>
                         </div>
-
-                        {/* Certificate Rules — only when editing existing subject */}
-                        {editingSubject && (
-                            <div className="border-t pt-4 mt-4">
-                                <CertificateRulesConfig subjectId={editingSubject.id} />
-                            </div>
-                        )}
-
                         <div className="flex gap-2 pt-4">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
                                 {t('إلغاء', 'Cancel')}

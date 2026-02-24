@@ -1,25 +1,26 @@
 /**
- * AI Service — Placeholder for AI-powered content operations.
- * 
- * Wire this to OpenAI, Gemini, or a Supabase Edge Function.
- * Each function takes content and returns transformed text.
- * The caller is responsible for previewing and applying the result.
+ * AI Service — Uses Google Gemini API (free tier) for content operations.
+ *
+ * Free tier: 15 requests/min, 1M tokens/min
+ * Get your API key at: https://aistudio.google.com/apikey
+ *
+ * Set VITE_GEMINI_API_KEY in your .env file.
  */
 
 export type AIAction =
-    | 'expand'          // Expand explanation with more detail
-    | 'simplify'        // Simplify for younger students
-    | 'generate_example' // Generate an example from content
-    | 'generate_summary' // Summarize section content
-    | 'generate_quiz'   // Generate quiz questions from content
-    | 'improve_language' // Polish grammar and clarity
-    | 'translate_ar_en' // Translate Arabic → English
-    | 'translate_en_ar'; // Translate English → Arabic
+    | 'expand'
+    | 'simplify'
+    | 'generate_example'
+    | 'generate_summary'
+    | 'generate_quiz'
+    | 'improve_language'
+    | 'translate_ar_en'
+    | 'translate_en_ar';
 
 export interface AIRequest {
     action: AIAction;
     content: string;
-    context?: string; // Additional context (e.g., subject, stage level)
+    context?: string;
     language?: 'ar' | 'en';
 }
 
@@ -29,71 +30,82 @@ export interface AIResponse {
     error?: string;
 }
 
+const SYSTEM_INSTRUCTION = `You are an expert educational content assistant for a bilingual Arabic/English academy called "Ayman Academy".
+You help teachers create and improve lesson content for students of all ages.
+- When the input is in Arabic, respond in Arabic.
+- When the input is in English, respond in English.
+- Unless explicitly asked to translate.
+- Keep your responses focused, educational, and clear.
+- Do not include any markdown formatting like ## or ** unless the content already uses it.`;
+
 const ACTION_PROMPTS: Record<AIAction, string> = {
-    expand: 'Expand the following educational content with more detail, examples, and explanations. Keep the same language:',
-    simplify: 'Simplify the following educational content for younger students (ages 10-14). Use simpler vocabulary and shorter sentences. Keep the same language:',
-    generate_example: 'Generate a clear, practical example based on the following educational content. Keep the same language:',
-    generate_summary: 'Write a concise summary of the following educational content in 2-3 sentences. Keep the same language:',
-    generate_quiz: 'Generate 3 multiple-choice quiz questions based on the following content. Format each question with options labeled A, B, C, D and indicate the correct answer. Keep the same language:',
-    improve_language: 'Improve the grammar, clarity, and flow of the following educational content. Maintain the original meaning and language:',
-    translate_ar_en: 'Translate the following Arabic text to English, maintaining educational context and tone:',
-    translate_en_ar: 'Translate the following English text to Arabic, maintaining educational context and tone:',
+    expand: 'Expand the following educational content with more detail, examples, and explanations. Keep the same language as the input:',
+    simplify: 'Simplify the following educational content for younger students (ages 10-14). Use simpler vocabulary and shorter sentences. Keep the same language as the input:',
+    generate_example: 'Generate a clear, practical example based on the following educational content. Keep the same language as the input:',
+    generate_summary: 'Write a concise summary of the following educational content in 2-3 sentences. Keep the same language as the input:',
+    generate_quiz: 'Generate 3 multiple-choice quiz questions based on the following content. Format each question with options labeled A, B, C, D and indicate the correct answer. Keep the same language as the input:',
+    improve_language: 'Improve the grammar, clarity, and flow of the following educational content. Maintain the original meaning and language. Return ONLY the improved text:',
+    translate_ar_en: 'Translate the following Arabic text to English, maintaining educational context and tone. Return ONLY the translation:',
+    translate_en_ar: 'Translate the following English text to Arabic, maintaining educational context and tone. Return ONLY the translation:',
 };
 
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
 /**
- * Process an AI request. 
- * 
- * Currently returns a placeholder response.
- * To connect to a real AI service:
- * 1. Replace the body of this function with an API call
- * 2. Use supabase.functions.invoke() for Edge Functions
- * 3. Or call OpenAI/Gemini directly with an API key
+ * Process an AI request using Google Gemini API.
  */
 export async function processAIRequest(request: AIRequest): Promise<AIResponse> {
     const prompt = ACTION_PROMPTS[request.action];
 
-    // ─── Option 1: Supabase Edge Function (recommended) ────────────
-    // const { data, error } = await supabase.functions.invoke('ai-assistant', {
-    //     body: { prompt: `${prompt}\n\n${request.content}`, context: request.context }
-    // });
-    // if (error) return { success: false, result: '', error: error.message };
-    // return { success: true, result: data.text };
+    if (!GEMINI_API_KEY) {
+        return {
+            success: false,
+            result: '',
+            error: 'Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env file. Get a free key at https://aistudio.google.com/apikey',
+        };
+    }
 
-    // ─── Option 2: Direct OpenAI call ──────────────────────────────
-    // const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    //     method: 'POST',
-    //     headers: {
-    //         'Content-Type': 'application/json',
-    //         'Authorization': `Bearer ${OPENAI_API_KEY}`,
-    //     },
-    //     body: JSON.stringify({
-    //         model: 'gpt-4o-mini',
-    //         messages: [
-    //             { role: 'system', content: 'You are an educational content assistant for an Arabic/English academy.' },
-    //             { role: 'user', content: `${prompt}\n\n${request.content}` }
-    //         ],
-    //         temperature: 0.7,
-    //     }),
-    // });
-    // const data = await response.json();
-    // return { success: true, result: data.choices[0].message.content };
+    try {
+        const userMessage = request.context
+            ? `${prompt}\n\nContext: ${request.context}\n\nContent:\n${request.content}`
+            : `${prompt}\n\n${request.content}`;
 
-    // ─── Placeholder: Simulate AI response ─────────────────────────
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate delay
+        const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                system_instruction: {
+                    parts: [{ text: SYSTEM_INSTRUCTION }],
+                },
+                contents: [{
+                    parts: [{ text: userMessage }],
+                }],
+                generationConfig: {
+                    temperature: 0.7,
+                    maxOutputTokens: 2048,
+                },
+            }),
+        });
 
-    const placeholders: Record<AIAction, (content: string) => string> = {
-        expand: (c) => `${c}\n\n[AI: Expanded explanation would appear here with additional details, examples, and context to help students better understand the concept.]`,
-        simplify: (c) => `[AI: Simplified version]\n${c.substring(0, Math.min(c.length, 100))}...\n[The content above would be rewritten in simpler language suitable for younger students.]`,
-        generate_example: (c) => `[AI: Generated Example]\nBased on the content about "${c.substring(0, 50)}...":\n\nExample: [A practical, relatable example would be generated here to illustrate the concept.]`,
-        generate_summary: (c) => `[AI: Summary]\n${c.substring(0, Math.min(c.length, 150))}... [This would be a concise 2-3 sentence summary of the full content.]`,
-        generate_quiz: (c) => `[AI: Generated Quiz]\n\n1. Question based on the content?\n   A) Option 1\n   B) Option 2 ✓\n   C) Option 3\n   D) Option 4\n\n2. Another question?\n   A) Option 1\n   B) Option 2\n   C) Option 3 ✓\n   D) Option 4`,
-        improve_language: (c) => c + '\n[AI: Grammar and clarity improvements would be applied here.]',
-        translate_ar_en: (c) => `[AI: English Translation]\n${c}\n[The Arabic content would be translated to English here.]`,
-        translate_en_ar: (c) => `[AI: Arabic Translation]\n${c}\n[The English content would be translated to Arabic here.]`,
-    };
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData?.error?.message || `API error: ${response.status}`;
+            return { success: false, result: '', error: errorMessage };
+        }
 
-    const result = placeholders[request.action](request.content);
-    return { success: true, result };
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) {
+            return { success: false, result: '', error: 'No response from AI' };
+        }
+
+        return { success: true, result: text.trim() };
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return { success: false, result: '', error: message };
+    }
 }
 
 /** Get display info for an AI action */

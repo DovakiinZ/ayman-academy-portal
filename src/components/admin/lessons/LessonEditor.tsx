@@ -5,6 +5,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Lesson, LessonSection, LessonBlock } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Loader2, Plus, Save, ArrowLeft, ArrowRight, Eye, EyeOff, X, CheckCircle, Cloud, CloudOff, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,11 @@ import { cn } from '@/lib/utils';
 import LessonOutline from './LessonOutline';
 import BlockEditor from './BlockEditor';
 import LessonSettings from './LessonSettings';
+import DraftRecoveryDialog from './DraftRecoveryDialog';
+
+// Utilities
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
+import { LessonDraftManager, LessonDraft } from '@/lib/draftManager';
 
 // Save status type
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
@@ -23,20 +29,28 @@ export default function LessonEditor() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { t, direction } = useLanguage();
+    const { profile } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
     const [previewMode, setPreviewMode] = useState(false);
 
     // Data State
     const [lesson, setLesson] = useState<Lesson | null>(null);
-    const [sections, setSections] = useState<any[]>([]);
-    const [blocks, setBlocks] = useState<any[]>([]);
+    const [sections, setSections] = useState<LessonSection[]>([]);
+    const [blocks, setBlocks] = useState<LessonBlock[]>([]);
 
     // UI State
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 
-    // Auto-save timer
+    // Draft management
+    const [draftManager, setDraftManager] = useState<LessonDraftManager | null>(null);
+    const [showDraftDialog, setShowDraftDialog] = useState(false);
+    const [pendingDraft, setPendingDraft] = useState<LessonDraft | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Auto-save timers
     const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
+    const draftSaveTimer = useRef<NodeJS.Timeout | null>(null);
     const pendingUpdates = useRef<Map<string, Partial<LessonBlock>>>(new Map());
 
     // DnD Sensors
@@ -51,26 +65,49 @@ export default function LessonEditor() {
         if (id) fetchLessonData();
     }, [id]);
 
+    // Initialize draft manager when lesson ID is available
+    useEffect(() => {
+        if (id) {
+            const manager = new LessonDraftManager(id);
+            setDraftManager(manager);
+
+            // Cleanup expired drafts on mount
+            LessonDraftManager.cleanupExpiredDrafts();
+        }
+    }, [id]);
+
+    // Check for existing draft after lesson data is loaded
+    useEffect(() => {
+        if (!lesson || !draftManager) return;
+
+        const draft = draftManager.loadDraft();
+        if (draft && draftManager.isDraftNewer(lesson.created_at || lesson.updated_at || new Date().toISOString())) {
+            setPendingDraft(draft);
+            setShowDraftDialog(true);
+        }
+    }, [lesson, draftManager]);
+
+    // Update hasUnsavedChanges when saveStatus changes
+    useEffect(() => {
+        setHasUnsavedChanges(saveStatus === 'unsaved' || saveStatus === 'error');
+    }, [saveStatus]);
+
+    // Setup unsaved changes protection
+    useUnsavedChanges({
+        hasUnsavedChanges,
+        message: t(
+            'لديك تغييرات غير محفوظة. هل أنت متأكد من المغادرة؟',
+            'You have unsaved changes. Are you sure you want to leave?'
+        ),
+    });
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+            if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
         };
     }, []);
-
-    // ─── Navigation guards for unsaved changes ──────────────────────────
-
-    // Browser close/refresh warning
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (saveStatus === 'unsaved' || saveStatus === 'saving') {
-                e.preventDefault();
-            }
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [saveStatus]);
-
 
     const fetchLessonData = async () => {
         setLoading(true);
@@ -82,9 +119,17 @@ export default function LessonEditor() {
                 .single();
 
             if (lessonError) throw lessonError;
+
+            // Check teacher access - teachers can only edit their own lessons
+            if (profile?.role === 'teacher' && lessonData.created_by !== profile.id) {
+                toast.error(t('ليس لديك صلاحية لتعديل هذا الدرس', 'You do not have permission to edit this lesson'));
+                navigate('/teacher/lessons');
+                return;
+            }
+
             setLesson(lessonData);
 
-            const { data: sectionsData, error: sectionsError } = await supabase
+            const { data: sectionsData, error: sectionsError} = await supabase
                 .from('lesson_sections')
                 .select('*')
                 .eq('lesson_id', id!)
@@ -113,6 +158,61 @@ export default function LessonEditor() {
         }
     };
 
+    // ─── Draft management ───────────────────────────────────────────────
+
+    const saveDraftToLocalStorage = useCallback(() => {
+        if (!draftManager || !lesson) return;
+
+        if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+
+        draftSaveTimer.current = setTimeout(() => {
+            draftManager.saveDraft({
+                blocks,
+                sections,
+                lesson: {
+                    title_ar: lesson.title_ar,
+                    title_en: lesson.title_en,
+                    duration_minutes: lesson.duration_minutes,
+                    video_url: lesson.video_url,
+                    is_published: lesson.is_published,
+                    is_paid: lesson.is_paid,
+                },
+            });
+        }, 3000); // 3 second debounce for localStorage
+    }, [draftManager, blocks, sections, lesson]);
+
+    // Trigger draft save when data changes
+    useEffect(() => {
+        if (saveStatus === 'unsaved') {
+            saveDraftToLocalStorage();
+        }
+    }, [saveStatus, saveDraftToLocalStorage]);
+
+    // Draft recovery handlers
+    const handleRestoreDraft = useCallback(() => {
+        if (!pendingDraft) return;
+
+        setBlocks(pendingDraft.blocks);
+        setSections(pendingDraft.sections);
+        if (pendingDraft.lesson && lesson) {
+            setLesson({ ...lesson, ...pendingDraft.lesson });
+        }
+
+        setShowDraftDialog(false);
+        setPendingDraft(null);
+        setSaveStatus('unsaved'); // Mark as unsaved to trigger save
+        toast.success(t('تم استعادة المسودة', 'Draft restored'));
+    }, [pendingDraft, lesson, t]);
+
+    const handleDiscardDraft = useCallback(() => {
+        if (draftManager) {
+            draftManager.clearDraft();
+        }
+        setShowDraftDialog(false);
+        setPendingDraft(null);
+        toast.info(t('تم تجاهل المسودة', 'Draft discarded'));
+    }, [draftManager, t]);
+
     // ─── Auto-save logic ────────────────────────────────────────────────
 
     const scheduleSave = useCallback(() => {
@@ -136,6 +236,12 @@ export default function LessonEditor() {
                 if (error) throw error;
             }
             setSaveStatus('saved');
+            setHasUnsavedChanges(false);
+
+            // Clear draft on successful save
+            if (draftManager) {
+                draftManager.clearDraft();
+            }
         } catch (error) {
             console.error('Auto-save error:', error);
             setSaveStatus('error');
@@ -283,19 +389,53 @@ export default function LessonEditor() {
 
     const SaveStatusIndicator = () => {
         const statusConfig = {
-            saved: { icon: Cloud, text: t('محفوظ', 'Saved'), color: 'text-green-500' },
-            saving: { icon: Loader2, text: t('جاري الحفظ...', 'Saving...'), color: 'text-blue-500' },
-            unsaved: { icon: CloudOff, text: t('تغييرات غير محفوظة', 'Unsaved'), color: 'text-yellow-500' },
-            error: { icon: AlertCircle, text: t('فشل الحفظ', 'Save failed'), color: 'text-red-500' },
+            saved: {
+                icon: Cloud,
+                text: t('محفوظ', 'Saved'),
+                color: 'text-green-500',
+                bgColor: 'bg-green-50 dark:bg-green-950/30'
+            },
+            saving: {
+                icon: Loader2,
+                text: t('جاري الحفظ...', 'Saving...'),
+                color: 'text-blue-500',
+                bgColor: 'bg-blue-50 dark:bg-blue-950/30'
+            },
+            unsaved: {
+                icon: CloudOff,
+                text: t('تغييرات غير محفوظة', 'Unsaved'),
+                color: 'text-yellow-600',
+                bgColor: 'bg-yellow-50 dark:bg-yellow-950/30'
+            },
+            error: {
+                icon: AlertCircle,
+                text: t('فشل الحفظ', 'Save failed'),
+                color: 'text-red-500',
+                bgColor: 'bg-red-50 dark:bg-red-950/30'
+            },
         };
 
         const cfg = statusConfig[saveStatus];
         const Icon = cfg.icon;
 
         return (
-            <div className={cn("flex items-center gap-1.5 text-xs", cfg.color)}>
+            <div className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors",
+                cfg.color,
+                cfg.bgColor
+            )}>
                 <Icon className={cn("w-3.5 h-3.5", saveStatus === 'saving' && "animate-spin")} />
-                <span>{cfg.text}</span>
+                <span className="font-medium">{cfg.text}</span>
+                {saveStatus === 'error' && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-2 text-xs"
+                        onClick={flushPendingUpdates}
+                    >
+                        {t('إعادة المحاولة', 'Retry')}
+                    </Button>
+                )}
             </div>
         );
     };
@@ -321,7 +461,15 @@ export default function LessonEditor() {
     }
 
     return (
-        <div className="flex h-screen bg-background overflow-hidden">
+        <>
+            <DraftRecoveryDialog
+                draft={pendingDraft}
+                open={showDraftDialog}
+                onRestore={handleRestoreDraft}
+                onDiscard={handleDiscardDraft}
+            />
+
+            <div className="flex h-screen bg-background overflow-hidden">
             {/* Left Sidebar: Outline */}
             <div className="w-64 border-e border-border bg-card flex flex-col">
                 <div className="p-4 border-b border-border flex items-center justify-between">
@@ -418,6 +566,7 @@ export default function LessonEditor() {
                 </div>
             </div>
         </div>
+        </>
     );
 }
 

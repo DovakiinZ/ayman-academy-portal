@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
-import { safeFetchSimple, clearCache } from '@/lib/safeFetch';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { GraduationCap, BookOpen, PlayCircle, UserPlus, AlertCircle, RefreshCw, BookMarked } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -12,7 +12,6 @@ interface AdminStats {
     stages: number;
     subjects: number;
     lessons: number;
-    students: number;
     pendingInvites: number;
 }
 
@@ -21,7 +20,6 @@ const initialStats: AdminStats = {
     stages: 0,
     subjects: 0,
     lessons: 0,
-    students: 0,
     pendingInvites: 0,
 };
 
@@ -29,122 +27,38 @@ export default function AdminDashboard() {
     const { user } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
-    const [stats, setStats] = useState<AdminStats>(initialStats);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
-    const mountedRef = useRef(true);
-    const initialLoadDone = useRef(false);
-
-    const fetchStats = async () => {
-        if (!mountedRef.current) return;
-
-        // Only show loading spinner on initial load, not when navigating back
-        if (!initialLoadDone.current) {
-            setLoading(true);
-        }
-        setError(null);
-
-        try {
-            // Fetch all counts in parallel
-            const [
-                teachersResult,
-                stagesResult,
-                subjectsResult,
-                lessonsResult,
-                studentsResult,
-                invitesResult
-            ] = await Promise.all([
-                safeFetchSimple(
-                    async () => {
-                        const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'teacher');
-                        return { data: { count: count ?? 0 }, error };
-                    },
-                    { count: 0 },
-                    'admin-teachers-count'
-                ),
-                safeFetchSimple(
-                    async () => {
-                        const { count, error } = await supabase.from('stages').select('*', { count: 'exact', head: true });
-                        return { data: { count: count ?? 0 }, error };
-                    },
-                    { count: 0 },
-                    'admin-stages-count'
-                ),
-                safeFetchSimple(
-                    async () => {
-                        const { count, error } = await supabase.from('subjects').select('*', { count: 'exact', head: true });
-                        return { data: { count: count ?? 0 }, error };
-                    },
-                    { count: 0 },
-                    'admin-subjects-count'
-                ),
-                safeFetchSimple(
-                    async () => {
-                        const { count, error } = await supabase.from('lessons').select('*', { count: 'exact', head: true });
-                        return { data: { count: count ?? 0 }, error };
-                    },
-                    { count: 0 },
-                    'admin-lessons-count'
-                ),
-                safeFetchSimple(
-                    async () => {
-                        const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student');
-                        return { data: { count: count ?? 0 }, error };
-                    },
-                    { count: 0 },
-                    'admin-students-count'
-                ),
-                safeFetchSimple(
-                    async () => {
-                        const { count, error } = await supabase.from('teacher_invites').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-                        return { data: { count: count ?? 0 }, error };
-                    },
-                    { count: 0 },
-                    'admin-invites-count'
-                ),
+    const { data: stats = initialStats, isLoading: loading, error: queryError, refetch } = useQuery({
+        queryKey: queryKeys.admin.stats,
+        queryFn: async (): Promise<AdminStats> => {
+            const [teachersResult, stagesResult, subjectsResult, lessonsResult, invitesResult] = await Promise.all([
+                supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'teacher'),
+                supabase.from('stages').select('*', { count: 'exact', head: true }),
+                supabase.from('subjects').select('*', { count: 'exact', head: true }),
+                supabase.from('lessons').select('*', { count: 'exact', head: true }),
+                supabase.from('teacher_invites').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
             ]);
 
-            if (!mountedRef.current) return;
-
-            setStats({
-                teachers: (teachersResult.data as any).count ?? 0,
-                stages: (stagesResult.data as any).count ?? 0,
-                subjects: (subjectsResult.data as any).count ?? 0,
-                lessons: (lessonsResult.data as any).count ?? 0,
-                students: (studentsResult.data as any).count ?? 0,
-                pendingInvites: (invitesResult.data as any).count ?? 0,
-            });
-
-            // Show error only if all crucial fetches failed
-            const crucialErrors = [teachersResult.error, stagesResult.error, subjectsResult.error, lessonsResult.error].filter(Boolean);
-            if (crucialErrors.length === 4) {
-                setError(crucialErrors[0] || 'Failed to fetch dashboard data');
+            const errors = [teachersResult.error, stagesResult.error, subjectsResult.error, lessonsResult.error, invitesResult.error].filter(Boolean);
+            if (errors.length === 5) {
+                throw new Error(errors[0]?.message || 'Failed to fetch data');
             }
-        } catch (err) {
-            if (!mountedRef.current) return;
-            setError(err instanceof Error ? err.message : 'Unknown error');
-            setStats(initialStats);
-        } finally {
-            if (mountedRef.current) {
-                setLoading(false);
-                initialLoadDone.current = true;
-            }
-        }
-    };
 
-    useEffect(() => {
-        mountedRef.current = true;
-        fetchStats();
+            return {
+                teachers: teachersResult.count ?? 0,
+                stages: stagesResult.count ?? 0,
+                subjects: subjectsResult.count ?? 0,
+                lessons: lessonsResult.count ?? 0,
+                pendingInvites: invitesResult.count ?? 0,
+            };
+        },
+        staleTime: 2 * 60 * 1000, // 2 minutes
+    });
 
-        return () => {
-            mountedRef.current = false;
-        };
-    }, []);
+    const error = queryError ? (queryError instanceof Error ? queryError.message : 'Unknown error') : null;
 
     const handleRetry = () => {
-        clearCache('admin-');
-        fetchStats();
+        refetch();
     };
 
     const statCards = [
@@ -175,13 +89,6 @@ export default function AdminDashboard() {
             icon: PlayCircle,
             color: 'bg-purple-100 text-purple-600',
             link: '/admin/lessons',
-        },
-        {
-            title: t('الطلاب', 'Students'),
-            value: stats.students,
-            icon: GraduationCap,
-            color: 'bg-orange-100 text-orange-600',
-            link: '/admin/enrollments',
         },
     ];
 

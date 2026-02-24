@@ -6,56 +6,35 @@ import { supabase } from '@/lib/supabase';
 import type { Course } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Video, Loader2, BookOpen, CreditCard } from 'lucide-react';
+import { Plus, Pencil, Video, Loader2 } from 'lucide-react';
 
 export default function MyCourses() {
     const { t } = useLanguage();
     const { user } = useAuth();
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
-    const [stages, setStages] = useState<any[]>([]);
-    const [subjects, setSubjects] = useState<any[]>([]);
 
     useEffect(() => {
-        async function fetchData() {
+        async function fetchCourses() {
             if (!user) return;
-            setLoading(true);
 
-            const [coursesRes, stagesRes, subjectsRes] = await Promise.all([
-                supabase
-                    .from('courses')
-                    .select('*')
-                    .eq('teacher_id', user.id)
-                    .order('created_at', { ascending: false }),
-                supabase
-                    .from('stages')
-                    .select('*')
-                    .order('sort_order'),
-                supabase
-                    .from('subjects')
-                    .select('id, title_ar, title_en')
-            ]);
+            const { data } = await supabase
+                .from('courses')
+                .select('*')
+                .eq('teacher_id', user.id)
+                .order('created_at', { ascending: false });
 
-            setCourses(coursesRes.data || []);
-            setStages(stagesRes.data || []);
-            setSubjects(subjectsRes.data || []);
+            setCourses(data || []);
             setLoading(false);
         }
 
-        fetchData();
+        fetchCourses();
     }, [user]);
 
-    const getStageTitle = (levelId: string) => {
-        const stage = stages.find(s => s.id === levelId);
-        if (!stage) return levelId;
-        return t(stage.title_ar, stage.title_en || stage.title_ar);
-    };
-
-    const getSubjectTitle = (subjectId: string | null) => {
-        if (!subjectId) return null;
-        const subject = subjects.find(s => s.id === subjectId);
-        if (!subject) return null;
-        return t(subject.title_ar, subject.title_en || subject.title_ar);
+    const stages: Record<string, { ar: string; en: string }> = {
+        'tamhidi': { ar: 'تمهيدي', en: 'Preparatory' },
+        'ibtidai': { ar: 'ابتدائي', en: 'Primary' },
+        'mutawasit': { ar: 'متوسط', en: 'Middle' },
     };
 
     return (
@@ -111,25 +90,9 @@ export default function MyCourses() {
                                         {course.is_published ? t('منشور', 'Published') : t('مسودة', 'Draft')}
                                     </Badge>
                                 </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-                                    <div className="flex items-center gap-1">
-                                        <BookOpen className="w-3 h-3" />
-                                        {getStageTitle(course.level_id)}
-                                    </div>
-                                    {getSubjectTitle(course.subject_id) && (
-                                        <>
-                                            <span>•</span>
-                                            <span>{getSubjectTitle(course.subject_id)}</span>
-                                        </>
-                                    )}
-                                </div>
-
-                                {course.is_paid && (
-                                    <div className="flex items-center gap-1 text-primary text-sm font-semibold mb-3">
-                                        <CreditCard className="w-4 h-4" />
-                                        <span>{course.price_amount} {t('ر.س', 'SAR')}</span>
-                                    </div>
-                                )}
+                                <p className="text-xs text-muted-foreground mb-4">
+                                    {t(stages[course.stage_id]?.ar || course.stage_id, stages[course.stage_id]?.en || course.stage_id)}
+                                </p>
                                 <div className="flex gap-2">
                                     <Button asChild variant="outline" size="sm" className="flex-1">
                                         <Link to={`/teacher/courses/${course.id}`}>

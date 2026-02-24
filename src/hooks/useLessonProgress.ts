@@ -74,17 +74,6 @@ export function useLessonProgress(lessonId: string) {
                 toast.error('Failed to update progress');
                 return;
             }
-
-            // Award XP if just completed
-            if (isCompleted && !progress?.completed_at) {
-                try {
-                    const { awardXP } = await import('@/lib/gamificationService');
-                    await awardXP(user.id, 'lesson_complete', lessonId);
-                } catch (xpErr) {
-                    console.error('Failed to award XP:', xpErr);
-                }
-            }
-
             setProgress(data);
         } catch (err) {
             console.error('Error updating progress:', err);

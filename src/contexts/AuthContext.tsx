@@ -20,14 +20,12 @@ interface AuthContextType {
     isSuperAdmin: boolean;
     isTeacher: boolean;
     isStudent: boolean;
-    isParent: boolean;
     signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
     signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
     signOut: () => Promise<void>;
     resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
     updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
     redirectByRole: (role: UserRole | null) => void;
-    refreshProfile: () => Promise<void>;
     retryProfileFetch: () => Promise<void>;
     clearError: () => void;
 }
@@ -38,8 +36,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // CONSTANTS
 // ============================================
 
-const PROFILE_FETCH_TIMEOUT = 5000; // Increased to 5 seconds
-const MAX_RETRIES = 2; // Increased to 2 retries
+const PROFILE_FETCH_TIMEOUT = 5000; // 5 seconds
+const MAX_RETRIES = 1;
 const isDev = import.meta.env.DEV;
 
 // Dev logging helper
@@ -65,7 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const hasRedirectedRef = useRef(false);
     const initStartedRef = useRef(false);
     const listenerSetRef = useRef(false);
-    const lastFetchedUserIdRef = useRef<string | null>(null);
+    const sessionRef = useRef<Session | null>(null);
+    const initCompletedRef = useRef(false);
 
     // ============================================
     // PROFILE FETCH WITH TIMEOUT + RETRY
@@ -106,9 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                     const { data: insertedProfile, error: insertError } = await supabase
                         .from('profiles')
-                        .insert(newProfile as any)
+                        .insert(newProfile)
                         .select()
-                        .single() as any;
+                        .single();
 
                     if (insertError) {
                         devLog(`Profile creation error: ${insertError.message}`);
@@ -165,9 +164,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             case 'student':
                 destination = '/student';
                 break;
-            case 'parent':
-                destination = '/parent';
-                break;
             default:
                 destination = '/';
         }
@@ -217,11 +213,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (!mounted) return;
 
                 setSession(currentSession);
+                sessionRef.current = currentSession;
                 setUser(currentSession?.user ?? null);
 
                 if (currentSession?.user) {
                     setProfileLoading(true);
-                    lastFetchedUserIdRef.current = currentSession.user.id;
                     try {
                         const profileData = await fetchProfileWithTimeout(currentSession.user.id);
                         if (mounted) {
@@ -241,7 +237,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (err) {
                 devLog('Auth init error', err);
             } finally {
-                if (mounted) setIsLoading(false);
+                if (mounted) {
+                    setIsLoading(false);
+                    initCompletedRef.current = true;
+                }
             }
         };
 
@@ -260,6 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (event === 'SIGNED_OUT') {
                     hasRedirectedRef.current = false;
                     setSession(null);
+                    sessionRef.current = null;
                     setUser(null);
                     setProfile(null);
                     setError(null);
@@ -267,36 +267,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     return;
                 }
 
+                // Skip INITIAL_SESSION — init() already handles the first profile fetch
+                if (event === 'INITIAL_SESSION') {
+                    return;
+                }
+
+                // During init, skip SIGNED_IN too — init() handles it via getSession()
+                if (!initCompletedRef.current && event === 'SIGNED_IN') {
+                    devLog('Skipping SIGNED_IN during init (init handles first fetch)');
+                    return;
+                }
+
                 // Optimization: Ignore session updates if token hasn't changed
                 // This prevents re-renders when switching tabs (which triggers TOKEN_REFRESHED)
-                const currentUserId = newSession?.user?.id || null;
-                const isNewUser = currentUserId !== lastFetchedUserIdRef.current;
+                // Use ref to avoid stale closure capturing outdated session value
+                if (newSession?.access_token === sessionRef.current?.access_token) {
+                    return;
+                }
 
                 setSession(newSession);
+                sessionRef.current = newSession;
                 setUser(newSession?.user ?? null);
 
-                // Re-fetch profile on SIGNED_IN or TOKEN_REFRESHED if user changed
-                if (newSession?.user && (event === 'SIGNED_IN' || isNewUser)) {
-                    // Avoid redundant fetches if we already have the profile for this user
-                    if (!isNewUser && profile) {
-                        setIsLoading(false);
-                        return;
-                    }
-
-                    lastFetchedUserIdRef.current = currentUserId;
+                if (newSession?.user && event === 'SIGNED_IN') {
                     setProfileLoading(true);
 
                     try {
                         const profileData = await fetchProfileWithTimeout(newSession.user.id);
                         if (mounted) {
                             setProfile(profileData);
-                            setError(null);
                         }
                     } catch (err) {
                         if (mounted) {
                             const message = err instanceof Error ? err.message : 'Failed to load profile';
                             setError(message);
-                            // Don't clear profile here so UI can show old data/error retry
                         }
                     } finally {
                         if (mounted) setProfileLoading(false);
@@ -361,11 +365,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signOut = async () => {
         devLog('Sign out');
         hasRedirectedRef.current = false;
-        // Clear React Query cache (in-memory + localStorage)
-        try {
-            const { clearQueryCache } = await import('@/lib/queryConfig');
-            clearQueryCache();
-        } catch (e) { /* ignore */ }
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
@@ -404,7 +403,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isSuperAdmin = role === 'super_admin';
     const isTeacher = role === 'teacher';
     const isStudent = role === 'student';
-    const isParent = role === 'parent';
 
     // ============================================
     // RENDER
@@ -426,14 +424,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         isTeacher,
         isStudent,
-        isParent,
         signIn,
         signUp,
         signOut,
         resetPassword,
         updatePassword,
         redirectByRole,
-        refreshProfile: retryProfileFetch,
         retryProfileFetch,
         clearError,
     }), [
@@ -448,7 +444,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         isTeacher,
         isStudent,
-        isParent,
         redirectByRole,
         retryProfileFetch
     ]);
