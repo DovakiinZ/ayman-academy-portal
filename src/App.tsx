@@ -25,6 +25,7 @@ import Register from "./pages/auth/Register";
 import ResetPassword from "./pages/auth/ResetPassword";
 import AcceptInvite from "./pages/auth/AcceptInvite";
 import AccessDenied from "./pages/AccessDenied";
+import TeacherProfilePublic from "./pages/TeacherProfilePublic";
 
 // Student pages
 import StudentLayout from "./components/student/StudentLayout";
@@ -94,6 +95,7 @@ const App = () => (
                   <Route path="/lesson/:lessonId" element={<LessonPage />} />
                   <Route path="/plans" element={<Plans />} />
                   <Route path="/account" element={<Account />} />
+                  <Route path="/teacher/:id" element={<TeacherProfilePublic />} />
 
                   {/* Auth routes */}
                   <Route path="/login" element={<Login />} />

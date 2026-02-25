@@ -570,3 +570,24 @@ export function useSidebarLessons(subjectId: string, userId: string) {
     staleTime: STALE.user,
   });
 }
+
+// ─── Teacher Public Profile ──────────────────────────────
+
+export function useTeacherProfile(teacherId: string | undefined) {
+  return useQuery({
+    queryKey: ['teacher-profile', teacherId!],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', teacherId!)
+        .eq('role', 'teacher')
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!teacherId,
+    staleTime: STALE.static,
+  });
+}
