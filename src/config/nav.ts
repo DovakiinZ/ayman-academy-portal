@@ -10,6 +10,10 @@ import {
   Settings,
   ClipboardList,
   Type,
+  CreditCard,
+  Mail,
+  Building2,
+  Ticket,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -58,6 +62,11 @@ const adminNav: NavItem[] = [
   { path: '/admin/stages', icon: GraduationCap, label: { ar: 'المراحل', en: 'Stages' } },
   { path: '/admin/subjects', icon: BookMarked, label: { ar: 'المواد', en: 'Subjects' } },
   { path: '/admin/lessons', icon: FileText, label: { ar: 'الدروس', en: 'Lessons' } },
+  { path: '/admin/plans', icon: CreditCard, label: { ar: 'الخطط', en: 'Plans' } },
+  { path: '/admin/subscriptions', icon: CreditCard, label: { ar: 'الاشتراكات', en: 'Subscriptions' } },
+  { path: '/admin/invites', icon: Mail, label: { ar: 'الدعوات', en: 'Invites' } },
+  { path: '/admin/organizations', icon: Building2, label: { ar: 'المؤسسات', en: 'Organizations' } },
+  { path: '/admin/coupons', icon: Ticket, label: { ar: 'الكوبونات', en: 'Coupons' } },
   { path: '/admin/settings', icon: Settings, label: { ar: 'الإعدادات', en: 'Settings' } },
 ];
 

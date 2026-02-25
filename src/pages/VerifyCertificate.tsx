@@ -13,6 +13,7 @@ export default function VerifyCertificate() {
     const [certificate, setCertificate] = useState<Certificate | null>(null);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [newerCertCode, setNewerCertCode] = useState<string | null>(null);
 
     useEffect(() => {
         if (code) fetchCertificate();
@@ -28,7 +29,23 @@ export default function VerifyCertificate() {
         if (error || !data) {
             setNotFound(true);
         } else {
-            setCertificate(data as Certificate);
+            const cert = data as Certificate;
+            setCertificate(cert);
+
+            // If revoked, check if a newer version exists
+            if (cert.status === 'revoked') {
+                const { data: newer } = await supabase
+                    .from('certificates')
+                    .select('verification_code')
+                    .eq('reissued_from_id', cert.id)
+                    .eq('status', 'issued')
+                    .limit(1)
+                    .single() as any;
+
+                if (newer?.verification_code) {
+                    setNewerCertCode(newer.verification_code);
+                }
+            }
         }
         setLoading(false);
     };
@@ -117,6 +134,21 @@ export default function VerifyCertificate() {
                                 {certificate.version > 1 && (
                                     <div className="mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                         {t('الإصدار', 'Version')} {certificate.version}
+                                    </div>
+                                )}
+                                {/* Newer version redirect for revoked certs */}
+                                {certificate.status === 'revoked' && newerCertCode && (
+                                    <div className="mt-3">
+                                        <Link to={`/verify/${newerCertCode}`}>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="gap-2 text-xs border-blue-200 text-blue-600 hover:bg-blue-50"
+                                            >
+                                                {t('عرض الإصدار الأحدث', 'View Newer Version')}
+                                                <ArrowRight className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </Link>
                                     </div>
                                 )}
                             </div>

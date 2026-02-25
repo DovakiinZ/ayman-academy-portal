@@ -8,6 +8,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLessons } from '@/hooks/useQueryHooks';
+import { useCheckSubjectAccess } from '@/hooks/useAcademyData';
 import {
     Play,
     FileText,
@@ -30,6 +31,14 @@ export default function StudentLessons() {
     const { profile } = useAuth();
 
     const { data, isLoading: loading, error } = useLessons(subjectId, profile?.id);
+
+    // ── Access Guard ──────────────────────────────────────
+    const isStudentRole = profile?.role === 'student';
+    const { data: accessResult, isLoading: accessLoading } = useCheckSubjectAccess(
+        isStudentRole ? profile?.id : undefined,
+        isStudentRole ? subjectId : undefined,
+    );
+
     const subject = data?.subject || null;
     const lessons = data?.lessons || [];
 
@@ -51,10 +60,33 @@ export default function StudentLessons() {
         || lessons.find((l: any) => !l.progress?.completed_at)
         || lessons[0];
 
-    if (loading) {
+    if (loading || accessLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    // Access denied for students
+    if (isStudentRole && accessResult && !accessResult.has_access) {
+        return (
+            <div className="text-center py-12">
+                <Lock className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                <h2 className="text-lg font-semibold text-foreground mb-2">
+                    {t('ليس لديك صلاحية الوصول لهذه المادة', 'You do not have access to this subject')}
+                </h2>
+                <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                    {accessResult.access_type === 'subscription'
+                        ? t('هذه المادة تتطلب اشتراك فعال', 'This subject requires an active subscription')
+                        : accessResult.access_type === 'invite_only'
+                            ? t('هذه المادة بدعوة فقط — تواصل مع المعلم', 'This subject is invite-only — contact your teacher')
+                            : t('هذه المادة غير متاحة لك حالياً', 'This subject is not available to you right now')}
+                </p>
+                <Button variant="outline" onClick={() => navigate('/student/subjects')}>
+                    <BackIcon className="w-4 h-4 me-2" />
+                    {t('العودة للمواد', 'Back to subjects')}
+                </Button>
             </div>
         );
     }

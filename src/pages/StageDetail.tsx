@@ -1,57 +1,44 @@
 import { Link, useParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useStage, useSubjects } from '@/hooks/useQueryHooks';
 import Layout from '@/components/layout/Layout';
-import { Calculator, BookOpen, Beaker, Globe, Palette, Music, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
-
-const stagesData = {
-  kindergarten: {
-    title: { ar: 'رياض الأطفال', en: 'Kindergarten' },
-    subjects: [
-      { id: 'arabic-kg', icon: BookOpen, title: { ar: 'اللغة العربية', en: 'Arabic' }, lessons: 24 },
-      { id: 'math-kg', icon: Calculator, title: { ar: 'الحساب', en: 'Mathematics' }, lessons: 20 },
-      { id: 'english-kg', icon: Globe, title: { ar: 'اللغة الإنجليزية', en: 'English' }, lessons: 18 },
-      { id: 'science-kg', icon: Beaker, title: { ar: 'اكتشاف العالم', en: 'Exploring the World' }, lessons: 16 },
-      { id: 'art-kg', icon: Palette, title: { ar: 'الفنون', en: 'Arts' }, lessons: 14 },
-      { id: 'music-kg', icon: Music, title: { ar: 'الأناشيد', en: 'Songs & Rhymes' }, lessons: 12 },
-    ],
-  },
-  primary: {
-    title: { ar: 'المرحلة الابتدائية', en: 'Primary Stage' },
-    subjects: [
-      { id: 'arabic-primary', icon: BookOpen, title: { ar: 'اللغة العربية', en: 'Arabic' }, lessons: 48 },
-      { id: 'math-primary', icon: Calculator, title: { ar: 'الرياضيات', en: 'Mathematics' }, lessons: 56 },
-      { id: 'science-primary', icon: Beaker, title: { ar: 'العلوم', en: 'Science' }, lessons: 42 },
-      { id: 'english-primary', icon: Globe, title: { ar: 'اللغة الإنجليزية', en: 'English' }, lessons: 45 },
-      { id: 'islamic-primary', icon: BookOpen, title: { ar: 'التربية الإسلامية', en: 'Islamic Studies' }, lessons: 32 },
-      { id: 'social-primary', icon: Globe, title: { ar: 'الدراسات الاجتماعية', en: 'Social Studies' }, lessons: 28 },
-    ],
-  },
-  middle: {
-    title: { ar: 'المرحلة المتوسطة', en: 'Middle School' },
-    subjects: [
-      { id: 'arabic-middle', icon: BookOpen, title: { ar: 'اللغة العربية', en: 'Arabic' }, lessons: 60 },
-      { id: 'math-middle', icon: Calculator, title: { ar: 'الرياضيات', en: 'Mathematics' }, lessons: 72 },
-      { id: 'science-middle', icon: Beaker, title: { ar: 'العلوم', en: 'Science' }, lessons: 65 },
-      { id: 'physics-middle', icon: Beaker, title: { ar: 'الفيزياء', en: 'Physics' }, lessons: 45 },
-      { id: 'chemistry-middle', icon: Beaker, title: { ar: 'الكيمياء', en: 'Chemistry' }, lessons: 42 },
-      { id: 'english-middle', icon: Globe, title: { ar: 'اللغة الإنجليزية', en: 'English' }, lessons: 55 },
-    ],
-  },
-};
+import {
+  Calculator, BookOpen, Beaker, Globe, Palette, Music,
+  ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Loader2,
+  GraduationCap, School
+} from 'lucide-react';
 
 const StageDetail = () => {
   const { stageId } = useParams();
   const { t, direction } = useLanguage();
+  const { data: stage, isLoading: stageLoading } = useStage(stageId);
+  const { data: subjects = [], isLoading: subjectsLoading, error } = useSubjects(stageId);
+
   const ArrowIcon = direction === 'rtl' ? ArrowLeft : ArrowRight;
   const BackIcon = direction === 'rtl' ? ChevronRight : ChevronLeft;
 
-  const stage = stagesData[stageId as keyof typeof stagesData];
+  // Icon mapping helper (similar to Stages.tsx)
+  const getSubjectIcon = (titleAr: string = '') => {
+    if (titleAr.includes('عرب')) return BookOpen;
+    if (titleAr.includes('رياضيات') || titleAr.includes('حساب')) return Calculator;
+    if (titleAr.includes('علوم') || titleAr.includes('فيزياء') || titleAr.includes('كيمياء')) return Beaker;
+    if (titleAr.includes('انجليزي') || titleAr.includes('عالم') || titleAr.includes('اجتماع')) return Globe;
+    if (titleAr.includes('فنون') || titleAr.includes('رسم')) return Palette;
+    if (titleAr.includes('نشيد') || titleAr.includes('موسيقى')) return Music;
+    return BookOpen;
+  };
 
-  if (!stage) {
+  const isLoading = stageLoading || subjectsLoading;
+
+  if (!isLoading && !stage) {
     return (
       <Layout>
         <div className="container-academic py-20 text-center">
-          <h1>{t('المرحلة غير موجودة', 'Stage Not Found')}</h1>
+          <GraduationCap className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-20" />
+          <h1 className="text-2xl font-bold">{t('المرحلة غير موجودة', 'Stage Not Found')}</h1>
+          <Link to="/stages" className="text-primary hover:underline mt-4 inline-block">
+            {t('العودة لكافة المراحل', 'Back to all stages')}
+          </Link>
         </div>
       </Layout>
     );
@@ -69,43 +56,73 @@ const StageDetail = () => {
             <BackIcon className="w-4 h-4" />
             {t('جميع المراحل', 'All Stages')}
           </Link>
-          <h1 className="text-foreground mb-4">
-            {t(stage.title.ar, stage.title.en)}
-          </h1>
-          <p className="text-muted-foreground max-w-2xl">
-            {t(
-              'اختر المادة الدراسية للوصول إلى الدروس والمحتوى التعليمي',
-              'Select a subject to access lessons and educational content'
-            )}
-          </p>
+
+          {stageLoading ? (
+            <div className="h-20 flex items-center">
+              <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+            </div>
+          ) : (
+            <>
+              <h1 className="text-foreground mb-4">
+                {t(stage?.title_ar, stage?.title_en || stage?.title_ar)}
+              </h1>
+              <p className="text-muted-foreground max-w-2xl">
+                {t(
+                  'اختر المادة الدراسية للوصول إلى الدروس والمحتوى التعليمي',
+                  'Select a subject to access lessons and educational content'
+                )}
+              </p>
+            </>
+          )}
         </div>
       </section>
 
       {/* Subjects Grid */}
       <section className="section-academic">
         <div className="container-academic">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stage.subjects.map((subject) => (
-              <Link
-                key={subject.id}
-                to={`/stages/${stageId}/${subject.id}`}
-                className="academic-card hover:shadow-md transition-all group"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                    <subject.icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <ArrowIcon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  {t(subject.title.ar, subject.title.en)}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {t(`${subject.lessons} درساً`, `${subject.lessons} Lessons`)}
-                </p>
-              </Link>
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <p className="text-muted-foreground">{t('جاري تحميل المواد...', 'Loading subjects...')}</p>
+            </div>
+          ) : error ? (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
+              <p className="text-destructive font-medium">{t('حدث خطأ أثناء تحميل المواد', 'Error loading subjects')}</p>
+              <p className="text-sm text-muted-foreground mt-1">{error instanceof Error ? error.message : String(error)}</p>
+            </div>
+          ) : subjects.length === 0 ? (
+            <div className="text-center py-20 bg-secondary/10 rounded-xl border-2 border-dashed border-border">
+              <School className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-20" />
+              <h3 className="text-lg font-medium text-foreground">{t('لا توجد مواد دراسية حالياً', 'No subjects found')}</h3>
+              <p className="text-muted-foreground mt-2">{t('سيتم إضافة المواد الدراسية لهذه المرحلة قريباً', 'Subjects for this stage will be added soon')}</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {subjects.map((subject: any) => {
+                const Icon = getSubjectIcon(subject.title_ar);
+                return (
+                  <Link
+                    key={subject.id}
+                    to={`/stages/${stageId}/${subject.id}`}
+                    className="academic-card hover:shadow-md transition-all group"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+                        <Icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <ArrowIcon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      {t(subject.title_ar, subject.title_en || subject.title_ar)}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {t(`${subject.lessons_count || 0} درساً`, `${subject.lessons_count || 0} Lessons`)}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
     </Layout>

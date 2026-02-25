@@ -87,6 +87,7 @@ export default function SubjectsManagement() {
         home_order: 0,
         teaser_ar: '',
         teaser_en: '',
+        access_type: 'stage' as string,
     });
 
     // ─── Fetch Data via useQuery ─────────────────────────────────────────────
@@ -197,6 +198,7 @@ export default function SubjectsManagement() {
             home_order: 0,
             teaser_ar: '',
             teaser_en: '',
+            access_type: 'stage',
         });
         setDialogOpen(true);
     };
@@ -216,6 +218,7 @@ export default function SubjectsManagement() {
             home_order: subject.home_order || 0,
             teaser_ar: subject.teaser_ar || '',
             teaser_en: subject.teaser_en || '',
+            access_type: subject.access_type || 'stage',
         });
         setDialogOpen(true);
     };
@@ -224,7 +227,8 @@ export default function SubjectsManagement() {
         e.preventDefault();
 
         const targetStageId = form.stage_id || stageId;
-        if (!targetStageId) {
+        // stage_id is required only for 'stage' access type
+        if (!targetStageId && form.access_type === 'stage') {
             toast.error(t('الرجاء اختيار المرحلة', 'Please select a stage'));
             return;
         }
@@ -241,11 +245,12 @@ export default function SubjectsManagement() {
                     'subjects',
                     editingSubject.id,
                     {
-                        stage_id: targetStageId,
+                        stage_id: targetStageId || null,
                         title_ar: form.title_ar,
                         title_en: form.title_en || null,
                         description_ar: form.description_ar || null,
                         description_en: form.description_en || null,
+                        access_type: form.access_type,
                         sort_order: form.sort_order,
                         is_active: form.is_active,
                         show_on_home: form.show_on_home,
@@ -267,12 +272,13 @@ export default function SubjectsManagement() {
                 const result = await verifiedInsert(
                     'subjects',
                     {
-                        stage_id: targetStageId,
+                        stage_id: targetStageId || null,
                         title_ar: form.title_ar,
                         title_en: form.title_en || null,
                         description_ar: form.description_ar || null,
                         description_en: form.description_en || null,
                         slug,
+                        access_type: form.access_type,
                         sort_order: form.sort_order,
                         is_active: form.is_active,
                         show_on_home: form.show_on_home,
@@ -517,6 +523,15 @@ export default function SubjectsManagement() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
+                                        <Badge variant="outline" className="text-[10px]">
+                                            {subject.access_type === 'public' ? t('عام', 'Public')
+                                                : subject.access_type === 'subscription' ? t('اشتراك', 'Sub')
+                                                    : subject.access_type === 'invite_only' ? t('دعوة', 'Invite')
+                                                        : subject.access_type === 'org_only' ? t('مؤسسة', 'Org')
+                                                            : t('مرحلة', 'Stage')}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
                                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                             <Button variant="ghost" size="icon" onClick={() => handleEdit(subject)} title={t('تعديل', 'Edit')}>
                                                 <Pencil className="w-4 h-4" />
@@ -571,6 +586,29 @@ export default function SubjectsManagement() {
                                     ))}
                                 </SelectContent>
                             </Select>
+                        </div>
+
+                        {/* Access Type */}
+                        <div className="space-y-2">
+                            <Label>{t('نوع الوصول', 'Access Type')}</Label>
+                            <Select
+                                value={form.access_type}
+                                onValueChange={(value) => setForm({ ...form, access_type: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="stage">{t('حسب المرحلة', 'Stage-based')}</SelectItem>
+                                    <SelectItem value="public">{t('عام للجميع', 'Public')}</SelectItem>
+                                    <SelectItem value="subscription">{t('اشتراك', 'Subscription')}</SelectItem>
+                                    <SelectItem value="invite_only">{t('بدعوة فقط', 'Invite Only')}</SelectItem>
+                                    <SelectItem value="org_only">{t('مؤسسة فقط', 'Organization Only')}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                {t('يحدد من يستطيع رؤية هذه المادة', 'Controls who can see this subject')}
+                            </p>
                         </div>
 
                         <div className="space-y-2">

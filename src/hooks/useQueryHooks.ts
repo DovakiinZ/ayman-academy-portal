@@ -460,6 +460,7 @@ export function useFeaturedSubjects() {
       const { data, error } = await supabase
         .from('subjects')
         .select('id, title_ar, title_en, teaser_ar, teaser_en, stage:stages(id, title_ar, title_en)')
+        .eq('is_active', true)
         .eq('show_on_home', true)
         .order('home_order', { ascending: true })
         .limit(4);
@@ -482,6 +483,7 @@ export function useFeaturedLessons() {
           course:courses(teacher:profiles(full_name)),
           subject:subjects(title_ar, title_en, stage:stages(title_ar, title_en))
         `)
+        .eq('is_published', true)
         .eq('show_on_home', true)
         .order('home_order', { ascending: true })
         .limit(4);

@@ -6,6 +6,8 @@ export type UserRole = 'super_admin' | 'teacher' | 'student';
 export type LanguagePref = 'ar' | 'en';
 export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
 export type ContentItemType = 'video' | 'article' | 'image' | 'file' | 'link';
+export type SubjectAccessType = 'public' | 'stage' | 'subscription' | 'invite_only' | 'org_only';
+export type StudentStage = 'primary' | 'middle' | 'high';
 
 export interface Profile {
     id: string;
@@ -15,6 +17,10 @@ export interface Profile {
     avatar_url?: string;
     language_pref?: LanguagePref;
     is_active: boolean;
+    // Student onboarding fields
+    student_stage?: StudentStage | null;
+    grade?: number | null;
+    gender?: 'male' | 'female' | 'unspecified' | null;
     // Teacher-specific fields
     bio_ar?: string | null;
     bio_en?: string | null;
@@ -55,12 +61,13 @@ export type Level = Stage;
 
 export interface Subject {
     id: string;
-    stage_id: string;
+    stage_id: string | null;
     slug?: string;
     title_ar: string;
     title_en: string | null;
     description_ar: string | null;
     description_en: string | null;
+    access_type?: SubjectAccessType;
     sort_order: number;
     is_active: boolean;
     created_at: string;
@@ -319,6 +326,226 @@ export interface HomeFeaturedLesson {
     lesson?: Lesson;
 }
 
+// ── Certificate Types ──
+
+
+export type CertificateStatus = 'draft' | 'eligible' | 'pending_approval' | 'issued' | 'revoked';
+
+export interface CertificateSnapshot {
+    student_name: string;
+    gender?: string;
+    course_name: string;
+    score: number | null;
+    completion_date: string;
+    teacher_name: string;
+    signer_name: string;
+    signer_role?: string;
+    template_version: string;
+    reissue_reason?: string;
+}
+
+export interface Certificate {
+    id: string;
+    student_id: string;
+    lesson_id: string | null;
+    subject_id: string | null;
+    template_id: string | null;
+    student_name: string;
+    course_name: string;
+    subject_name: string | null;
+    score: number | null;
+    issued_at: string;
+    verification_code: string;
+    pdf_url: string | null;
+    status: CertificateStatus;
+    version: number;
+    reissued_from_id: string | null;
+    snapshot_json: CertificateSnapshot | null;
+    template_version: number;
+    created_at: string;
+}
+
+export interface RuleNode {
+    type: 'AND' | 'OR' | 'progress' | 'final_exam' | 'assignment_approved';
+    rules?: RuleNode[];
+    minPercent?: number;
+    minScore?: number;
+    required?: boolean;
+}
+
+export interface CertificateRule {
+    id: string;
+    subject_id: string;
+    enabled: boolean;
+    rule_json: RuleNode;
+    requires_manual_approval: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface MissingRequirement {
+    type: string;
+    current: number;
+    required: number;
+}
+
+export interface EligibilityResult {
+    eligible: boolean;
+    missingRequirements: MissingRequirement[];
+}
+
+// ── Subject Access Control Types ──────────────────────────
+
+export interface StudentSubject {
+    id: string;
+    student_id: string;
+    subject_id: string;
+    status: 'active' | 'inactive';
+    assigned_by: 'admin' | 'teacher' | 'system';
+    assigned_reason?: string | null;
+    created_at: string;
+}
+
+export interface Plan {
+    id: string;
+    name_ar: string;
+    name_en: string | null;
+    description_ar: string | null;
+    description_en: string | null;
+    billing: 'monthly' | 'yearly' | 'lifetime';
+    price_cents: number;
+    currency: string;
+    stage_id: string | null;
+    is_family: boolean;
+    max_members: number | null;
+    is_active: boolean;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PlanSubject {
+    id: string;
+    plan_id: string;
+    subject_id: string;
+}
+
+export interface Subscription {
+    id: string;
+    owner_user_id: string;
+    student_id: string | null;
+    plan_id: string;
+    status: 'trialing' | 'active' | 'past_due' | 'expired' | 'cancelled';
+    starts_at: string;
+    ends_at: string | null;
+    trial_ends_at: string | null;
+    provider: 'manual' | 'stripe' | 'tap' | 'hyperpay';
+    provider_ref: string | null;
+    created_at: string;
+    updated_at: string;
+    // Joins
+    plan?: Plan;
+}
+
+export interface FamilyMember {
+    id: string;
+    subscription_id: string;
+    student_id: string;
+    status: 'active' | 'removed';
+    created_at: string;
+}
+
+export interface SubjectInvite {
+    id: string;
+    student_id: string;
+    subject_id: string;
+    status: 'active' | 'revoked';
+    invited_by_user_id: string;
+    expires_at: string | null;
+    created_at: string;
+    // Joins
+    subject?: Subject;
+    student?: Profile;
+}
+
+export interface Organization {
+    id: string;
+    name_ar: string;
+    name_en: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface OrgMember {
+    id: string;
+    organization_id: string;
+    student_id: string;
+    status: 'active' | 'inactive';
+    created_at: string;
+}
+
+export interface OrgSubject {
+    id: string;
+    organization_id: string;
+    subject_id: string;
+    status: 'active' | 'inactive';
+    created_at: string;
+}
+
+export interface Coupon {
+    id: string;
+    code: string;
+    discount_type: 'percent' | 'fixed';
+    discount_value: number;
+    max_redemptions: number | null;
+    redeemed_count: number;
+    starts_at: string | null;
+    ends_at: string | null;
+    applies_to: 'plan' | 'subject';
+    plan_id: string | null;
+    subject_id: string | null;
+    is_active: boolean;
+    created_at: string;
+}
+
+export interface CouponRedemption {
+    id: string;
+    coupon_id: string;
+    user_id: string;
+    subscription_id: string | null;
+    redeemed_at: string;
+}
+
+/** Returned by get_student_subjects RPC — subject with entitlement metadata */
+export interface EntitledSubject extends Subject {
+    entitlement_reason: string;
+    stage_title_ar?: string;
+    stage_title_en?: string;
+    total_lessons?: number;
+    completed_lessons?: number;
+    progress_percent?: number;
+}
+
+/** Returned by get_discover_subjects RPC — locked subject with lock reason */
+export interface DiscoverSubject {
+    id: string;
+    title_ar: string;
+    title_en: string | null;
+    description_ar: string | null;
+    description_en: string | null;
+    slug: string | null;
+    stage_id: string | null;
+    access_type: SubjectAccessType;
+    sort_order: number;
+    show_on_home: boolean;
+    teaser_ar: string | null;
+    teaser_en: string | null;
+    lock_reason: string;
+    stage_title_ar: string | null;
+    stage_title_en: string | null;
+}
+
 // Database helper type
 export type Database = {
     public: {
@@ -428,6 +655,71 @@ export type Database = {
                 Insert: Partial<Template>;
                 Update: Partial<Template>;
             };
+            certificates: {
+                Row: Certificate;
+                Insert: Partial<Certificate>;
+                Update: Partial<Certificate>;
+            };
+            certificate_rules: {
+                Row: CertificateRule;
+                Insert: Partial<CertificateRule>;
+                Update: Partial<CertificateRule>;
+            };
+            student_subjects: {
+                Row: StudentSubject;
+                Insert: Partial<StudentSubject>;
+                Update: Partial<StudentSubject>;
+            };
+            plans: {
+                Row: Plan;
+                Insert: Partial<Plan>;
+                Update: Partial<Plan>;
+            };
+            plan_subjects: {
+                Row: PlanSubject;
+                Insert: Partial<PlanSubject>;
+                Update: Partial<PlanSubject>;
+            };
+            subscriptions: {
+                Row: Subscription;
+                Insert: Partial<Subscription>;
+                Update: Partial<Subscription>;
+            };
+            family_members: {
+                Row: FamilyMember;
+                Insert: Partial<FamilyMember>;
+                Update: Partial<FamilyMember>;
+            };
+            subject_invites: {
+                Row: SubjectInvite;
+                Insert: Partial<SubjectInvite>;
+                Update: Partial<SubjectInvite>;
+            };
+            organizations: {
+                Row: Organization;
+                Insert: Partial<Organization>;
+                Update: Partial<Organization>;
+            };
+            org_members: {
+                Row: OrgMember;
+                Insert: Partial<OrgMember>;
+                Update: Partial<OrgMember>;
+            };
+            org_subjects: {
+                Row: OrgSubject;
+                Insert: Partial<OrgSubject>;
+                Update: Partial<OrgSubject>;
+            };
+            coupons: {
+                Row: Coupon;
+                Insert: Partial<Coupon>;
+                Update: Partial<Coupon>;
+            };
+            coupon_redemptions: {
+                Row: CouponRedemption;
+                Insert: Partial<CouponRedemption>;
+                Update: Partial<CouponRedemption>;
+            };
         };
         Functions: {
             get_student_teachers: {
@@ -438,6 +730,35 @@ export type Database = {
                 Args: { p_user_id: string; p_lesson_id: string };
                 Returns: boolean;
             };
+            request_certificate: {
+                Args: { p_subject_id: string };
+                Returns: Record<string, unknown>;
+            };
+            admin_reissue_certificate: {
+                Args: { p_certificate_id: string; p_reason?: string };
+                Returns: Record<string, unknown>;
+            };
+            admin_approve_certificate: {
+                Args: { p_certificate_id: string };
+                Returns: Record<string, unknown>;
+            };
+            admin_revoke_certificate: {
+                Args: { p_certificate_id: string };
+                Returns: Record<string, unknown>;
+            };
+            get_student_subjects: {
+                Args: { p_student_id: string };
+                Returns: EntitledSubject[];
+            };
+            get_discover_subjects: {
+                Args: { p_student_id: string };
+                Returns: DiscoverSubject[];
+            };
+            check_subject_access: {
+                Args: { p_student_id: string; p_subject_id: string };
+                Returns: { has_access: boolean; reason: string; access_type?: string };
+            };
         };
     };
 };
+

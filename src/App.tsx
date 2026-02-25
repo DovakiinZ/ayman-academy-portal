@@ -39,7 +39,6 @@ import Messages from "./pages/student/Messages";
 import LessonPlayer from "./pages/student/LessonPlayer";
 import QuizPlayer from "./pages/student/QuizPlayer";
 
-// Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import TeachersManagement from "./pages/admin/TeachersManagement";
@@ -49,6 +48,11 @@ import LessonsManagement from "./pages/admin/LessonsManagement";
 import HomepageManagement from "./pages/admin/HomepageManagement";
 import TemplatesManagement from "./pages/admin/TemplatesManagement";
 import AdminSettings from "./pages/admin/AdminSettings";
+import PlansManagement from "./pages/admin/PlansManagement";
+import SubscriptionsManagement from "./pages/admin/SubscriptionsManagement";
+import InvitesManagement from "./pages/admin/InvitesManagement";
+import OrganizationsManagement from "./pages/admin/OrganizationsManagement";
+import CouponsManagement from "./pages/admin/CouponsManagement";
 
 import TeacherLayout from "./components/teacher/TeacherLayout";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
@@ -115,6 +119,11 @@ const App = () => (
                     <Route path="homepage" element={<HomepageManagement />} />
                     <Route path="templates" element={<TemplatesManagement />} />
                     <Route path="settings" element={<AdminSettings />} />
+                    <Route path="plans" element={<PlansManagement />} />
+                    <Route path="subscriptions" element={<SubscriptionsManagement />} />
+                    <Route path="invites" element={<InvitesManagement />} />
+                    <Route path="organizations" element={<OrganizationsManagement />} />
+                    <Route path="coupons" element={<CouponsManagement />} />
                   </Route>
 
                   {/* Teacher routes (accessible by teacher and super_admin) */}

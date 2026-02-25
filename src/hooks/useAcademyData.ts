@@ -215,23 +215,29 @@ export function useSubjectTeachers(subjectId?: string) {
     });
 }
 
-// ── My Subjects (all subjects with progress) ──
+// ── My Subjects (entitled subjects with progress) ──
 
 export function useMySubjects(userId?: string) {
     return useQuery({
         queryKey: ['my-subjects', userId],
         queryFn: async () => {
-            // Fetch all subjects with stage + lesson IDs
-            const { data: subjectsData, error } = await supabase
-                .from('subjects')
-                .select('*, stage:stages(*), lessons(id)')
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true });
+            // Call the secure RPC that returns ONLY entitled subjects
+            const { data: entitledData, error } = await (supabase
+                .rpc as any)('get_student_subjects', { p_student_id: userId! });
 
             if (error) throw error;
-            if (!subjectsData) return [];
+            if (!entitledData || entitledData.length === 0) return [];
 
-            // Fetch all progress for this user
+            const subjectIds = (entitledData as any[]).map((s: any) => s.id);
+
+            // Fetch lesson IDs for entitled subjects
+            const { data: lessonsData } = await supabase
+                .from('lessons')
+                .select('id, subject_id')
+                .in('subject_id', subjectIds)
+                .eq('is_published', true);
+
+            // Fetch progress for this user
             const { data: progressData } = await supabase
                 .from('lesson_progress')
                 .select('lesson_id, completed_at')
@@ -241,8 +247,16 @@ export function useMySubjects(userId?: string) {
                 ((progressData || []) as any[]).filter(p => p.completed_at).map(p => p.lesson_id)
             );
 
-            return (subjectsData as any[]).map(s => {
-                const lessonIds: string[] = (s.lessons || []).map((l: any) => l.id);
+            // Group lessons by subject
+            const lessonsBySubject = new Map<string, string[]>();
+            for (const l of (lessonsData || []) as any[]) {
+                const ids = lessonsBySubject.get(l.subject_id) || [];
+                ids.push(l.id);
+                lessonsBySubject.set(l.subject_id, ids);
+            }
+
+            return (entitledData as any[]).map(s => {
+                const lessonIds = lessonsBySubject.get(s.id) || [];
                 const totalLessons = lessonIds.length;
                 const completedLessons = lessonIds.filter(id => completedIds.has(id)).length;
                 const progressPercent = totalLessons > 0
@@ -251,7 +265,10 @@ export function useMySubjects(userId?: string) {
 
                 return {
                     ...s,
-                    lessons: undefined,
+                    stage: s.stage_title_ar ? {
+                        title_ar: s.stage_title_ar,
+                        title_en: s.stage_title_en,
+                    } : undefined,
                     total_lessons: totalLessons,
                     completed_lessons: completedLessons,
                     progress_percent: progressPercent,
@@ -259,6 +276,47 @@ export function useMySubjects(userId?: string) {
             });
         },
         enabled: !!userId,
+        staleTime: STALE_TIMES.DYNAMIC,
+    });
+}
+
+// ── Entitled Subjects (alias for useMySubjects) ──
+
+export const useEntitledSubjects = useMySubjects;
+
+// ── Discover Subjects (locked subjects for "Discover" tab) ──
+
+export function useDiscoverSubjects(userId?: string) {
+    return useQuery({
+        queryKey: ['discover-subjects', userId],
+        queryFn: async () => {
+            const { data, error } = await (supabase
+                .rpc as any)('get_discover_subjects', { p_student_id: userId! });
+
+            if (error) throw error;
+            return (data || []) as any[];
+        },
+        enabled: !!userId,
+        staleTime: STALE_TIMES.SEMI_STATIC,
+    });
+}
+
+// ── Check Subject Access (guard for subject detail pages) ──
+
+export function useCheckSubjectAccess(userId?: string, subjectId?: string) {
+    return useQuery({
+        queryKey: ['check-subject-access', userId, subjectId],
+        queryFn: async () => {
+            const { data, error } = await (supabase
+                .rpc as any)('check_subject_access', {
+                    p_student_id: userId!,
+                    p_subject_id: subjectId!,
+                });
+
+            if (error) throw error;
+            return data as { has_access: boolean; reason: string; access_type?: string };
+        },
+        enabled: !!userId && !!subjectId,
         staleTime: STALE_TIMES.DYNAMIC,
     });
 }

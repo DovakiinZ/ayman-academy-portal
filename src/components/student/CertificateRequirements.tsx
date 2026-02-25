@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { evaluateEligibility } from '@/lib/eligibilityService';
-import { requestCertificate } from '@/lib/certificateGenerator';
+import { requestCertificateViaRPC } from '@/lib/certificateGenerator';
 import type { EligibilityResult, CertificateRule, Certificate, MissingRequirement } from '@/types/database';
 import { CheckCircle, XCircle, Award, Loader2, Clock, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -83,12 +83,7 @@ export default function CertificateRequirements({ subjectId, subjectName }: Prop
         if (!profile?.id || !rule) return;
         setRequesting(true);
         try {
-            const res = await requestCertificate(
-                profile.id,
-                profile.full_name || profile.email || 'طالب',
-                subjectId,
-                subjectName,
-            );
+            const res = await requestCertificateViaRPC(subjectId);
 
             if (res.status === 'issued') {
                 toast.success(t('🎉 تم إصدار الشهادة!', '🎉 Certificate issued!'));
@@ -186,8 +181,8 @@ export default function CertificateRequirements({ subjectId, subjectName }: Prop
                     <div
                         key={i}
                         className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${item.passed
-                                ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800/30'
-                                : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800/30'
+                            ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800/30'
+                            : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800/30'
                             }`}
                     >
                         {item.passed ? (

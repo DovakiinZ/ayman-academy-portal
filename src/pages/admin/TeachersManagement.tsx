@@ -224,6 +224,7 @@ export default function TeachersManagement() {
             const result = await verifiedInsert(
                 'profiles',
                 {
+                    id: crypto.randomUUID(),
                     email: createForm.email.trim(),
                     full_name: createForm.full_name.trim(),
                     bio_ar: createForm.bio_ar.trim() || null,
