@@ -36,8 +36,7 @@ export const queryClient = new QueryClient({
             gcTime: 24 * HOUR,                     // Keep unused cache 24h
             refetchOnWindowFocus: false,
             refetchOnReconnect: false,
-            retry: 1,
-            retryDelay: 1000,
+            retry: false,                          // Matched to App.tsx
         },
     },
 });

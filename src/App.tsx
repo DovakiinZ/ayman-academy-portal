@@ -1,8 +1,9 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { queryClient, queryPersister, PERSIST_MAX_AGE, CACHE_BUSTER } from "@/lib/queryConfig";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
@@ -64,20 +65,18 @@ import TeacherQuizzes from "./pages/teacher/TeacherQuizzes";
 import LessonEditor from "./components/admin/lessons/LessonEditor";
 import TeacherProfile from "./pages/teacher/TeacherProfile";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false, // Prevent reload on tab wake
-      retry: false,
-    },
-  },
-});
 
 import { TemplateProvider } from "./contexts/TemplateContext";
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{
+      persister: queryPersister,
+      maxAge: PERSIST_MAX_AGE,
+      buster: CACHE_BUSTER,
+    }}
+  >
     <AuthProvider>
       <SettingsProvider>
         <LanguageProvider>
@@ -170,7 +169,7 @@ const App = () => (
         </LanguageProvider>
       </SettingsProvider>
     </AuthProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 
 export default App;
