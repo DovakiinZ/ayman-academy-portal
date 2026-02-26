@@ -27,7 +27,7 @@ export default function FeaturedLessonsSection() {
             subject_en: lesson.subject?.title_en,
             stage_ar: lesson.subject?.stage?.title_ar,
             stage_en: lesson.subject?.stage?.title_en,
-            instructor: lesson.course?.teacher?.full_name,
+            instructor: lesson.teacher?.full_name,
             duration,
             is_preview: !!lesson.preview_video_url,
             thumbnail: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=225&fit=crop',

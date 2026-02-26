@@ -480,7 +480,7 @@ export function useFeaturedLessons() {
         .from('lessons')
         .select(`
           id, title_ar, title_en, teaser_ar, teaser_en, preview_video_url, duration_seconds,
-          course:courses(teacher:profiles(full_name)),
+          teacher:profiles!created_by(full_name),
           subject:subjects(title_ar, title_en, stage:stages(title_ar, title_en))
         `)
         .eq('is_published', true)
@@ -586,6 +586,55 @@ export function useTeacherProfile(teacherId: string | undefined) {
 
       if (error) throw error;
       return data;
+    },
+    enabled: !!teacherId,
+    staleTime: STALE.static,
+  });
+}
+
+export function useTeacherPublicSubjects(teacherId: string | undefined) {
+  return useQuery({
+    queryKey: ['teacher-public-subjects', teacherId],
+    queryFn: async () => {
+      // Get all published lessons by this teacher and their subjects
+      const { data: lessons, error } = await supabase
+        .from('lessons')
+        .select(`
+          subject_id,
+          subject:subjects(
+            id, 
+            title_ar, 
+            title_en,
+            teaser_ar,
+            teaser_en,
+            stage:stages(id, title_ar, title_en)
+          )
+        `)
+        .eq('created_by', teacherId!)
+        .eq('is_published', true);
+
+      if (error) throw error;
+
+      // Group by subject and count lessons
+      const subjectMap = new Map<string, any>();
+
+      for (const lesson of (lessons || [])) {
+        const anyLesson = lesson as any;
+        if (!anyLesson.subject) continue;
+        const subj = Array.isArray(anyLesson.subject) ? anyLesson.subject[0] : anyLesson.subject;
+        if (!subj) continue;
+
+        if (subjectMap.has(subj.id)) {
+          subjectMap.get(subj.id).lessons_count++;
+        } else {
+          subjectMap.set(subj.id, {
+            ...subj,
+            lessons_count: 1
+          });
+        }
+      }
+
+      return Array.from(subjectMap.values());
     },
     enabled: !!teacherId,
     staleTime: STALE.static,

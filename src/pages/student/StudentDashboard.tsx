@@ -46,7 +46,7 @@ export default function StudentDashboard() {
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
     const { continueItem, subjectProgress, recentLessons, stats } = useMemo(() => {
-        const progressItems = allProgress as any[];
+        const progressItems = Array.isArray(allProgress) ? (allProgress as any[]) : [];
 
         // Continue Learning — most recent incomplete
         const lastIncomplete = progressItems.find(
@@ -71,9 +71,9 @@ export default function StudentDashboard() {
             progressItems.filter((p: any) => p.completed_at).map((p: any) => p.lesson_id)
         );
 
-        const spList = (allSubjects as any[])
+        const spList = (Array.isArray(allSubjects) ? (allSubjects as any[]) : [])
             .map(s => {
-                const lessonIds: string[] = (s.lessons || []).map((l: any) => l.id);
+                const lessonIds: string[] = (Array.isArray(s.lessons) ? (s.lessons as any[]) : []).map((l: any) => l.id);
                 const total = lessonIds.length;
                 const completed = lessonIds.filter((id: string) => completedIds.has(id)).length;
                 return {

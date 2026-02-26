@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useTeacherProfile } from '@/hooks/useQueryHooks';
-import { User, ChevronLeft, ChevronRight, BookOpen, GraduationCap, MapPin } from 'lucide-react';
+import { useTeacherProfile, useTeacherPublicSubjects } from '@/hooks/useQueryHooks';
+import { User, ChevronLeft, ChevronRight, BookOpen, GraduationCap, MapPin, FileText } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ export default function TeacherProfilePublic() {
     const { id } = useParams();
     const { t, direction } = useLanguage();
     const { data: teacher, isLoading, error } = useTeacherProfile(id);
+    const { data: subjects = [], isLoading: subjectsLoading } = useTeacherPublicSubjects(id);
 
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
@@ -104,12 +105,12 @@ export default function TeacherProfilePublic() {
                             </div>
 
                             <div className="flex gap-3 pt-4">
-                                <Link to="/stages">
+                                <a href="#subjects">
                                     <Button className="rounded-full px-8">
                                         {t('استكشف الدروس', 'Explore Lessons')}
                                         <ChevronIcon className="w-4 h-4 ms-2" />
                                     </Button>
-                                </Link>
+                                </a>
                                 <Link to="/register">
                                     <Button variant="outline" className="rounded-full px-8">
                                         {t('سجل الآن', 'Register Now')}
@@ -154,6 +155,45 @@ export default function TeacherProfilePublic() {
                         </div>
                     </div>
                 </div>
+
+                {/* Subjects Section */}
+                {subjects.length > 0 && (
+                    <div id="subjects" className="mt-16 pt-12 border-t border-border">
+                        <h2 className="text-2xl font-bold text-foreground mb-8">
+                            {t('مواد المعلم', 'Teacher\'s Subjects')}
+                        </h2>
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            {subjects.map((subject: any) => (
+                                <Link
+                                    key={subject.id}
+                                    to={`/subject/${subject.id}`}
+                                    className="academic-card group hover:border-primary/30 transition-colors bg-secondary/10 p-5 rounded-xl border border-border flex flex-col"
+                                >
+                                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                                        <BookOpen className="w-6 h-6 text-primary" />
+                                    </div>
+                                    {subject.stage && (
+                                        <span className="inline-block px-2 py-0.5 bg-secondary text-[10px] text-muted-foreground rounded mb-2 w-fit">
+                                            {t(subject.stage.title_ar, subject.stage.title_en || subject.stage.title_ar)}
+                                        </span>
+                                    )}
+                                    <h3 className="text-base font-medium text-foreground mb-2">
+                                        {t(subject.title_ar, subject.title_en || subject.title_ar)}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                                        {t(subject.teaser_ar, subject.teaser_en || subject.teaser_ar)}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-auto pt-4 border-t border-border">
+                                        <FileText className="w-3.5 h-3.5" />
+                                        <span>
+                                            {subject.lessons_count} {t('درس', 'lessons')}
+                                        </span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </Layout>
     );
