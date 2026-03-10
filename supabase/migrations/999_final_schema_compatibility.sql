@@ -167,7 +167,7 @@ BEGIN
         JOIN stages st ON s.stage_id = st.id
         JOIN profiles p ON p.id = p_student_id
         WHERE s.id = p_subject_id 
-          AND st.slug = p.student_stage
+          AND st.slug = p.student_stage::text
           AND s.is_active = true
     ) THEN
         RETURN jsonb_build_object('has_access', true, 'reason', 'stage');
@@ -186,7 +186,7 @@ AS $$
     SELECT s.* FROM public.subjects s
     JOIN public.stages st ON s.stage_id = st.id
     JOIN public.profiles p ON p.id = p_student_id
-    WHERE (st.slug = p.student_stage OR s.access_type = 'public')
+    WHERE (st.slug = p.student_stage::text OR s.access_type = 'public')
       AND s.is_active = true
     ORDER BY s.sort_order ASC;
 $$;
