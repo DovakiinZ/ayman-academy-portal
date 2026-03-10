@@ -19,6 +19,7 @@ import {
     Lock,
     Sparkles,
     Search,
+    GraduationCap,
 } from 'lucide-react';
 
 type Tab = 'my' | 'discover';
@@ -27,7 +28,7 @@ export default function MySubjects() {
     const { t, direction } = useLanguage();
     const { profile } = useAuth();
     const [activeTab, setActiveTab] = useState<Tab>('my');
-    const { data: mySubjects = [], isLoading: myLoading } = useMySubjects(profile?.id);
+    const { data: mySubjects = [], isLoading: myLoading } = useMySubjects(profile?.id, profile?.student_stage);
     const { data: discoverSubjects = [], isLoading: discoverLoading } = useDiscoverSubjects(profile?.id);
 
     const loading = activeTab === 'my' ? myLoading : discoverLoading;
@@ -63,13 +64,27 @@ export default function MySubjects() {
     return (
         <div className="space-y-6 pb-8">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                    {t('موادي الدراسية', 'My Subjects')}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                    {t('تصفح المواد المتاحة وتابع تقدمك', 'Browse your subjects and track progress')}
-                </p>
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">
+                        {t('موادي الدراسية', 'My Subjects')}
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        {t('تصفح المواد المتاحة وتابع تقدمك', 'Browse your subjects and track progress')}
+                    </p>
+                </div>
+                {profile?.student_stage && (
+                    <div className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-medium px-3 py-1.5 rounded-full">
+                        <GraduationCap className="w-3.5 h-3.5" />
+                        <span>
+                            {profile.student_stage === 'kindergarten' ? t('رياض الأطفال', 'Kindergarten')
+                                : profile.student_stage === 'primary' ? t('ابتدائي', 'Primary')
+                                : profile.student_stage === 'middle' ? t('متوسط', 'Middle')
+                                : profile.student_stage === 'high' ? t('ثانوي', 'High School')
+                                : profile.student_stage}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Tab Switcher */}
@@ -206,19 +221,42 @@ export default function MySubjects() {
                     {/* Empty State */}
                     {(mySubjects as any[]).length === 0 && (
                         <div className="bg-background rounded-xl border border-border p-12 text-center">
-                            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                            <h3 className="font-medium text-foreground mb-2">
-                                {t('لا توجد مواد متاحة', 'No subjects available')}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                {t('تأكد من إكمال ملفك الشخصي لعرض مواد مرحلتك', 'Complete your profile to see subjects for your stage')}
-                            </p>
-                            <button
-                                onClick={() => setActiveTab('discover')}
-                                className="text-sm text-primary font-medium hover:underline"
-                            >
-                                {t('استكشف المواد المتاحة ←', 'Discover available subjects →')}
-                            </button>
+                            {profile?.student_stage ? (
+                                <>
+                                    <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                                    <h3 className="font-medium text-foreground mb-2">
+                                        {t('لا توجد مواد متاحة لمرحلتك الآن', 'No subjects available for your stage yet')}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        {t('سيتم إضافة مواد لمرحلتك قريباً. استكشف المواد المتاحة في الوقت الحالي.', 'Subjects for your stage will be added soon. Explore available subjects in the meantime.')}
+                                    </p>
+                                    <button
+                                        onClick={() => setActiveTab('discover')}
+                                        className="text-sm text-primary font-medium hover:underline"
+                                    >
+                                        {t('استكشف المواد المتاحة ←', 'Discover available subjects →')}
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <GraduationCap className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                                    <h3 className="font-medium text-foreground mb-2">
+                                        {t('حدد مرحلتك الدراسية', 'Set your educational stage')}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        {t(
+                                            'أكمل ملفك الشخصي وحدد مرحلتك الدراسية لعرض المواد المناسبة لك.',
+                                            'Complete your profile and set your educational stage to see subjects tailored for you.'
+                                        )}
+                                    </p>
+                                    <Link
+                                        to="/student/profile"
+                                        className="inline-block text-sm bg-primary text-primary-foreground font-medium px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                                    >
+                                        {t('إكمال الملف الشخصي', 'Complete Profile')}
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     )}
                 </>

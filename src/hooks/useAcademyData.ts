@@ -217,15 +217,47 @@ export function useSubjectTeachers(subjectId?: string) {
 
 // ── My Subjects (entitled subjects with progress) ──
 
-export function useMySubjects(userId?: string) {
+export function useMySubjects(userId?: string, studentStage?: string | null) {
     return useQuery({
-        queryKey: ['my-subjects', userId],
+        queryKey: ['my-subjects', userId, studentStage],
         queryFn: async () => {
-            // Call the secure RPC that returns ONLY entitled subjects
-            const { data: entitledData, error } = await (supabase
-                .rpc as any)('get_student_subjects', { p_student_id: userId! });
+            // Try the secure RPC first — returns entitled subjects with priority ordering
+            let entitledData: any[] | null = null;
+            try {
+                const { data, error } = await (supabase
+                    .rpc as any)('get_student_subjects', { p_student_id: userId! });
+                if (!error) entitledData = data;
+            } catch {
+                // RPC unavailable — fall through to direct query
+            }
 
-            if (error) throw error;
+            // Fallback: direct query by the student's stage slug when RPC is
+            // unavailable or returns nothing but the student has a stage set.
+            if ((!entitledData || entitledData.length === 0) && studentStage) {
+                const { data: stageRow } = await supabase
+                    .from('stages')
+                    .select('id, title_ar, title_en')
+                    .eq('slug', studentStage)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
+                if (stageRow) {
+                    const { data: directSubjects } = await supabase
+                        .from('subjects')
+                        .select('*, stage:stages(title_ar, title_en)')
+                        .eq('stage_id', stageRow.id)
+                        .eq('is_active', true)
+                        .order('sort_order', { ascending: true });
+
+                    entitledData = (directSubjects || []).map((s: any) => ({
+                        ...s,
+                        entitlement_reason: 'stage',
+                        stage_title_ar: stageRow.title_ar,
+                        stage_title_en: stageRow.title_en,
+                    }));
+                }
+            }
+
             if (!entitledData || entitledData.length === 0) return [];
 
             const subjectIds = (entitledData as any[]).map((s: any) => s.id);
@@ -290,11 +322,14 @@ export function useDiscoverSubjects(userId?: string) {
     return useQuery({
         queryKey: ['discover-subjects', userId],
         queryFn: async () => {
-            const { data, error } = await (supabase
-                .rpc as any)('get_discover_subjects', { p_student_id: userId! });
-
-            if (error) throw error;
-            return (data || []) as any[];
+            try {
+                const { data, error } = await (supabase
+                    .rpc as any)('get_discover_subjects', { p_student_id: userId! });
+                if (error) return [] as any[];
+                return (data || []) as any[];
+            } catch {
+                return [] as any[];
+            }
         },
         enabled: !!userId,
         staleTime: STALE_TIMES.SEMI_STATIC,
