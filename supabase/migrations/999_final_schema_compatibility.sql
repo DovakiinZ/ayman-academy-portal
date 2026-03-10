@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS public.lesson_quiz_questions (
 );
 
 -- 6. RPC: check_subject_access (Required for Student Portal)
+DROP FUNCTION IF EXISTS public.check_subject_access(uuid, uuid);
 CREATE OR REPLACE FUNCTION public.check_subject_access(p_student_id uuid, p_subject_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
@@ -177,6 +178,7 @@ END;
 $$;
 
 -- 7. RPC: get_student_subjects (Required for Student Dashboard)
+DROP FUNCTION IF EXISTS public.get_student_subjects(uuid);
 CREATE OR REPLACE FUNCTION public.get_student_subjects(p_student_id uuid)
 RETURNS SETOF public.subjects
 LANGUAGE sql SECURITY DEFINER
