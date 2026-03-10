@@ -63,6 +63,7 @@ export type Level = Stage;
 export interface Subject {
     id: string;
     stage_id: string | null;
+    teacher_id?: string | null;
     slug?: string;
     title_ar: string;
     title_en: string | null;
@@ -81,9 +82,28 @@ export interface Subject {
     stage?: Stage;
 }
 
+export interface Course {
+    id: string;
+    teacher_id: string;
+    title_ar: string;
+    title_en: string | null;
+    description_ar: string | null;
+    description_en: string | null;
+    stage_id: string | null;
+    level_id?: string | null;
+    slug?: string | null;
+    thumbnail_url?: string | null;
+    cover_image_url?: string | null;
+    is_published: boolean;
+    is_paid?: boolean;
+    created_at: string;
+    updated_at?: string;
+}
+
 export interface Lesson {
     id: string;
     subject_id: string;
+    course_id?: string | null;
     slug?: string;
     title_ar: string;
     title_en: string | null;
@@ -575,6 +595,11 @@ export type Database = {
                 Row: Subject;
                 Insert: Partial<Subject>;
                 Update: Partial<Subject>;
+            };
+            courses: {
+                Row: Course;
+                Insert: Partial<Course>;
+                Update: Partial<Course>;
             };
             lessons: {
                 Row: Lesson;
