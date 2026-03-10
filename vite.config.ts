@@ -14,14 +14,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // qrcode package requires Node built-ins; provide browser-safe stubs
-  define: {
-    global: "window",
-    "process.env": "{}",
-    "process.version": '"v18.0.0"',
-    "process.platform": '"browser"',
-  },
-  optimizeDeps: {
-    include: ["qrcode"],
-  },
 });
