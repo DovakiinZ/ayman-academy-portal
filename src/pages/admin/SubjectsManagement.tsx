@@ -74,18 +74,6 @@ export default function SubjectsManagement() {
     const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    // Auto-translate AR → EN
-    const { isTranslating: titleAutoTranslating } = useAutoTranslate(
-        form.title_ar, 'ar', 'en',
-        (text) => setForm(f => ({ ...f, title_en: text })),
-        dialogOpen
-    );
-    const { isTranslating: descAutoTranslating } = useAutoTranslate(
-        form.description_ar, 'ar', 'en',
-        (text) => setForm(f => ({ ...f, description_en: text })),
-        dialogOpen
-    );
-
     // Form state
     const [form, setForm] = useState({
         stage_id: '',
@@ -102,6 +90,18 @@ export default function SubjectsManagement() {
         teaser_en: '',
         access_type: 'stage' as string,
     });
+
+    // Auto-translate AR → EN
+    const { isTranslating: titleAutoTranslating } = useAutoTranslate(
+        form.title_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, title_en: text })),
+        dialogOpen
+    );
+    const { isTranslating: descAutoTranslating } = useAutoTranslate(
+        form.description_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, description_en: text })),
+        dialogOpen
+    );
 
     // ─── Fetch Data via useQuery ─────────────────────────────────────────────
 
@@ -218,18 +218,18 @@ export default function SubjectsManagement() {
         setDialogOpen(true);
     };
 
-    const handleEdit = (subject: Subject) => {
+    const handleEdit = (subject: any) => {
         setEditingSubject(subject);
         setForm({
             stage_id: subject.stage_id || '',
-            title_ar: subject.title_ar,
+            title_ar: subject.title_ar || '',
             title_en: subject.title_en || '',
             description_ar: subject.description_ar || '',
             description_en: subject.description_en || '',
             slug: subject.slug || '',
-            sort_order: subject.sort_order,
-            is_active: subject.is_active,
-            show_on_home: subject.show_on_home || false,
+            sort_order: subject.sort_order || 0,
+            is_active: !!subject.is_active,
+            show_on_home: !!subject.show_on_home,
             home_order: subject.home_order || 0,
             teaser_ar: subject.teaser_ar || '',
             teaser_en: subject.teaser_en || '',

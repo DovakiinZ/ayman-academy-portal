@@ -88,19 +88,41 @@ function useTeacherSubjects(userId: string | undefined) {
     return useQuery({
         queryKey: ['teacher', userId, 'subjects'],
         queryFn: async () => {
-            // Get lessons created by this teacher, grouped by subject
-            const { data: lessons, error } = await supabase
+            // 1. Fetch subjects explicitly assigned to this teacher
+            const { data: assignedSubjects, error: subjectsErr } = await supabase
+                .from('subjects')
+                .select('id, title_ar, title_en, stage:stages(title_ar, title_en)')
+                .eq('teacher_id', userId!);
+
+            if (subjectsErr) throw subjectsErr;
+
+            // 2. Fetch all lessons by this teacher to catch legacy subjects or contributions
+            const { data: lessons, error: lessonsErr } = await supabase
                 .from('lessons')
                 .select('id, subject_id, is_published, subject:subjects(id, title_ar, title_en, stage:stages(title_ar, title_en))')
                 .eq('created_by', userId!);
 
-            if (error) throw error;
+            if (lessonsErr) throw lessonsErr;
 
-            // Group by subject
             const subjectMap = new Map<string, TeacherSubject>();
+
+            // Initialize map with assigned subjects
+            for (const subj of (assignedSubjects || [])) {
+                subjectMap.set(subj.id, {
+                    id: subj.id,
+                    title_ar: subj.title_ar,
+                    title_en: (subj as any).title_en,
+                    stage: (subj as any).stage,
+                    lessons_count: 0,
+                    published_count: 0,
+                });
+            }
+
+            // Update counts and add subjects from lessons
             for (const lesson of (lessons || [])) {
                 const subj = (lesson as any).subject;
                 if (!subj) continue;
+                
                 const existing = subjectMap.get(subj.id);
                 if (existing) {
                     existing.lessons_count++;
@@ -138,7 +160,7 @@ function useSubjectDetail(subjectId: string | undefined, teacherId: string | und
 
             if (lessonsErr) throw lessonsErr;
 
-            const lessonIds = (lessons || []).map(l => l.id);
+            const lessonIds = ((lessons as any) || []).map((l: any) => l.id);
 
             // Fetch quizzes for these lessons
             let quizzes: SubjectQuiz[] = [];
@@ -148,9 +170,9 @@ function useSubjectDetail(subjectId: string | undefined, teacherId: string | und
                     .select('id, lesson_id, is_enabled, passing_score')
                     .in('lesson_id', lessonIds);
 
-                const lessonMap = new Map((lessons || []).map(l => [l.id, l]));
+                const lessonMap = new Map(((lessons as any) || []).map((l: any) => [l.id, l]));
                 quizzes = (quizData || []).map((q: any) => {
-                    const lesson = lessonMap.get(q.lesson_id);
+                    const lesson = lessonMap.get(q.lesson_id) as any;
                     return {
                         id: q.id,
                         lesson_title_ar: lesson?.title_ar || '',
@@ -169,7 +191,7 @@ function useSubjectDetail(subjectId: string | undefined, teacherId: string | und
                     .select('user_id, updated_at')
                     .in('lesson_id', lessonIds);
 
-                const uniqueUserIds = [...new Set((progressData || []).map(p => p.user_id))];
+                const uniqueUserIds = [...new Set(((progressData as any) || []).map((p: any) => p.user_id))];
 
                 if (uniqueUserIds.length > 0) {
                     const { data: profiles } = await supabase
@@ -180,14 +202,14 @@ function useSubjectDetail(subjectId: string | undefined, teacherId: string | und
 
                     // Get latest activity per student
                     const activityMap = new Map<string, string>();
-                    for (const p of (progressData || [])) {
+                    for (const p of ((progressData as any) || [])) {
                         const current = activityMap.get(p.user_id);
-                        if (!current || p.updated_at > current) {
+                        if (!current || (p.updated_at && p.updated_at > current)) {
                             activityMap.set(p.user_id, p.updated_at);
                         }
                     }
 
-                    students = (profiles || []).map(p => ({
+                    students = ((profiles as any) || []).map((p: any) => ({
                         id: p.id,
                         full_name: p.full_name,
                         email: p.email,
@@ -310,7 +332,7 @@ export default function TeacherSubjects() {
                     `مرحباً ${inviteForm.name}، أنت مدعو للانضمام إلى مادة "${selectedSubject.title_ar}".`,
                     `Hello ${inviteForm.name}, you are invited to join the subject "${selectedSubject.title_en || selectedSubject.title_ar}".`
                 ),
-            });
+            } as any);
 
             toast.success(t('تم إرسال الدعوة بنجاح', 'Invitation sent successfully'));
             setInviteOpen(false);
@@ -334,7 +356,7 @@ export default function TeacherSubjects() {
                 content: announcementText.trim(),
             }));
 
-            const { error } = await supabase.from('messages').insert(messages);
+            const { error } = await supabase.from('messages').insert(messages as any);
             if (error) throw error;
 
             toast.success(t(
@@ -359,15 +381,24 @@ export default function TeacherSubjects() {
 
         setCreatingSubject(true);
         try {
+            const slugText = subjectForm.title_en || subjectForm.title_ar;
+            const slug = slugText
+                .toLowerCase()
+                .replace(/[^\u0621-\u064A0-9a-zA-Z]/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+
             const { error } = await supabase.from('subjects').insert({
                 title_ar: subjectForm.title_ar.trim(),
                 title_en: subjectForm.title_en.trim() || null,
                 description_ar: subjectForm.description_ar.trim() || null,
                 description_en: subjectForm.description_en.trim() || null,
                 stage_id: subjectForm.stage_id || null,
+                teacher_id: user?.id,
+                slug: `${slug}-${Math.random().toString(36).substring(2, 7)}`,
                 is_active: true,
                 sort_order: 0,
-            });
+            } as any);
 
             if (error) throw error;
 

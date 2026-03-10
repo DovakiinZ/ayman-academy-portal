@@ -14,7 +14,15 @@ import type { Profile } from '@/types/database';
 
 export default function TeacherProfile() {
     const { t } = useLanguage();
-    const { profile, refreshProfile } = useAuth();
+    const { profile, refreshProfile, error: authError } = useAuth();
+
+    const [form, setForm] = useState({
+        full_name: '',
+        bio_ar: '',
+        bio_en: '',
+        avatar_url: '',
+        qualifications: '',
+    });
 
     const { isTranslating: bioTranslating } = useAutoTranslate(
         form.bio_ar, 'ar', 'en',
@@ -24,22 +32,16 @@ export default function TeacherProfile() {
     const [saved, setSaved] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [form, setForm] = useState({
-        full_name: '',
-        bio_ar: '',
-        bio_en: '',
-        avatar_url: '',
-        qualifications: '',
-    });
 
     useEffect(() => {
         if (profile) {
+            const p = profile as any;
             setForm({
-                full_name: (profile as any).full_name || '',
-                bio_ar: (profile as any).bio_ar || '',
-                bio_en: (profile as any).bio_en || '',
-                avatar_url: (profile as any).avatar_url || '',
-                qualifications: (profile as any).qualifications || '',
+                full_name: p.full_name || '',
+                bio_ar: p.bio_ar || '',
+                bio_en: p.bio_en || '',
+                avatar_url: p.avatar_url || '',
+                qualifications: p.qualifications || '',
             });
         }
     }, [profile]);
@@ -98,7 +100,8 @@ export default function TeacherProfile() {
         setUploadingAvatar(true);
         try {
             const ext = file.name.split('.').pop();
-            const filePath = `avatars/${profile.id}.${ext}`;
+            const fileName = `${Date.now()}.${ext}`;
+            const filePath = `${profile.id}/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
@@ -122,6 +125,21 @@ export default function TeacherProfile() {
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
+
+    if (!profile) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                {authError ? (
+                    <>
+                        <p className="text-destructive font-medium">{authError}</p>
+                        <Button onClick={() => refreshProfile()}>{t('إعادة المحاولة', 'Retry')}</Button>
+                    </>
+                ) : (
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                )}
+            </div>
+        );
+    }
 
     const p = profile as any;
 
