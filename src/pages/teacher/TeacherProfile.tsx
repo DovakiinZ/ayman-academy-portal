@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, Save, User, Camera, Award, BookOpen } from 'lucide-react';
+import { Loader2, Save, User, Camera, Award, BookOpen, Upload } from 'lucide-react';
 import type { Profile } from '@/types/database';
 
 export default function TeacherProfile() {
@@ -15,6 +15,8 @@ export default function TeacherProfile() {
     const { profile, refreshProfile } = useAuth();
     const [submitting, setSubmitting] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [form, setForm] = useState({
         full_name: '',
         bio_ar: '',
@@ -71,6 +73,49 @@ export default function TeacherProfile() {
         }
     };
 
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !profile) return;
+
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!validTypes.includes(file.type)) {
+            toast.error(t('يرجى اختيار صورة بصيغة JPG أو PNG أو WebP', 'Please select a JPG, PNG, or WebP image'));
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error(t('حجم الصورة يجب أن يكون أقل من 5 ميجابايت', 'Image must be smaller than 5MB'));
+            return;
+        }
+
+        setUploadingAvatar(true);
+        try {
+            const ext = file.name.split('.').pop();
+            const filePath = `avatars/${profile.id}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+            setForm((prev) => ({ ...prev, avatar_url: publicUrl }));
+            toast.success(t('تم رفع الصورة بنجاح. اضغط حفظ لتطبيق التغييرات.', 'Photo uploaded. Click Save to apply.'));
+        } catch (err: any) {
+            toast.error(t('فشل في رفع الصورة', 'Failed to upload photo'), {
+                description: err.message,
+            });
+        } finally {
+            setUploadingAvatar(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
     const p = profile as any;
 
     return (
@@ -87,25 +132,55 @@ export default function TeacherProfile() {
             <form onSubmit={handleSubmit} className="bg-background rounded-xl border border-border p-6 space-y-6">
                 {/* Avatar preview */}
                 <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden ring-2 ring-border flex-shrink-0">
-                        {form.avatar_url ? (
-                            <img src={form.avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                        ) : (
-                            <User className="w-9 h-9 text-primary" />
-                        )}
+                    <div className="relative flex-shrink-0">
+                        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden ring-2 ring-border">
+                            {form.avatar_url ? (
+                                <img src={form.avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                            ) : (
+                                <User className="w-9 h-9 text-primary" />
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadingAvatar}
+                            className="absolute bottom-0 end-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-50"
+                            title={t('رفع صورة', 'Upload photo')}
+                        >
+                            {uploadingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            onChange={handleAvatarUpload}
+                        />
                     </div>
                     <div className="flex-1 space-y-1">
-                        <Label htmlFor="avatar_url" className="flex items-center gap-2">
+                        <Label className="flex items-center gap-2">
                             <Camera className="w-4 h-4" />
-                            {t('رابط الصورة الشخصية', 'Avatar URL')}
+                            {t('الصورة الشخصية', 'Profile Photo')}
                         </Label>
-                        <Input
-                            id="avatar_url"
-                            type="url"
-                            placeholder="https://example.com/photo.jpg"
-                            value={form.avatar_url}
-                            onChange={(e) => setForm({ ...form, avatar_url: e.target.value })}
-                        />
+                        <div className="flex gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploadingAvatar}
+                            >
+                                {uploadingAvatar ? (
+                                    <Loader2 className="w-4 h-4 animate-spin me-2" />
+                                ) : (
+                                    <Upload className="w-4 h-4 me-2" />
+                                )}
+                                {t('رفع من الجهاز', 'Upload from device')}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {t('JPG، PNG، WebP — حتى 5 ميجابايت', 'JPG, PNG, WebP — up to 5MB')}
+                        </p>
                     </div>
                 </div>
 

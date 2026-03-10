@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,6 +16,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     BookOpen,
     Users,
     ClipboardList,
@@ -28,10 +35,17 @@ import {
     UserPlus,
     Mail,
     Send,
+    Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // ─── Types ──────────────────────────────────────────────────
+
+interface StageOption {
+    id: string;
+    title_ar: string;
+    title_en: string | null;
+}
 
 interface TeacherSubject {
     id: string;
@@ -192,11 +206,28 @@ function useSubjectDetail(subjectId: string | undefined, teacherId: string | und
     });
 }
 
+function useStages() {
+    return useQuery({
+        queryKey: ['stages'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('stages')
+                .select('id, title_ar, title_en')
+                .eq('is_active', true)
+                .order('sort_order', { ascending: true });
+            if (error) throw error;
+            return (data || []) as StageOption[];
+        },
+        staleTime: 10 * 60 * 1000,
+    });
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 export default function TeacherSubjects() {
     const { t, direction } = useLanguage();
     const { user } = useAuth();
+    const queryClient = useQueryClient();
     const [selectedSubject, setSelectedSubject] = useState<TeacherSubject | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [inviteOpen, setInviteOpen] = useState(false);
@@ -206,11 +237,23 @@ export default function TeacherSubjects() {
     const [announcementText, setAnnouncementText] = useState('');
     const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
 
+    // Create subject dialog
+    const [createSubjectOpen, setCreateSubjectOpen] = useState(false);
+    const [creatingSubject, setCreatingSubject] = useState(false);
+    const [subjectForm, setSubjectForm] = useState({
+        title_ar: '',
+        title_en: '',
+        description_ar: '',
+        description_en: '',
+        stage_id: '',
+    });
+
     const { data: subjects = [], isLoading } = useTeacherSubjects(user?.id);
     const { data: detail, isLoading: detailLoading } = useSubjectDetail(
         selectedSubject?.id,
         user?.id
     );
+    const { data: stages = [] } = useStages();
 
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
@@ -290,6 +333,40 @@ export default function TeacherSubjects() {
             toast.error(t('فشل في إرسال الإعلان', 'Failed to send announcement'));
         } finally {
             setSendingAnnouncement(false);
+        }
+    };
+
+    const handleCreateSubject = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!subjectForm.title_ar.trim()) {
+            toast.error(t('العنوان بالعربية مطلوب', 'Arabic title is required'));
+            return;
+        }
+
+        setCreatingSubject(true);
+        try {
+            const { error } = await supabase.from('subjects').insert({
+                title_ar: subjectForm.title_ar.trim(),
+                title_en: subjectForm.title_en.trim() || null,
+                description_ar: subjectForm.description_ar.trim() || null,
+                description_en: subjectForm.description_en.trim() || null,
+                stage_id: subjectForm.stage_id || null,
+                is_active: true,
+                sort_order: 0,
+            });
+
+            if (error) throw error;
+
+            toast.success(t('تم إنشاء المادة بنجاح', 'Subject created successfully'));
+            queryClient.invalidateQueries({ queryKey: ['teacher', user?.id, 'subjects'] });
+            setCreateSubjectOpen(false);
+            setSubjectForm({ title_ar: '', title_en: '', description_ar: '', description_en: '', stage_id: '' });
+        } catch (err: any) {
+            toast.error(t('فشل في إنشاء المادة', 'Failed to create subject'), {
+                description: err.message,
+            });
+        } finally {
+            setCreatingSubject(false);
         }
     };
 
@@ -582,6 +659,10 @@ export default function TeacherSubjects() {
                         )}
                     </p>
                 </div>
+                <Button onClick={() => setCreateSubjectOpen(true)}>
+                    <Plus className="w-4 h-4 me-2" />
+                    {t('مادة جديدة', 'New Subject')}
+                </Button>
             </div>
 
             {/* Search */}
@@ -655,6 +736,89 @@ export default function TeacherSubjects() {
                     ))}
                 </div>
             )}
+
+            {/* Create Subject Dialog */}
+            <Dialog open={createSubjectOpen} onOpenChange={setCreateSubjectOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{t('إنشاء مادة جديدة', 'Create New Subject')}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateSubject} className="space-y-4 mt-2">
+                        <div className="space-y-2">
+                            <Label>{t('العنوان بالعربية', 'Arabic Title')} <span className="text-destructive">*</span></Label>
+                            <Input
+                                dir="rtl"
+                                value={subjectForm.title_ar}
+                                onChange={(e) => setSubjectForm({ ...subjectForm, title_ar: e.target.value })}
+                                placeholder={t('مثال: الرياضيات', 'e.g. Mathematics')}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{t('العنوان بالإنجليزية', 'English Title')}</Label>
+                            <Input
+                                dir="ltr"
+                                value={subjectForm.title_en}
+                                onChange={(e) => setSubjectForm({ ...subjectForm, title_en: e.target.value })}
+                                placeholder="e.g. Mathematics"
+                            />
+                        </div>
+                        {stages.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>{t('المرحلة الدراسية', 'Stage')}</Label>
+                                <Select
+                                    value={subjectForm.stage_id}
+                                    onValueChange={(v) => setSubjectForm({ ...subjectForm, stage_id: v })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={t('اختر المرحلة (اختياري)', 'Select stage (optional)')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {stages.map((stage) => (
+                                            <SelectItem key={stage.id} value={stage.id}>
+                                                {t(stage.title_ar, stage.title_en || stage.title_ar)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        <div className="space-y-2">
+                            <Label>{t('الوصف بالعربية', 'Arabic Description')}</Label>
+                            <Textarea
+                                dir="rtl"
+                                rows={2}
+                                value={subjectForm.description_ar}
+                                onChange={(e) => setSubjectForm({ ...subjectForm, description_ar: e.target.value })}
+                                placeholder={t('وصف مختصر للمادة...', 'Brief subject description...')}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{t('الوصف بالإنجليزية', 'English Description')}</Label>
+                            <Textarea
+                                dir="ltr"
+                                rows={2}
+                                value={subjectForm.description_en}
+                                onChange={(e) => setSubjectForm({ ...subjectForm, description_en: e.target.value })}
+                                placeholder="Brief subject description..."
+                            />
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => setCreateSubjectOpen(false)}>
+                                {t('إلغاء', 'Cancel')}
+                            </Button>
+                            <Button type="submit" className="flex-1" disabled={creatingSubject || !subjectForm.title_ar.trim()}>
+                                {creatingSubject ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                                    <>
+                                        <Plus className="w-4 h-4 me-2" />
+                                        {t('إنشاء', 'Create')}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

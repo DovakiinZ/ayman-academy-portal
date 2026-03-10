@@ -6,8 +6,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     ClipboardList,
     Search,
@@ -16,6 +30,7 @@ import {
     HelpCircle,
     ChevronRight,
     ChevronLeft,
+    Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,6 +51,38 @@ interface TeacherQuiz {
         } | null;
     } | null;
     questions_count: number;
+}
+
+interface LessonOption {
+    id: string;
+    title_ar: string;
+    title_en: string | null;
+    subject: { title_ar: string; title_en: string | null } | null;
+}
+
+function useTeacherLessonsWithoutQuiz(userId: string | undefined, quizLessonIds: string[]) {
+    return useQuery({
+        queryKey: ['teacher', userId, 'lessons-no-quiz', quizLessonIds],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('lessons')
+                .select('id, title_ar, title_en, subject:subjects(title_ar, title_en)')
+                .eq('created_by', userId!)
+                .order('title_ar', { ascending: true });
+            if (error) throw error;
+            const lessons = (data || []) as any[];
+            return lessons
+                .filter(l => !quizLessonIds.includes(l.id))
+                .map(l => ({
+                    id: l.id,
+                    title_ar: l.title_ar,
+                    title_en: l.title_en,
+                    subject: l.subject,
+                })) as LessonOption[];
+        },
+        enabled: !!userId,
+        staleTime: 2 * 60 * 1000,
+    });
 }
 
 function useTeacherQuizzes(userId: string | undefined) {
@@ -81,8 +128,17 @@ export default function TeacherQuizzes() {
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const [searchQuery, setSearchQuery] = useState('');
+    const [createOpen, setCreateOpen] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [quizForm, setQuizForm] = useState({
+        lesson_id: '',
+        passing_score: '70',
+        unlock_after_percent: '0',
+    });
 
     const { data: quizzes = [], isLoading } = useTeacherQuizzes(user?.id);
+    const quizLessonIds = quizzes.map(q => q.lesson_id);
+    const { data: lessonsWithoutQuiz = [] } = useTeacherLessonsWithoutQuiz(user?.id, quizLessonIds);
 
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
@@ -113,6 +169,43 @@ export default function TeacherQuizzes() {
         },
     });
 
+    const handleCreateQuiz = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quizForm.lesson_id) {
+            toast.error(t('يرجى اختيار درس', 'Please select a lesson'));
+            return;
+        }
+
+        const passingScore = parseInt(quizForm.passing_score);
+        if (isNaN(passingScore) || passingScore < 0 || passingScore > 100) {
+            toast.error(t('درجة النجاح يجب أن تكون بين 0 و 100', 'Passing score must be between 0 and 100'));
+            return;
+        }
+
+        setCreating(true);
+        try {
+            const { error } = await supabase.from('lesson_quizzes').insert({
+                lesson_id: quizForm.lesson_id,
+                is_enabled: true,
+                passing_score: passingScore,
+                unlock_after_percent: parseInt(quizForm.unlock_after_percent) || 0,
+            });
+
+            if (error) throw error;
+
+            toast.success(t('تم إنشاء الاختبار بنجاح. يمكنك إضافة الأسئلة من محرر الدرس.', 'Quiz created. Add questions from the lesson editor.'));
+            queryClient.invalidateQueries({ queryKey: ['teacher', user?.id, 'quizzes'] });
+            setCreateOpen(false);
+            setQuizForm({ lesson_id: '', passing_score: '70', unlock_after_percent: '0' });
+        } catch (err: any) {
+            toast.error(t('فشل في إنشاء الاختبار', 'Failed to create quiz'), {
+                description: err.message,
+            });
+        } finally {
+            setCreating(false);
+        }
+    };
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
@@ -127,6 +220,10 @@ export default function TeacherQuizzes() {
                         )}
                     </p>
                 </div>
+                <Button onClick={() => setCreateOpen(true)}>
+                    <Plus className="w-4 h-4 me-2" />
+                    {t('اختبار جديد', 'New Quiz')}
+                </Button>
             </div>
 
             {/* Search */}
@@ -222,6 +319,94 @@ export default function TeacherQuizzes() {
                     ))}
                 </div>
             )}
+
+            {/* Create Quiz Dialog */}
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t('إنشاء اختبار جديد', 'Create New Quiz')}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateQuiz} className="space-y-4 mt-2">
+                        <div className="space-y-2">
+                            <Label>{t('الدرس', 'Lesson')} <span className="text-destructive">*</span></Label>
+                            {lessonsWithoutQuiz.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-2">
+                                    {t(
+                                        'جميع دروسك لديها اختبارات بالفعل، أو لم تقم بإنشاء دروس بعد.',
+                                        'All your lessons already have quizzes, or you have no lessons yet.'
+                                    )}
+                                </p>
+                            ) : (
+                                <Select
+                                    value={quizForm.lesson_id}
+                                    onValueChange={(v) => setQuizForm({ ...quizForm, lesson_id: v })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={t('اختر درسًا', 'Select a lesson')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {lessonsWithoutQuiz.map((lesson) => (
+                                            <SelectItem key={lesson.id} value={lesson.id}>
+                                                <span>
+                                                    {t(lesson.title_ar, lesson.title_en || lesson.title_ar)}
+                                                    {lesson.subject && (
+                                                        <span className="text-muted-foreground ms-1">
+                                                            — {t(lesson.subject.title_ar, lesson.subject.title_en || lesson.subject.title_ar)}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{t('درجة النجاح (%)', 'Passing Score (%)')}</Label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={quizForm.passing_score}
+                                onChange={(e) => setQuizForm({ ...quizForm, passing_score: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>{t('افتح بعد إكمال (%) من الدرس', 'Unlock after (%) of lesson')}</Label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={quizForm.unlock_after_percent}
+                                onChange={(e) => setQuizForm({ ...quizForm, unlock_after_percent: e.target.value })}
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {t(
+                                'بعد الإنشاء، يمكنك إضافة الأسئلة من محرر الدرس.',
+                                'After creating, add questions from the lesson editor.'
+                            )}
+                        </p>
+                        <div className="flex gap-2 pt-2">
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => setCreateOpen(false)}>
+                                {t('إلغاء', 'Cancel')}
+                            </Button>
+                            <Button
+                                type="submit"
+                                className="flex-1"
+                                disabled={creating || !quizForm.lesson_id || lessonsWithoutQuiz.length === 0}
+                            >
+                                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                                    <>
+                                        <Plus className="w-4 h-4 me-2" />
+                                        {t('إنشاء', 'Create')}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
