@@ -117,15 +117,15 @@ export default function StudentLessons() {
     const totalCount = lessons.length;
     const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    // Find "Continue" lesson — first incomplete or first lesson
+    // Find \"Continue\" lesson — first incomplete or first lesson
     const continueLesson = lessons.find((l: any) => l.progress && !l.progress.completed_at && l.progress.progress_percent > 0)
         || lessons.find((l: any) => !l.progress?.completed_at)
         || lessons[0];
 
     if (loading || accessLoading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className=\"flex items-center justify-center h-64\">
+                <Loader2 className=\"w-8 h-8 animate-spin text-primary\" />
             </div>
         );
     }
@@ -133,20 +133,20 @@ export default function StudentLessons() {
     // Access denied for students
     if (isStudentRole && accessResult && !accessResult.has_access) {
         return (
-            <div className="text-center py-12">
-                <Lock className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-                <h2 className="text-lg font-semibold text-foreground mb-2">
+            <div className=\"text-center py-12\">
+                <Lock className=\"w-12 h-12 text-amber-500 mx-auto mb-4\" />
+                <h2 className=\"text-lg font-semibold text-foreground mb-2\">
                     {t('ليس لديك صلاحية الوصول لهذه المادة', 'You do not have access to this subject')}
                 </h2>
-                <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                <p className=\"text-sm text-muted-foreground mb-4 max-w-sm mx-auto\">
                     {accessResult.access_type === 'subscription'
                         ? t('هذه المادة تتطلب اشتراك فعال', 'This subject requires an active subscription')
                         : accessResult.access_type === 'invite_only'
                             ? t('هذه المادة بدعوة فقط — تواصل مع المعلم', 'This subject is invite-only — contact your teacher')
                             : t('هذه المادة غير متاحة لك حالياً', 'This subject is not available to you right now')}
                 </p>
-                <Button variant="outline" onClick={() => navigate('/student/subjects')}>
-                    <BackIcon className="w-4 h-4 me-2" />
+                <Button variant=\"outline\" onClick={() => navigate('/student/subjects')}>
+                    <BackIcon className=\"w-4 h-4 me-2\" />
                     {t('العودة للمواد', 'Back to subjects')}
                 </Button>
             </div>
@@ -155,13 +155,13 @@ export default function StudentLessons() {
 
     if (!subject) {
         return (
-            <div className="text-center py-12">
-                <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-                <h2 className="text-lg font-semibold text-foreground mb-2">
+            <div className=\"text-center py-12\">
+                <AlertCircle className=\"w-12 h-12 text-destructive mx-auto mb-4\" />
+                <h2 className=\"text-lg font-semibold text-foreground mb-2\">
                     {t('المادة غير موجودة', 'Subject not found')}
                 </h2>
-                <Button variant="outline" onClick={() => navigate(-1)}>
-                    <BackIcon className="w-4 h-4 me-2" />
+                <Button variant=\"outline\" onClick={() => navigate(-1)}>
+                    <BackIcon className=\"w-4 h-4 me-2\" />
                     {t('العودة', 'Go back')}
                 </Button>
             </div>
@@ -169,48 +169,48 @@ export default function StudentLessons() {
     }
 
     return (
-        <div className="space-y-6 pb-8">
+        <div className=\"space-y-6 pb-8\">
             {/* Header */}
-            <div className="flex items-start gap-4">
+            <div className=\"flex items-start gap-4\">
                 <Button
-                    variant="ghost"
-                    size="sm"
+                    variant=\"ghost\"
+                    size=\"sm\"
                     onClick={() => navigate('/student/subjects')}
-                    className="shrink-0"
+                    className=\"shrink-0\"
                 >
-                    <BackIcon className="w-4 h-4 me-1" />
+                    <BackIcon className=\"w-4 h-4 me-1\" />
                     {t('عودة', 'Back')}
                 </Button>
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                <div className=\"flex-1\">
+                    <div className=\"flex items-center gap-2 text-sm text-muted-foreground mb-1\">
                         <span>{t(subject.stage?.title_ar || '', subject.stage?.title_en || '')}</span>
                     </div>
-                    <h1 className="text-2xl font-bold text-foreground">
+                    <h1 className=\"text-2xl font-bold text-foreground\">
                         {t(subject.title_ar, subject.title_en || subject.title_ar)}
                     </h1>
                 </div>
             </div>
 
             {/* Progress Card */}
-            <div className="bg-background border border-border rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
+            <div className=\"bg-background border border-border rounded-xl p-5\">
+                <div className=\"flex items-center justify-between mb-3\">
                     <div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className=\"text-sm text-muted-foreground\">
                             {completedCount}/{totalCount} {t('دروس مكتملة', 'lessons completed')}
                         </p>
                     </div>
-                    <span className="text-sm font-bold text-primary">{progressPercent}%</span>
+                    <span className=\"text-sm font-bold text-primary\">{progressPercent}%</span>
                 </div>
-                <div className="w-full h-2.5 bg-secondary rounded-full overflow-hidden mb-4">
+                <div className=\"w-full h-2.5 bg-secondary rounded-full overflow-hidden mb-4\">
                     <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressPercent === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${progressPercent === 100 ? 'bg-green-50' : 'bg-primary'}`}
                         style={{ width: `${progressPercent}%` }}
                     />
                 </div>
                 {continueLesson && progressPercent < 100 && (
                     <Link to={`/student/lesson/${continueLesson.id}`}>
-                        <Button className="gap-2">
-                            <Play className="w-4 h-4 fill-current" />
+                        <Button className=\"gap-2\">
+                            <Play className=\"w-4 h-4 fill-current\" />
                             {continueLesson.progress?.progress_percent
                                 ? t('متابعة', 'Continue')
                                 : t('ابدأ الآن', 'Start Now')}
@@ -218,8 +218,8 @@ export default function StudentLessons() {
                     </Link>
                 )}
                 {progressPercent === 100 && (
-                    <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
-                        <CheckCircle className="w-4 h-4" />
+                    <div className=\"flex items-center gap-2 text-green-600 text-sm font-medium\">
+                        <CheckCircle className=\"w-4 h-4\" />
                         {t('أكملت جميع الدروس!', 'All lessons completed!')}
                     </div>
                 )}
@@ -231,8 +231,8 @@ export default function StudentLessons() {
             </div>
 
             {/* Lessons List */}
-            <div className="space-y-2">
-                <h2 className="text-lg font-semibold text-foreground mb-3">
+            <div className=\"space-y-2\">
+                <h2 className=\"text-lg font-semibold text-foreground mb-3\">
                     {t('الدروس', 'Lessons')}
                 </h2>
                 {lessons.map((lesson: any, index: number) => {
@@ -250,54 +250,54 @@ export default function StudentLessons() {
                                 }`}
                         >
                             {/* Status Icon */}
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
+                            <div className=\"w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0\">
                                 {isCompleted ? (
-                                    <CheckCircle className="w-6 h-6 text-green-500" />
+                                    <CheckCircle className=\"w-6 h-6 text-green-500\" />
                                 ) : isCurrent ? (
-                                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                                        <Play className="w-4 h-4 text-primary-foreground fill-current ms-0.5" />
+                                    <div className=\"w-10 h-10 rounded-full bg-primary flex items-center justify-center\">
+                                        <Play className=\"w-4 h-4 text-primary-foreground fill-current ms-0.5\" />
                                     </div>
                                 ) : hasProgress ? (
-                                    <div className="w-10 h-10 rounded-full border-2 border-primary/50 flex items-center justify-center">
-                                        <span className="text-xs font-bold text-primary">{lesson.progress?.progress_percent}%</span>
+                                    <div className=\"w-10 h-10 rounded-full border-2 border-primary/50 flex items-center justify-center\">
+                                        <span className=\"text-xs font-bold text-primary\">{lesson.progress?.progress_percent}%</span>
                                     </div>
                                 ) : (
-                                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                                        <span className="text-sm font-medium text-muted-foreground">{index + 1}</span>
+                                    <div className=\"w-10 h-10 rounded-full bg-secondary flex items-center justify-center\">
+                                        <span className=\"text-sm font-medium text-muted-foreground\">{index + 1}</span>
                                     </div>
                                 )}
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
+                            <div className=\"flex-1 min-w-0\">
+                                <div className=\"flex items-center gap-2\">
                                     <h3 className={`font-medium transition-colors truncate ${isCurrent ? 'text-primary' : 'text-foreground group-hover:text-primary'
                                         }`}>
                                         {t(lesson.title_ar, lesson.title_en || lesson.title_ar)}
                                     </h3>
                                     {lesson.is_free_preview && (
-                                        <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                        <Badge variant=\"secondary\" className=\"shrink-0 text-[10px]\">
                                             {t('مجاني', 'Free')}
                                         </Badge>
                                     )}
                                     {lesson.is_paid && !lesson.is_free_preview && (
-                                        <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                        <Lock className=\"w-3.5 h-3.5 text-muted-foreground shrink-0\" />
                                     )}
                                 </div>
                                 {lesson.summary_ar && (
-                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                                    <p className=\"text-xs text-muted-foreground mt-1 line-clamp-1\">
                                         {t(lesson.summary_ar, lesson.summary_en || lesson.summary_ar)}
                                     </p>
                                 )}
-                                <div className="flex items-center gap-3 mt-1">
+                                <div className=\"flex items-center gap-3 mt-1\">
                                     {lesson.duration_seconds && (
-                                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                            <Clock className="w-3 h-3" />
+                                        <span className=\"flex items-center gap-1 text-[11px] text-muted-foreground\">
+                                            <Clock className=\"w-3 h-3\" />
                                             {formatDuration(lesson.duration_seconds)}
                                         </span>
                                     )}
                                     {isCurrent && (
-                                        <span className="text-[11px] text-primary font-medium">
+                                        <span className=\"text-[11px] text-primary font-medium\">
                                             {t('التالي ▸', 'Next ▸')}
                                         </span>
                                     )}
@@ -305,13 +305,13 @@ export default function StudentLessons() {
                             </div>
 
                             {/* Right icon */}
-                            <div className="shrink-0">
+                            <div className=\"shrink-0\">
                                 {isCompleted ? (
-                                    <span className="text-xs text-green-600 font-medium">{t('مكتمل', 'Done')}</span>
+                                    <span className=\"text-xs text-green-600 font-medium\">{t('مكتمل', 'Done')}</span>
                                 ) : lesson.full_video_url || lesson.preview_video_url || lesson.video_url ? (
-                                    <Play className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                    <Play className=\"w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors\" />
                                 ) : (
-                                    <FileText className="w-5 h-5 text-muted-foreground" />
+                                    <FileText className=\"w-5 h-5 text-muted-foreground\" />
                                 )}
                             </div>
                         </Link>
@@ -321,12 +321,12 @@ export default function StudentLessons() {
 
             {/* Empty State */}
             {lessons.length === 0 && !loading && (
-                <div className="bg-background rounded-xl border border-border p-8 text-center">
-                    <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                    <h3 className="font-medium text-foreground mb-2">
+                <div className=\"bg-background rounded-xl border border-border p-8 text-center\">
+                    <BookOpen className=\"w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50\" />
+                    <h3 className=\"font-medium text-foreground mb-2\">
                         {t('لا توجد دروس متاحة', 'No lessons available')}
                     </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className=\"text-sm text-muted-foreground\">
                         {t('سيتم إضافة الدروس قريباً', 'Lessons will be added soon')}
                     </p>
                 </div>
@@ -370,8 +370,8 @@ function CertificateClaimSection({
                 ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800'
                 : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'
             }`}>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
+            <div className=\"flex items-center justify-between gap-4 flex-wrap\">
+                <div className=\"flex items-center gap-3\">
                     <Award className={`w-6 h-6 flex-shrink-0 ${certStatus.alreadyIssued ? 'text-green-600' : 'text-amber-600'
                         }`} />
                     <div>
@@ -381,7 +381,7 @@ function CertificateClaimSection({
                                 ? t('حصلت على شهادة إتمام هذه المادة ✓', 'You have a completion certificate for this subject ✓')
                                 : t('مؤهل للحصول على شهادة إتمام!', 'You are eligible for a completion certificate!')}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className=\"text-xs text-muted-foreground\">
                             {certStatus.alreadyIssued
                                 ? t('يمكنك تحميلها من صفحة شهاداتي', 'Download it from My Certificates page')
                                 : t('أكملت جميع الدروس — احصل على شهادتك الآن', 'You completed all lessons — claim your certificate now')}
@@ -389,23 +389,23 @@ function CertificateClaimSection({
                     </div>
                 </div>
                 {certStatus.alreadyIssued ? (
-                    <Link to="/student/certificates">
-                        <Button size="sm" variant="outline" className="gap-1.5">
-                            <Award className="w-4 h-4" />
+                    <Link to=\"/student/certificates\">
+                        <Button size=\"sm\" variant=\"outline\" className=\"gap-1.5\">
+                            <Award className=\"w-4 h-4\" />
                             {t('عرض شهاداتي', 'My Certificates')}
                         </Button>
                     </Link>
                 ) : (
                     <Button
-                        size="sm"
-                        className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                        size=\"sm\"
+                        className=\"gap-1.5 bg-amber-600 hover:bg-amber-700 text-white\"
                         onClick={() => claimMutation.mutate()}
                         disabled={claimMutation.isPending}
                     >
                         {claimMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className=\"w-4 h-4 animate-spin\" />
                         ) : (
-                            <Award className="w-4 h-4" />
+                            <Award className=\"w-4 h-4\" />
                         )}
                         {t('احصل على شهادتك', 'Claim Certificate')}
                     </Button>
@@ -424,17 +424,17 @@ function AnnouncementsPanel({
     if (announcements.length === 0) return null;
 
     return (
-        <div className="bg-background rounded-xl border border-border p-5">
-            <h2 className="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-primary" />
+        <div className=\"bg-background rounded-xl border border-border p-5\">
+            <h2 className=\"text-base font-semibold text-foreground mb-3 flex items-center gap-2\">
+                <Megaphone className=\"w-4 h-4 text-primary\" />
                 {t('إعلانات المادة', 'Subject Announcements')}
             </h2>
-            <div className="space-y-3">
+            <div className=\"space-y-3\">
                 {announcements.map((ann: any) => (
-                    <div key={ann.id} className="border-s-2 border-primary/40 ps-3">
-                        <p className="text-sm font-medium text-foreground">{ann.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ann.body}</p>
-                        <p className="text-[11px] text-muted-foreground/60 mt-1">
+                    <div key={ann.id} className=\"border-s-2 border-primary/40 ps-3\">
+                        <p className=\"text-sm font-medium text-foreground\">{ann.title}</p>
+                        <p className=\"text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap\">{ann.body}</p>
+                        <p className=\"text-[11px] text-muted-foreground/60 mt-1\">
                             {ann.profiles?.full_name && `${ann.profiles.full_name} · `}
                             {new Date(ann.created_at).toLocaleDateString()}
                         </p>
