@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 import type { Quiz, QuizQuestion, QuestionType, Course, Lesson } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -148,6 +150,11 @@ export default function QuizBuilder() {
         time_limit_minutes: null as number | null,
         randomize_questions: false,
     });
+
+    const { isTranslating: titleTranslating } = useAutoTranslate(
+        form.title_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, title_en: text }))
+    );
 
     // Questions state
     const [questions, setQuestions] = useState<QuestionForm[]>([]);
@@ -586,12 +593,16 @@ export default function QuizBuilder() {
                         </div>
 
                         <div>
-                            <Label htmlFor="title_en">{t('عنوان الاختبار (إنجليزي)', 'Quiz Title (English)')}</Label>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <Label htmlFor="title_en">{t('عنوان الاختبار (إنجليزي)', 'Quiz Title (English)')}</Label>
+                                <TranslationButton sourceText={form.title_ar} sourceLang="ar" targetLang="en"
+                                    onTranslated={(text) => setForm(f => ({ ...f, title_en: text }))}
+                                    autoTranslating={titleTranslating} />
+                            </div>
                             <Input
                                 id="title_en"
                                 value={form.title_en}
                                 onChange={(e) => setForm({ ...form, title_en: e.target.value })}
-                                className="mt-1.5"
                             />
                         </div>
 

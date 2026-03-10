@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -254,6 +256,18 @@ export default function TeacherSubjects() {
         user?.id
     );
     const { data: stages = [] } = useStages();
+
+    // Auto-translate: AR → EN when dialog is open
+    const { isTranslating: titleTranslating } = useAutoTranslate(
+        subjectForm.title_ar, 'ar', 'en',
+        (text) => setSubjectForm(f => ({ ...f, title_en: text })),
+        createSubjectOpen
+    );
+    const { isTranslating: descTranslating } = useAutoTranslate(
+        subjectForm.description_ar, 'ar', 'en',
+        (text) => setSubjectForm(f => ({ ...f, description_en: text })),
+        createSubjectOpen
+    );
 
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
 
@@ -755,7 +769,15 @@ export default function TeacherSubjects() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>{t('العنوان بالإنجليزية', 'English Title')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label>{t('العنوان بالإنجليزية', 'English Title')}</Label>
+                                <TranslationButton
+                                    sourceText={subjectForm.title_ar}
+                                    sourceLang="ar" targetLang="en"
+                                    onTranslated={(text) => setSubjectForm(f => ({ ...f, title_en: text }))}
+                                    autoTranslating={titleTranslating}
+                                />
+                            </div>
                             <Input
                                 dir="ltr"
                                 value={subjectForm.title_en}
@@ -794,7 +816,15 @@ export default function TeacherSubjects() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>{t('الوصف بالإنجليزية', 'English Description')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label>{t('الوصف بالإنجليزية', 'English Description')}</Label>
+                                <TranslationButton
+                                    sourceText={subjectForm.description_ar}
+                                    sourceLang="ar" targetLang="en"
+                                    onTranslated={(text) => setSubjectForm(f => ({ ...f, description_en: text }))}
+                                    autoTranslating={descTranslating}
+                                />
+                            </div>
                             <Textarea
                                 dir="ltr"
                                 rows={2}

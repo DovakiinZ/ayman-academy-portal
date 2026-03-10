@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 import type { Course } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +38,15 @@ export default function CourseEditor() {
         stage_id: '',
         is_published: false,
     });
+
+    const { isTranslating: titleTranslating } = useAutoTranslate(
+        form.title_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, title_en: text }))
+    );
+    const { isTranslating: descTranslating } = useAutoTranslate(
+        form.description_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, description_en: text }))
+    );
 
     useEffect(() => {
         if (isEditing && courseId) {
@@ -138,7 +149,12 @@ export default function CourseEditor() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="title_en">{t('عنوان الدورة (إنجليزي)', 'Course Title (English)')}</Label>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="title_en">{t('عنوان الدورة (إنجليزي)', 'Course Title (English)')}</Label>
+                            <TranslationButton sourceText={form.title_ar} sourceLang="ar" targetLang="en"
+                                onTranslated={(text) => setForm(f => ({ ...f, title_en: text }))}
+                                autoTranslating={titleTranslating} />
+                        </div>
                         <Input
                             id="title_en"
                             value={form.title_en}
@@ -153,6 +169,23 @@ export default function CourseEditor() {
                             value={form.description_ar}
                             onChange={(e) => setForm({ ...form, description_ar: e.target.value })}
                             rows={3}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="description_en">{t('الوصف (إنجليزي)', 'Description (English)')}</Label>
+                            <TranslationButton sourceText={form.description_ar} sourceLang="ar" targetLang="en"
+                                onTranslated={(text) => setForm(f => ({ ...f, description_en: text }))}
+                                autoTranslating={descTranslating} />
+                        </div>
+                        <Textarea
+                            id="description_en"
+                            dir="ltr"
+                            value={form.description_en}
+                            onChange={(e) => setForm({ ...form, description_en: e.target.value })}
+                            rows={3}
+                            placeholder="Brief course description..."
                         />
                     </div>
 

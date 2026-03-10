@@ -4,6 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
 import type { Subject, Lesson } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -105,6 +106,17 @@ export default function LessonsManagement() {
         teaser_ar: '',
         teaser_en: '',
     });
+
+    const { isTranslating: titleAutoTranslating } = useAutoTranslate(
+        form.title_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, title_en: text })),
+        dialogOpen
+    );
+    const { isTranslating: summaryAutoTranslating } = useAutoTranslate(
+        form.summary_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, summary_en: text })),
+        dialogOpen
+    );
 
     const fetchData = async () => {
         if (!mountedRef.current) return;
@@ -538,7 +550,7 @@ export default function LessonsManagement() {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="title_en">{t('العنوان بالإنجليزية', 'English Title')}</Label>
-                                    <TranslationButton sourceText={form.title_ar} sourceLang="ar" targetLang="en" onTranslated={(text) => setForm({ ...form, title_en: text })} label="Auto EN" />
+                                    <TranslationButton sourceText={form.title_ar} sourceLang="ar" targetLang="en" onTranslated={(text) => setForm({ ...form, title_en: text })} label="Auto EN" autoTranslating={titleAutoTranslating} />
                                 </div>
                                 <Input id="title_en" value={form.title_en} onChange={(e) => setForm({ ...form, title_en: e.target.value })} />
                             </div>
@@ -561,7 +573,7 @@ export default function LessonsManagement() {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="summary_en">{t('ملخص بالإنجليزية', 'English Summary')}</Label>
-                                <TranslationButton sourceText={form.summary_ar} sourceLang="ar" targetLang="en" onTranslated={(text) => setForm({ ...form, summary_en: text })} label="Auto EN" />
+                                <TranslationButton sourceText={form.summary_ar} sourceLang="ar" targetLang="en" onTranslated={(text) => setForm({ ...form, summary_en: text })} label="Auto EN" autoTranslating={summaryAutoTranslating} />
                             </div>
                             <Textarea id="summary_en" value={form.summary_en} onChange={(e) => setForm({ ...form, summary_en: e.target.value })} rows={3} />
                         </div>

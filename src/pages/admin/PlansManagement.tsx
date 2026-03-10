@@ -26,6 +26,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Loader2, Plus, Pencil, Trash2, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 
 export default function PlansManagement() {
     const { t } = useLanguage();
@@ -42,6 +44,10 @@ export default function PlansManagement() {
         is_family: false, max_members: 0, is_active: true, sort_order: 0,
     };
     const [form, setForm] = useState(defaultForm);
+
+    // Auto-translate hooks
+    const { isTranslating: nameTranslating } = useAutoTranslate(form.name_ar, 'ar', 'en', (text) => setForm(f => ({ ...f, name_en: text })), dialogOpen);
+    const { isTranslating: descTranslating } = useAutoTranslate(form.description_ar, 'ar', 'en', (text) => setForm(f => ({ ...f, description_en: text })), dialogOpen);
 
     const { data: plans = [], isLoading } = useQuery({
         queryKey: ['admin-plans'],
@@ -190,7 +196,12 @@ export default function PlansManagement() {
                             <Input value={form.name_ar} onChange={e => setForm({ ...form, name_ar: e.target.value })} required />
                         </div>
                         <div className="space-y-2">
-                            <Label>{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label>{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                                <TranslationButton sourceText={form.name_ar} sourceLang="ar" targetLang="en"
+                                    onTranslated={(text) => setForm(f => ({ ...f, name_en: text }))}
+                                    autoTranslating={nameTranslating} />
+                            </div>
                             <Input value={form.name_en} onChange={e => setForm({ ...form, name_en: e.target.value })} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">

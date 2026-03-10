@@ -44,6 +44,8 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 
 export default function TeachersManagement() {
     const { t } = useLanguage();
@@ -83,6 +85,10 @@ export default function TeachersManagement() {
         show_on_home: false,
         home_order: 0,
     });
+
+    // Auto-translate hooks
+    const { isTranslating: createBioTranslating } = useAutoTranslate(createForm.bio_ar, 'ar', 'en', (text) => setCreateForm(f => ({ ...f, bio_en: text })), createDialogOpen);
+    const { isTranslating: editBioTranslating } = useAutoTranslate(editForm.bio_ar, 'ar', 'en', (text) => setEditForm(f => ({ ...f, bio_en: text })), editDialogOpen);
 
     // Password change state
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -800,7 +806,12 @@ export default function TeachersManagement() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="create_bio_en">{t('السيرة الذاتية بالإنجليزية', 'English Bio')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="create_bio_en">{t('السيرة الذاتية بالإنجليزية', 'English Bio')}</Label>
+                                <TranslationButton sourceText={createForm.bio_ar} sourceLang="ar" targetLang="en"
+                                    onTranslated={(text) => setCreateForm(f => ({ ...f, bio_en: text }))}
+                                    autoTranslating={createBioTranslating} />
+                            </div>
                             <Textarea
                                 id="create_bio_en"
                                 value={createForm.bio_en}
@@ -918,7 +929,12 @@ export default function TeachersManagement() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="edit_bio_en">{t('السيرة الذاتية بالإنجليزية', 'English Bio')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="edit_bio_en">{t('السيرة الذاتية بالإنجليزية', 'English Bio')}</Label>
+                                <TranslationButton sourceText={editForm.bio_ar} sourceLang="ar" targetLang="en"
+                                    onTranslated={(text) => setEditForm(f => ({ ...f, bio_en: text }))}
+                                    autoTranslating={editBioTranslating} />
+                            </div>
                             <Textarea
                                 id="edit_bio_en"
                                 value={editForm.bio_en}
