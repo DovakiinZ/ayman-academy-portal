@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Loader2, Plus, Pencil, Trash2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 
 export default function OrganizationsManagement() {
     const { t } = useLanguage();
@@ -34,6 +36,9 @@ export default function OrganizationsManagement() {
     const [submitting, setSubmitting] = useState(false);
 
     const [form, setForm] = useState({ name_ar: '', name_en: '', is_active: true });
+
+    // Auto-translate hooks
+    const { isTranslating: nameTranslating } = useAutoTranslate(form.name_ar, 'ar', 'en', (text) => setForm(f => ({ ...f, name_en: text })), dialogOpen);
 
     const { data: orgs = [], isLoading } = useQuery({
         queryKey: ['admin-organizations'],
@@ -170,7 +175,12 @@ export default function OrganizationsManagement() {
                             <Input value={form.name_ar} onChange={e => setForm({ ...form, name_ar: e.target.value })} required />
                         </div>
                         <div className="space-y-2">
-                            <Label>{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                            <div className="flex items-center justify-between">
+                                <Label>{t('الاسم بالإنجليزية', 'English Name')}</Label>
+                                <TranslationButton sourceText={form.name_ar} sourceLang="ar" targetLang="en"
+                                    onTranslated={(text) => setForm(f => ({ ...f, name_en: text }))}
+                                    autoTranslating={nameTranslating} />
+                            </div>
                             <Input value={form.name_en} onChange={e => setForm({ ...form, name_en: e.target.value })} />
                         </div>
                         <div className="flex items-center justify-between">

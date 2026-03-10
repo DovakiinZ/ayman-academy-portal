@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +15,11 @@ import type { Profile } from '@/types/database';
 export default function TeacherProfile() {
     const { t } = useLanguage();
     const { profile, refreshProfile } = useAuth();
+
+    const { isTranslating: bioTranslating } = useAutoTranslate(
+        form.bio_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, bio_en: text }))
+    );
     const [submitting, setSubmitting] = useState(false);
     const [saved, setSaved] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -238,9 +245,17 @@ export default function TeacherProfile() {
 
                 {/* Bio English */}
                 <div className="space-y-2">
-                    <Label htmlFor="bio_en">
-                        {t('نبذة تعريفية بالإنجليزية', 'English Bio')}
-                    </Label>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="bio_en">
+                            {t('نبذة تعريفية بالإنجليزية', 'English Bio')}
+                        </Label>
+                        <TranslationButton
+                            sourceText={form.bio_ar}
+                            sourceLang="ar" targetLang="en"
+                            onTranslated={(text) => setForm(f => ({ ...f, bio_en: text }))}
+                            autoTranslating={bioTranslating}
+                        />
+                    </div>
                     <Textarea
                         id="bio_en"
                         dir="ltr"

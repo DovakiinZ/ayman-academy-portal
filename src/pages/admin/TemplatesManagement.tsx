@@ -14,6 +14,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedUpdate, verifiedInsert, devLog } from '@/lib/adminDb';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 import { Template, TemplateType, TemplateVariable } from '@/types/database';
 import {
     renderTemplate,
@@ -105,6 +107,11 @@ export default function TemplatesManagement() {
     const [hasChanges, setHasChanges] = useState(false);
     const [activeTab, setActiveTab] = useState<'ar' | 'en'>('ar');
     const [showPreview, setShowPreview] = useState(true);
+
+    // Auto-translate hooks
+    const isEditorOpen = selectedTemplate !== null;
+    const { isTranslating: titleTranslating } = useAutoTranslate(editForm.title_ar, 'ar', 'en', (text) => setEditForm(prev => ({ ...prev, title_en: text })), isEditorOpen);
+    const { isTranslating: contentTranslating } = useAutoTranslate(editForm.content_ar, 'ar', 'en', (text) => setEditForm(prev => ({ ...prev, content_en: text })), isEditorOpen);
 
     // Textarea refs for cursor insertion
     const arTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -551,7 +558,12 @@ export default function TemplatesManagement() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-medium text-muted-foreground mb-1 block">{t('العنوان (إنجليزي)', 'Title (English)')}</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-xs font-medium text-muted-foreground">{t('العنوان (إنجليزي)', 'Title (English)')}</label>
+                                            <TranslationButton sourceText={editForm.title_ar} sourceLang="ar" targetLang="en"
+                                                onTranslated={(text) => setEditForm(prev => ({ ...prev, title_en: text }))}
+                                                autoTranslating={titleTranslating} />
+                                        </div>
                                         <Input
                                             value={editForm.title_en}
                                             onChange={(e) => setEditForm(prev => ({ ...prev, title_en: e.target.value }))}
@@ -600,6 +612,9 @@ export default function TemplatesManagement() {
                                         <TabsTrigger value="en" className="gap-1.5">
                                             <Pencil className="w-3.5 h-3.5" />
                                             {t('الإنجليزية', 'English')}
+                                            <TranslationButton sourceText={editForm.content_ar} sourceLang="ar" targetLang="en"
+                                                onTranslated={(text) => setEditForm(prev => ({ ...prev, content_en: text }))}
+                                                autoTranslating={contentTranslating} />
                                         </TabsTrigger>
                                     </TabsList>
 

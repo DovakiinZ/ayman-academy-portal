@@ -4,6 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
 import type { Stage } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
@@ -107,6 +108,17 @@ export default function TaxonomyManagement() {
         sort_order: 0,
         is_active: true,
     });
+
+    const { isTranslating: titleAutoTranslating } = useAutoTranslate(
+        form.title_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, title_en: text })),
+        dialogOpen
+    );
+    const { isTranslating: descAutoTranslating } = useAutoTranslate(
+        form.description_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, description_en: text })),
+        dialogOpen
+    );
 
     const invalidateStages = () => {
         queryClient.invalidateQueries({ queryKey: ['admin', 'stages'] });
@@ -459,6 +471,7 @@ export default function TaxonomyManagement() {
                                     sourceLang="ar"
                                     targetLang="en"
                                     onTranslated={(text) => setForm({ ...form, title_en: text })}
+                                    autoTranslating={titleAutoTranslating}
                                     label="Auto EN"
                                 />
                             </div>
@@ -486,6 +499,7 @@ export default function TaxonomyManagement() {
                                     sourceLang="ar"
                                     targetLang="en"
                                     onTranslated={(text) => setForm({ ...form, description_en: text })}
+                                    autoTranslating={descAutoTranslating}
                                     label="Auto EN"
                                 />
                             </div>

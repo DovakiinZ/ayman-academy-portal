@@ -4,6 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
 import { TranslationButton } from '@/components/admin/TranslationButton';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
 import type { Stage, Subject } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
@@ -72,6 +73,18 @@ export default function SubjectsManagement() {
     const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    // Auto-translate AR → EN
+    const { isTranslating: titleAutoTranslating } = useAutoTranslate(
+        form.title_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, title_en: text })),
+        dialogOpen
+    );
+    const { isTranslating: descAutoTranslating } = useAutoTranslate(
+        form.description_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, description_en: text })),
+        dialogOpen
+    );
 
     // Form state
     const [form, setForm] = useState({
@@ -661,6 +674,7 @@ export default function SubjectsManagement() {
                                     sourceLang="ar"
                                     targetLang="en"
                                     onTranslated={(text) => setForm({ ...form, title_en: text })}
+                                    autoTranslating={titleAutoTranslating}
                                     label="Auto EN"
                                 />
                             </div>
@@ -688,6 +702,7 @@ export default function SubjectsManagement() {
                                     sourceLang="ar"
                                     targetLang="en"
                                     onTranslated={(text) => setForm({ ...form, description_en: text })}
+                                    autoTranslating={descAutoTranslating}
                                     label="Auto EN"
                                 />
                             </div>

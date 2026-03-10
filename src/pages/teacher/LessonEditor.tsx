@@ -3,6 +3,8 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAutoTranslate } from '@/hooks/useAutoTranslate';
+import { TranslationButton } from '@/components/admin/TranslationButton';
 import type { Lesson, Course } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +49,12 @@ export default function LessonEditor() {
         duration_minutes: '',
         is_free: false,
     });
+
+    const { isTranslating: titleTranslating } = useAutoTranslate(
+        form.title_ar, 'ar', 'en',
+        (text) => setForm(f => ({ ...f, title_en: text })),
+        dialogOpen
+    );
 
     const fetchData = async () => {
         if (!courseId || !user) return;
@@ -178,6 +186,21 @@ export default function LessonEditor() {
                                     value={form.title_ar}
                                     onChange={(e) => setForm({ ...form, title_ar: e.target.value })}
                                     required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="title_en">{t('عنوان الدرس (إنجليزي)', 'Lesson Title (English)')}</Label>
+                                    <TranslationButton sourceText={form.title_ar} sourceLang="ar" targetLang="en"
+                                        onTranslated={(text) => setForm(f => ({ ...f, title_en: text }))}
+                                        autoTranslating={titleTranslating} />
+                                </div>
+                                <Input
+                                    id="title_en"
+                                    dir="ltr"
+                                    value={form.title_en}
+                                    onChange={(e) => setForm({ ...form, title_en: e.target.value })}
+                                    placeholder="e.g. Introduction to Algebra"
                                 />
                             </div>
                             <div className="space-y-2">

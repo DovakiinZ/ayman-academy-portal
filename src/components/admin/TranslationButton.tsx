@@ -1,7 +1,6 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Languages, Loader2 } from 'lucide-react';
 import { translateText } from '@/lib/translation';
 import { toast } from 'sonner';
 
@@ -11,6 +10,8 @@ interface TranslationButtonProps {
     targetLang: 'ar' | 'en';
     onTranslated: (text: string) => void;
     label?: string;
+    /** Pass true when an auto-translate is in progress (from useAutoTranslate hook) */
+    autoTranslating?: boolean;
 }
 
 export function TranslationButton({
@@ -18,30 +19,26 @@ export function TranslationButton({
     sourceLang,
     targetLang,
     onTranslated,
-    label
+    label,
+    autoTranslating = false,
 }: TranslationButtonProps) {
     const [loading, setLoading] = useState(false);
+    const busy = loading || autoTranslating;
 
     const handleTranslate = async () => {
         if (!sourceText) {
-            toast.error(
-                sourceLang === 'ar' ? 'الرجاء إدخال النص أولاً' : 'Please enter text first'
-            );
+            toast.error(sourceLang === 'ar' ? 'الرجاء إدخال النص أولاً' : 'Please enter text first');
             return;
         }
-
         setLoading(true);
         try {
             const result = await translateText(sourceText, sourceLang, targetLang);
             if (result) {
                 onTranslated(result);
-                toast.success(
-                    targetLang === 'ar' ? 'تمت الترجمة بنجاح' : 'Translated successfully'
-                );
             } else {
                 toast.error('Could not translate text');
             }
-        } catch (err) {
+        } catch {
             toast.error('Translation failed');
         } finally {
             setLoading(false);
@@ -54,16 +51,16 @@ export function TranslationButton({
             variant="ghost"
             size="sm"
             onClick={handleTranslate}
-            disabled={loading || !sourceText}
-            title="Auto Translate"
-            className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
+            disabled={busy || !sourceText}
+            title={sourceLang === 'ar' ? 'ترجمة إلى الإنجليزية' : 'Translate to Arabic'}
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-primary gap-1"
         >
-            {loading ? (
-                <Loader2 className="w-3 h-3 animate-spin me-1" />
+            {busy ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
             ) : (
-                <Sparkles className="w-3 h-3 me-1 text-yellow-500" />
+                <Languages className="w-3 h-3" />
             )}
-            {label || 'Translate'}
+            {label ?? (sourceLang === 'ar' ? 'ترجم' : 'Translate')}
         </Button>
     );
 }
