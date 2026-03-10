@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { roleBasePath } from '@/config/nav';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +11,7 @@ import { toast } from 'sonner';
 import logo from '@/assets/logo.png';
 
 export default function Login() {
-    const { signIn, resetPassword, role, isAuthenticated, redirectByRole, isLoading: authLoading } = useAuth();
+    const { signIn, resetPassword, role, isAuthenticated, isBootstrapped, isLoading: authLoading } = useAuth();
     const { t, direction } = useLanguage();
     const navigate = useNavigate();
 
@@ -26,12 +27,12 @@ export default function Login() {
     const [forgotSubmitting, setForgotSubmitting] = useState(false);
     const [forgotSuccess, setForgotSuccess] = useState(false);
 
-    // If already authenticated, redirect based on role
+    // If already authenticated and bootstrapped, redirect to the correct dashboard
     useEffect(() => {
-        if (!authLoading && isAuthenticated && role) {
-            redirectByRole(role);
+        if (!authLoading && isBootstrapped && isAuthenticated && role) {
+            navigate(roleBasePath[role] ?? '/', { replace: true });
         }
-    }, [authLoading, isAuthenticated, role, redirectByRole]);
+    }, [authLoading, isBootstrapped, isAuthenticated, role, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

@@ -322,6 +322,28 @@ export default function LessonsManagement() {
     const clearFilters = () => { setFilterStage('all'); setFilterSubject('all'); setFilterPublished('all'); setSearchQuery(''); };
     const hasActiveFilters = filterStage !== 'all' || filterSubject !== 'all' || filterPublished !== 'all' || searchQuery.trim().length > 0;
 
+    // Quick toggle is_published
+    const handleTogglePublished = async (lesson: Lesson, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newValue = !lesson.is_published;
+        try {
+            const result = await verifiedUpdate(
+                'lessons',
+                lesson.id,
+                { is_published: newValue },
+                {
+                    successMessage: newValue
+                        ? { ar: 'تم نشر الدرس', en: 'Lesson published' }
+                        : { ar: 'تم إخفاء الدرس', en: 'Lesson unpublished' },
+                    errorMessage: { ar: 'فشل التحديث', en: 'Update failed' },
+                }
+            );
+            if (result.success) fetchData();
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        }
+    };
+
     return (
         <div>
             {subjectId && subject && (
@@ -461,10 +483,18 @@ export default function LessonsManagement() {
                                             {lesson.is_paid ? t('مدفوع', 'Paid') : t('مجاني', 'Free')}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>
-                                        <Badge variant={lesson.is_published ? 'default' : 'secondary'}>
-                                            {lesson.is_published ? t('منشور', 'Published') : t('مسودة', 'Draft')}
-                                        </Badge>
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                checked={lesson.is_published}
+                                                onCheckedChange={() => { }}
+                                                onClick={(e) => handleTogglePublished(lesson, e as any)}
+                                                className="scale-75"
+                                            />
+                                            <span className={`text-xs font-medium ${lesson.is_published ? 'text-green-600' : 'text-amber-600'}`}>
+                                                {lesson.is_published ? t('منشور', 'Published') : t('مسودة', 'Draft')}
+                                            </span>
+                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-1">

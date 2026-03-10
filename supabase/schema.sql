@@ -214,20 +214,21 @@ CREATE TABLE public.lesson_resources (
 -- ============================================
 
 CREATE TABLE public.plans (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code TEXT UNIQUE NOT NULL,
-  title_ar TEXT NOT NULL,
-  title_en TEXT,
-  description_ar TEXT,
-  description_en TEXT,
-  scope plan_scope NOT NULL,
-  level_id UUID REFERENCES public.levels(id),
-  subject_id UUID REFERENCES public.subjects(id),
-  course_id UUID REFERENCES public.courses(id),
-  price_amount NUMERIC(10,2),
-  price_currency TEXT DEFAULT 'SAR',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name_ar text NOT NULL,
+  name_en text,
+  description_ar text,
+  description_en text,
+  billing text NOT NULL DEFAULT 'monthly' CHECK (billing IN ('monthly','yearly','lifetime')),
+  price_cents integer NOT NULL DEFAULT 0,
+  currency text NOT NULL DEFAULT 'SAR',
+  stage_id uuid REFERENCES public.stages(id) ON DELETE SET NULL,
+  is_family boolean NOT NULL DEFAULT false,
+  max_members integer,
+  is_active boolean NOT NULL DEFAULT true,
+  sort_order integer DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 
 CREATE TABLE public.subscriptions (
@@ -358,10 +359,21 @@ CREATE POLICY "resources_teacher" ON public.lesson_resources FOR ALL USING (
 );
 
 -- Plans
-CREATE POLICY "plans_select" ON public.plans FOR SELECT USING (true);
-CREATE POLICY "plans_admin" ON public.plans FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'super_admin')
+DROP POLICY IF EXISTS "plans_select" ON public.plans;
+DROP POLICY IF EXISTS "plans_admin" ON public.plans;
+DROP POLICY IF EXISTS "Anyone reads active plans" ON public.plans;
+DROP POLICY IF EXISTS "Admins manage plans" ON public.plans;
+
+CREATE POLICY "Anyone reads active plans" ON public.plans FOR SELECT USING (is_active = true OR public.is_super_admin());
+
+CREATE POLICY "Admins manage plans" ON public.plans FOR ALL USING (
+  public.is_super_admin()
+) WITH CHECK (
+  public.is_super_admin()
 );
+
+GRANT ALL ON public.plans TO authenticated;
+GRANT SELECT ON public.plans TO anon;
 
 -- Subscriptions
 CREATE POLICY "subs_select_own" ON public.subscriptions FOR SELECT USING (user_id = auth.uid());

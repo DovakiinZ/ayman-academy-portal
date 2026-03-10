@@ -16,7 +16,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 const onboardingSchema = z.object({
     gender: z.enum(['male', 'female', 'unspecified']),
-    stage: z.enum(['primary', 'middle', 'high'], {
+    stage: z.enum(['kindergarten', 'primary', 'middle', 'high'], {
         required_error: 'يرجى اختيار المرحلة الدراسية',
     }),
     grade: z.number().nullable().optional(),
@@ -25,6 +25,9 @@ const onboardingSchema = z.object({
 type OnboardingForm = z.infer<typeof onboardingSchema>;
 
 const GRADE_OPTIONS: Record<StudentStage, { value: number; ar: string; en: string }[]> = {
+    kindergarten: [
+        { value: 0, ar: 'التمهيدي (KG)', en: 'Kindergarten' },
+    ],
     primary: [
         { value: 1, ar: 'الصف الأول', en: '1st Grade' },
         { value: 2, ar: 'الصف الثاني', en: '2nd Grade' },
@@ -143,8 +146,9 @@ export default function StudentOnboarding() {
                             {t('المرحلة الدراسية', 'School Stage')}
                             <span className="text-destructive">*</span>
                         </Label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                             {([
+                                { value: 'kindergarten' as const, ar: 'تمهيدي', en: 'KG', icon: '🎨' },
                                 { value: 'primary' as const, ar: 'ابتدائي', en: 'Primary', icon: '🌱' },
                                 { value: 'middle' as const, ar: 'متوسط', en: 'Middle', icon: '📖' },
                                 { value: 'high' as const, ar: 'ثانوي', en: 'High', icon: '🎓' },

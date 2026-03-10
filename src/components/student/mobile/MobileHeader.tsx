@@ -38,7 +38,7 @@ export default function MobileHeader() {
     const handleSignOut = async () => {
         setDrawerOpen(false);
         await signOut();
-        navigate('/login');
+        // signOut() handles navigation to /login internally
     };
 
     return (
@@ -114,8 +114,8 @@ export default function MobileHeader() {
                                 to={item.path}
                                 onClick={() => setDrawerOpen(false)}
                                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${active
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground active:scale-[0.98]'
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground active:scale-[0.98]'
                                     }`}
                             >
                                 <item.icon className="w-[18px] h-[18px]" />

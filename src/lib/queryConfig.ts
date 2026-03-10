@@ -65,6 +65,26 @@ export const CACHE_BUSTER = '1.0.0';
 // ── Utilities ───────────────────────────────
 
 /**
+ * Role-specific localStorage keys.
+ * Each role's UI state (nav open/closed, selected tabs, etc.) is stored
+ * under a unique key so they never bleed into each other.
+ */
+export const ROLE_NAV_STORAGE_KEYS = [
+    'app_nav_state_student',
+    'app_nav_state_teacher',
+    'app_nav_state_admin',
+] as const;
+
+/**
+ * Remove all role-specific localStorage keys.
+ * Call on login (clear prev session) and logout.
+ */
+export function clearRoleLocalStorage() {
+    if (typeof window === 'undefined') return;
+    ROLE_NAV_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+}
+
+/**
  * Clear ALL cached data (in-memory + localStorage).
  * Call this on logout to prevent data leaking between users.
  */
@@ -73,4 +93,5 @@ export function clearQueryCache() {
     if (typeof window !== 'undefined') {
         window.localStorage.removeItem('ayman-academy-cache');
     }
+    clearRoleLocalStorage();
 }

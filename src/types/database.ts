@@ -7,7 +7,8 @@ export type LanguagePref = 'ar' | 'en';
 export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
 export type ContentItemType = 'video' | 'article' | 'image' | 'file' | 'link';
 export type SubjectAccessType = 'public' | 'stage' | 'subscription' | 'invite_only' | 'org_only';
-export type StudentStage = 'primary' | 'middle' | 'high';
+export type StudentStage = 'kindergarten' | 'primary' | 'middle' | 'high';
+export type StudentGender = 'male' | 'female' | 'unspecified';
 
 export interface Profile {
     id: string;
@@ -334,6 +335,7 @@ export type CertificateStatus = 'draft' | 'eligible' | 'pending_approval' | 'iss
 export interface CertificateSnapshot {
     student_name: string;
     gender?: string;
+    student_stage?: string;
     course_name: string;
     score: number | null;
     completion_date: string;
@@ -362,6 +364,15 @@ export interface Certificate {
     reissued_from_id: string | null;
     snapshot_json: CertificateSnapshot | null;
     template_version: number;
+    render_mode?: 'official' | 'live';
+    created_at: string;
+}
+
+export interface CertificateReissueLog {
+    id: string;
+    student_id: string;
+    old_certificate_id: string;
+    new_certificate_id: string | null;
     created_at: string;
 }
 

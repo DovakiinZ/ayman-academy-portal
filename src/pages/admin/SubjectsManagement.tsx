@@ -92,7 +92,7 @@ export default function SubjectsManagement() {
 
     // ─── Fetch Data via useQuery ─────────────────────────────────────────────
 
-    const subjectsQueryKey = stageId ? queryKeys.subjects.byStage(stageId) : queryKeys.subjects.all;
+    const subjectsQueryKey = stageId ? ['admin', 'subjects', stageId] : ['admin', 'subjects'];
 
     const { data: queryData, isLoading: loading, error: queryError, refetch } = useQuery({
         queryKey: subjectsQueryKey,
@@ -147,8 +147,10 @@ export default function SubjectsManagement() {
     const error = queryError ? (queryError instanceof Error ? queryError.message : 'Unknown error') : null;
 
     const invalidateSubjects = () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.subjects.all });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'subjects'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.subjects.all }); // also invalidate student cache
         if (stageId) {
+            queryClient.invalidateQueries({ queryKey: ['admin', 'subjects', stageId] });
             queryClient.invalidateQueries({ queryKey: queryKeys.subjects.byStage(stageId) });
         }
     };
@@ -329,6 +331,28 @@ export default function SubjectsManagement() {
 
     const handleSubjectClick = (subject: Subject) => {
         navigate(`/admin/subjects/${subject.id}/lessons`);
+    };
+
+    // Quick toggle is_active
+    const handleToggleSubjectActive = async (subject: Subject, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newValue = !subject.is_active;
+        try {
+            const result = await verifiedUpdate(
+                'subjects',
+                subject.id,
+                { is_active: newValue },
+                {
+                    successMessage: newValue
+                        ? { ar: 'تم تفعيل المادة', en: 'Subject activated' }
+                        : { ar: 'تم إخفاء المادة', en: 'Subject hidden' },
+                    errorMessage: { ar: 'فشل التحديث', en: 'Update failed' },
+                }
+            );
+            if (result.success) invalidateSubjects();
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        }
     };
 
     // ─── Render ─────────────────────────────────────────────────────────────
@@ -517,10 +541,18 @@ export default function SubjectsManagement() {
                                             <span className="text-sm">{getLessonCount(subject)}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        <Badge variant={subject.is_active ? 'default' : 'secondary'}>
-                                            {subject.is_active ? t('مفعّل', 'Active') : t('معطّل', 'Inactive')}
-                                        </Badge>
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                checked={subject.is_active}
+                                                onCheckedChange={() => { }}
+                                                onClick={(e) => handleToggleSubjectActive(subject, e as any)}
+                                                className="scale-75"
+                                            />
+                                            <span className={`text-xs font-medium ${subject.is_active ? 'text-green-600' : 'text-amber-600'}`}>
+                                                {subject.is_active ? t('مفعّل', 'Active') : t('مخفي', 'Hidden')}
+                                            </span>
+                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className="text-[10px]">

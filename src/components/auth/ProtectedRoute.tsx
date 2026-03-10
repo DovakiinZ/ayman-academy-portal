@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { roleBasePath } from '@/config/nav';
 import type { UserRole } from '@/types/database';
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,11 +16,12 @@ export function ProtectedRoute({
     allowedRoles,
     redirectTo = '/login'
 }: ProtectedRouteProps) {
-    const { isAuthenticated, isLoading, profileLoading, role, error, retryProfileFetch } = useAuth();
+    const { isAuthenticated, isLoading, profileLoading, isBootstrapped, role, error, retryProfileFetch } = useAuth();
     const location = useLocation();
 
-    // Initial auth loading
-    if (isLoading) {
+    // Wait for both session resolution AND profile fetch to complete.
+    // This prevents a flash of wrong layout (or wrong redirect) before role is known.
+    if (isLoading || !isBootstrapped) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -61,7 +63,7 @@ export function ProtectedRoute({
         );
     }
 
-    // Still loading profile
+    // Still loading profile (bootstrapped but profile is mid-fetch — e.g. on retry)
     if (profileLoading) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-background">
@@ -71,9 +73,12 @@ export function ProtectedRoute({
         );
     }
 
-    // Role-based access control
+    // Role-based access control:
+    // If the user's role is not in allowedRoles, redirect them to THEIR correct dashboard
+    // instead of a generic /access-denied page. This fixes the teacher→/student bug.
     if (allowedRoles && role && !allowedRoles.includes(role)) {
-        return <Navigate to="/access-denied" replace />;
+        const correctDashboard = roleBasePath[role] ?? '/';
+        return <Navigate to={correctDashboard} replace />;
     }
 
     return <>{children}</>;

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, useRef, useCallback, us
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { clearQueryCache, clearRoleLocalStorage } from '@/lib/queryConfig';
+import { roleBasePath } from '@/config/nav';
 import type { Profile, UserRole } from '@/types/database';
 
 // ============================================
@@ -15,6 +17,8 @@ interface AuthContextType {
     role: UserRole | null;
     isLoading: boolean;
     profileLoading: boolean;
+    /** True once both session AND profile fetch have completed (even if profile is null). */
+    isBootstrapped: boolean;
     error: string | null;
     isAuthenticated: boolean;
     isSuperAdmin: boolean;
@@ -27,6 +31,7 @@ interface AuthContextType {
     updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
     redirectByRole: (role: UserRole | null) => void;
     retryProfileFetch: () => Promise<void>;
+    refreshProfile: () => Promise<void>;
     clearError: () => void;
 }
 
@@ -57,14 +62,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [profileLoading, setProfileLoading] = useState(false);
+    const [isBootstrapped, setIsBootstrapped] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Refs to prevent duplicate operations
-    const hasRedirectedRef = useRef(false);
     const initStartedRef = useRef(false);
     const listenerSetRef = useRef(false);
     const sessionRef = useRef<Session | null>(null);
     const initCompletedRef = useRef(false);
+
+    const navigate = useNavigate();
 
     // ============================================
     // PROFILE FETCH WITH TIMEOUT + RETRY
@@ -99,12 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         id: userId,
                         email: userData.user?.email || '',
                         full_name: userData.user?.user_metadata?.full_name || null,
-                        role: 'student' as UserRole,
+                        role: (userData.user?.user_metadata?.role as UserRole) || 'student',
                         is_active: true,
                     };
 
-                    const { data: insertedProfile, error: insertError } = await supabase
-                        .from('profiles')
+                    const { data: insertedProfile, error: insertError } = await (supabase
+                        .from('profiles') as any)
                         .insert(newProfile)
                         .select()
                         .single();
@@ -147,31 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // ============================================
 
     const redirectByRole = useCallback((role: UserRole | null) => {
-        if (hasRedirectedRef.current) {
-            devLog('Redirect already performed, skipping');
-            return;
-        }
-
-        let destination = '/';
-
-        switch (role) {
-            case 'super_admin':
-                destination = '/admin';
-                break;
-            case 'teacher':
-                destination = '/teacher';
-                break;
-            case 'student':
-                destination = '/student';
-                break;
-            default:
-                destination = '/';
-        }
-
+        const destination = role ? (roleBasePath[role] ?? '/') : '/';
         devLog(`Redirecting to: ${destination}`);
-        hasRedirectedRef.current = true;
-        window.location.href = destination;
-    }, []);
+        navigate(destination, { replace: true });
+    }, [navigate]);
 
     // ============================================
     // RETRY PROFILE FETCH
@@ -239,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } finally {
                 if (mounted) {
                     setIsLoading(false);
+                    setIsBootstrapped(true);
                     initCompletedRef.current = true;
                 }
             }
@@ -255,15 +242,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 if (!mounted) return;
 
-                // Reset redirect flag on sign out
+                // Reset bootstrapped on sign out
                 if (event === 'SIGNED_OUT') {
-                    hasRedirectedRef.current = false;
                     setSession(null);
                     sessionRef.current = null;
                     setUser(null);
                     setProfile(null);
                     setError(null);
                     setIsLoading(false);
+                    setIsBootstrapped(true); // bootstrapped = we know user is logged out
                     return;
                 }
 
@@ -279,8 +266,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
 
                 // Optimization: Ignore session updates if token hasn't changed
-                // This prevents re-renders when switching tabs (which triggers TOKEN_REFRESHED)
-                // Use ref to avoid stale closure capturing outdated session value
                 if (newSession?.access_token === sessionRef.current?.access_token) {
                     return;
                 }
@@ -291,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 if (newSession?.user && event === 'SIGNED_IN') {
                     setProfileLoading(true);
+                    setIsBootstrapped(false); // Fetching new profile → not bootstrapped yet
 
                     try {
                         const profileData = await fetchProfileWithTimeout(newSession.user.id);
@@ -303,7 +289,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             setError(message);
                         }
                     } finally {
-                        if (mounted) setProfileLoading(false);
+                        if (mounted) {
+                            setProfileLoading(false);
+                            setIsBootstrapped(true);
+                        }
                     }
                 }
 
@@ -327,7 +316,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signIn = async (email: string, password: string) => {
         devLog('Sign in attempt', email);
-        hasRedirectedRef.current = false;
+
+        // Clear any stale role state from a previous session before we log in
+        clearRoleLocalStorage();
 
         const { error: signInError } = await supabase.auth.signInWithPassword({
             email,
@@ -364,12 +355,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signOut = async () => {
         devLog('Sign out');
-        hasRedirectedRef.current = false;
+        // Clear all cached query data and role-specific storage first
+        clearQueryCache();
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
         setSession(null);
         setError(null);
+        setIsBootstrapped(true);
+        navigate('/login', { replace: true });
     };
 
     const resetPassword = async (email: string) => {
@@ -405,10 +399,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isStudent = role === 'student';
 
     // ============================================
-    // RENDER
-    // ============================================
-
-    // ============================================
     // MEMOIZED VALUE
     // ============================================
 
@@ -419,6 +409,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         isLoading,
         profileLoading,
+        isBootstrapped,
         error,
         isAuthenticated,
         isSuperAdmin,
@@ -431,6 +422,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updatePassword,
         redirectByRole,
         retryProfileFetch,
+        refreshProfile: retryProfileFetch,
         clearError,
     }), [
         user,
@@ -439,6 +431,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         isLoading,
         profileLoading,
+        isBootstrapped,
         error,
         isAuthenticated,
         isSuperAdmin,

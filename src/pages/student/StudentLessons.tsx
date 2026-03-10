@@ -1,14 +1,17 @@
 /**
  * StudentLessons — Subject detail page with lesson list + progress
- * Shows subject title, overall progress bar, and ordered lesson list
- * with completion checkmarks and progress indicators.
+ * Shows subject title, overall progress bar, ordered lesson list,
+ * teacher announcements, and certificate claim CTA.
  */
 
+import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLessons } from '@/hooks/useQueryHooks';
 import { useCheckSubjectAccess } from '@/hooks/useAcademyData';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import {
     Play,
     FileText,
@@ -20,9 +23,68 @@ import {
     AlertCircle,
     BookOpen,
     CheckCircle,
+    Award,
+    Megaphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+
+// ── Certificate Claim Hook ────────────────────────────────────────────────────
+function useCertificateClaimStatus(subjectId: string | undefined, studentId: string | undefined) {
+    return useQuery({
+        queryKey: ['cert-claim-status', subjectId, studentId],
+        queryFn: async () => {
+            if (!subjectId || !studentId) return { canClaim: false, alreadyIssued: false };
+
+            // Check if certificate rule is enabled for this subject
+            const { data: rule } = await supabase
+                .from('certificate_rules')
+                .select('enabled')
+                .eq('subject_id', subjectId)
+                .eq('enabled', true)
+                .maybeSingle();
+
+            if (!rule) return { canClaim: false, alreadyIssued: false };
+
+            // Check if already issued
+            const { data: existing } = await supabase
+                .from('certificates')
+                .select('id, status')
+                .eq('subject_id', subjectId)
+                .eq('student_id', studentId)
+                .eq('status', 'issued')
+                .maybeSingle();
+
+            return {
+                canClaim: true,
+                alreadyIssued: !!existing,
+                certId: existing?.id,
+            };
+        },
+        enabled: !!subjectId && !!studentId,
+        staleTime: 30 * 1000,
+    });
+}
+
+// ── Announcements Hook ────────────────────────────────────────────────────────
+function useSubjectAnnouncements(subjectId: string | undefined) {
+    return useQuery({
+        queryKey: ['subject-announcements', subjectId],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('announcements')
+                .select('id, title, body, created_at, profiles(full_name)')
+                .eq('subject_id', subjectId!)
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(5);
+            return data || [];
+        },
+        enabled: !!subjectId,
+        staleTime: 60 * 1000,
+    });
+}
 
 export default function StudentLessons() {
     const { subjectId } = useParams<{ subjectId: string }>();
@@ -161,6 +223,11 @@ export default function StudentLessons() {
                         {t('أكملت جميع الدروس!', 'All lessons completed!')}
                     </div>
                 )}
+
+                {/* Certificate Claim CTA */}
+                {progressPercent === 100 && profile?.role === 'student' && (
+                    <CertificateClaimSection subjectId={subjectId!} studentId={profile.id} t={t} />
+                )}
             </div>
 
             {/* Lessons List */}
@@ -264,6 +331,116 @@ export default function StudentLessons() {
                     </p>
                 </div>
             )}
+
+            {/* Announcements Panel */}
+            {subjectId && <AnnouncementsPanel subjectId={subjectId} t={t} />}
+        </div>
+    );
+}
+
+// ── Certificate Claim Section ─────────────────────────────────────────────────
+function CertificateClaimSection({
+    subjectId, studentId, t
+}: { subjectId: string; studentId: string; t: (ar: string, en: string) => string }) {
+    const queryClient = useQueryClient();
+    const { data: certStatus, isLoading } = useCertificateClaimStatus(subjectId, studentId);
+
+    const claimMutation = useMutation({
+        mutationFn: async () => {
+            const { data, error } = await supabase.rpc('issue_certificate', {
+                p_student_id: studentId,
+                p_subject_id: subjectId,
+            });
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            toast.success(t('🎉 تم إصدار شهادتك بنجاح!', '🎉 Your certificate has been issued!'));
+            queryClient.invalidateQueries({ queryKey: ['cert-claim-status', subjectId, studentId] });
+        },
+        onError: (err: any) => {
+            toast.error(t('فشل إصدار الشهادة', 'Failed to issue certificate'), { description: err.message });
+        },
+    });
+
+    if (isLoading || !certStatus?.canClaim) return null;
+
+    return (
+        <div className={`mt-4 rounded-xl p-4 border ${certStatus.alreadyIssued
+                ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800'
+                : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'
+            }`}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <Award className={`w-6 h-6 flex-shrink-0 ${certStatus.alreadyIssued ? 'text-green-600' : 'text-amber-600'
+                        }`} />
+                    <div>
+                        <p className={`text-sm font-semibold ${certStatus.alreadyIssued ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'
+                            }`}>
+                            {certStatus.alreadyIssued
+                                ? t('حصلت على شهادة إتمام هذه المادة ✓', 'You have a completion certificate for this subject ✓')
+                                : t('مؤهل للحصول على شهادة إتمام!', 'You are eligible for a completion certificate!')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            {certStatus.alreadyIssued
+                                ? t('يمكنك تحميلها من صفحة شهاداتي', 'Download it from My Certificates page')
+                                : t('أكملت جميع الدروس — احصل على شهادتك الآن', 'You completed all lessons — claim your certificate now')}
+                        </p>
+                    </div>
+                </div>
+                {certStatus.alreadyIssued ? (
+                    <Link to="/student/certificates">
+                        <Button size="sm" variant="outline" className="gap-1.5">
+                            <Award className="w-4 h-4" />
+                            {t('عرض شهاداتي', 'My Certificates')}
+                        </Button>
+                    </Link>
+                ) : (
+                    <Button
+                        size="sm"
+                        className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={() => claimMutation.mutate()}
+                        disabled={claimMutation.isPending}
+                    >
+                        {claimMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Award className="w-4 h-4" />
+                        )}
+                        {t('احصل على شهادتك', 'Claim Certificate')}
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ── Announcements Panel ───────────────────────────────────────────────────────
+function AnnouncementsPanel({
+    subjectId, t
+}: { subjectId: string; t: (ar: string, en: string) => string }) {
+    const { data: announcements = [] } = useSubjectAnnouncements(subjectId);
+
+    if (announcements.length === 0) return null;
+
+    return (
+        <div className="bg-background rounded-xl border border-border p-5">
+            <h2 className="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Megaphone className="w-4 h-4 text-primary" />
+                {t('إعلانات المادة', 'Subject Announcements')}
+            </h2>
+            <div className="space-y-3">
+                {announcements.map((ann: any) => (
+                    <div key={ann.id} className="border-s-2 border-primary/40 ps-3">
+                        <p className="text-sm font-medium text-foreground">{ann.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ann.body}</p>
+                        <p className="text-[11px] text-muted-foreground/60 mt-1">
+                            {ann.profiles?.full_name && `${ann.profiles.full_name} · `}
+                            {new Date(ann.created_at).toLocaleDateString()}
+                        </p>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

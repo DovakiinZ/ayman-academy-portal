@@ -45,7 +45,7 @@ const Header = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    window.location.href = '/';
+    // signOut() handles navigation to /login internally
   };
 
   return (

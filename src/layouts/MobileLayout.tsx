@@ -47,7 +47,7 @@ export default function MobileLayout({ role }: MobileLayoutProps) {
   const handleSignOut = async () => {
     setDrawerOpen(false);
     await signOut();
-    navigate('/login');
+    // signOut() handles navigation to /login internally
   };
 
   return (
@@ -91,11 +91,10 @@ export default function MobileLayout({ role }: MobileLayoutProps) {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
-                    active
+                  className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${active
                       ? 'text-primary'
                       : 'text-muted-foreground'
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
                   <span className="text-[10px] font-medium">

@@ -30,7 +30,7 @@ export default function TeacherLayout() {
 
     const handleSignOut = async () => {
         await signOut();
-        navigate('/login');
+        // signOut() handles navigation to /login internally
     };
 
     return (

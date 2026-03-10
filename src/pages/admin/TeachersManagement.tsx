@@ -3,6 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import type { Profile, TeacherInvite } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +35,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users, Beaker, Pencil, Home } from 'lucide-react';
+import { UserPlus, Copy, Check, Loader2, MoreHorizontal, UserX, RefreshCw, AlertCircle, Trash2, Users, Beaker, Pencil, Home, Mail } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -69,6 +70,7 @@ export default function TeachersManagement() {
         show_on_home: false,
         home_order: 0,
         avatar_url: '',
+        password: '',
     });
 
     // Edit teacher dialog state
@@ -81,6 +83,11 @@ export default function TeachersManagement() {
         show_on_home: false,
         home_order: 0,
     });
+
+    // Password change state
+    const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+    const [passwordTargetTeacher, setPasswordTargetTeacher] = useState<Profile | null>(null);
+    const [newPassword, setNewPassword] = useState('');
 
     // Common UI state
     const [submitting, setSubmitting] = useState(false);
@@ -209,7 +216,7 @@ export default function TeachersManagement() {
     const handleCreateTeacher = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user?.id) {
-            toast.error(t('خطأ في المصادقة', 'Authentication error'));
+            toast.error(t('خطأ في المصাদقة', 'Authentication error'));
             return;
         }
 
@@ -221,23 +228,45 @@ export default function TeachersManagement() {
         setSubmitting(true);
 
         try {
-            const result = await verifiedInsert(
-                'profiles',
-                {
-                    id: crypto.randomUUID(),
-                    email: createForm.email.trim(),
+            const admin = getSupabaseAdmin();
+
+            // 1. Create Auth User
+            const { data: authData, error: authError } = await admin.auth.admin.createUser({
+                email: createForm.email.trim(),
+                password: createForm.password.trim() || crypto.randomUUID(),
+                email_confirm: true,
+                user_metadata: {
                     full_name: createForm.full_name.trim(),
+                    role: 'teacher'
+                }
+            });
+
+            if (authError) {
+                if (authError.message.includes('already exists') || authError.message.includes('registered')) {
+                    toast.error(t('هذا البريد مرتبط بحساب آخر بالفعل', 'Email already used by another account'));
+                    setSubmitting(false);
+                    return;
+                }
+                throw authError;
+            }
+
+            // Wait a moment for the DB trigger to create the profile row
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 2. Update Profile with extra metadata
+            const result = await verifiedUpdate(
+                'profiles',
+                authData.user.id,
+                {
                     bio_ar: createForm.bio_ar.trim() || null,
                     bio_en: createForm.bio_en.trim() || null,
-                    role: 'teacher',
-                    is_active: true,
                     show_on_home: createForm.show_on_home,
                     home_order: createForm.home_order,
                     avatar_url: createForm.avatar_url.trim() || null,
                 },
                 {
                     successMessage: { ar: 'تم إنشاء المعلم بنجاح', en: 'Teacher created successfully' },
-                    errorMessage: { ar: 'فشل في إنشاء المعلم', en: 'Failed to create teacher' },
+                    errorMessage: { ar: 'تم إنشاء الحساب ولكن فشل تحديث البيانات الإضافية', en: 'Account created but extra data update failed' },
                 }
             );
 
@@ -251,14 +280,9 @@ export default function TeachersManagement() {
                     show_on_home: false,
                     home_order: 0,
                     avatar_url: '',
+                    password: '',
                 });
                 fetchData();
-
-                // Show instruction toast
-                toast.info(
-                    t('سيتمكن المعلم من التسجيل باستخدام البريد المدخل', 'Teacher can register using this email'),
-                    { duration: 5000 }
-                );
             }
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
@@ -343,6 +367,80 @@ export default function TeachersManagement() {
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             toast.error(t('حدث خطأ', 'An error occurred'), { description: message });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleSendPasswordReset = async (teacher: Profile) => {
+        if (!teacher.email) {
+            toast.error(t('لا يوجد بريد إلكتروني لهذا المعلم', 'No email for this teacher'));
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(teacher.email, {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+
+            if (error) throw error;
+
+            toast.success(t('تم إرسال رابط إعادة تعيين كلمة المرور', 'Password reset link sent'), {
+                description: teacher.email
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('فشل في إرسال رابط إعادة التعيين', 'Failed to send reset link'), { description: message });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleManualPasswordChange = async () => {
+        if (!passwordTargetTeacher || !newPassword) return;
+        if (newPassword.length < 6) {
+            toast.error(t('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'Password must be at least 6 characters'));
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const admin = getSupabaseAdmin();
+            const { error: updateError } = await admin.auth.admin.updateUserById(passwordTargetTeacher.id, {
+                password: newPassword
+            });
+
+            if (updateError) {
+                // If user doesn't exist in Auth yet (shadow profile)
+                if (updateError.message.toLowerCase().includes('not found') || (updateError as any).status === 404) {
+                    devLog('User not found in auth, creating new auth account for shadow profile');
+                    const { data: createData, error: createError } = await admin.auth.admin.createUser({
+                        email: passwordTargetTeacher.email!,
+                        password: newPassword,
+                        email_confirm: true,
+                        user_metadata: {
+                            full_name: passwordTargetTeacher.full_name,
+                            role: 'teacher'
+                        }
+                    });
+
+                    if (createError) throw createError;
+
+                    toast.success(t('تم إنشاء حساب المعلم وتعيين كلمة المرور', 'Teacher account created and password set'));
+                    fetchData();
+                } else {
+                    throw updateError;
+                }
+            } else {
+                toast.success(t('تم تغيير كلمة المرور بنجاح', 'Password changed successfully'));
+            }
+
+            setPasswordDialogOpen(false);
+            setNewPassword('');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            toast.error(t('فشل في تغيير كلمة المرور', 'Failed to change password'), { description: message });
         } finally {
             setSubmitting(false);
         }
@@ -622,6 +720,17 @@ export default function TeachersManagement() {
                                                         <Pencil className="w-4 h-4 me-2" />
                                                         {t('تعديل', 'Edit')}
                                                     </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSendPasswordReset(teacher)} disabled={submitting}>
+                                                        <Mail className="w-4 h-4 me-2" />
+                                                        {t('إعادة تعيين كلمة المرور', 'Reset Password')}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => {
+                                                        setPasswordTargetTeacher(teacher);
+                                                        setPasswordDialogOpen(true);
+                                                    }}>
+                                                        <RefreshCw className="w-4 h-4 me-2" />
+                                                        {t('تغيير كلمة المرور يدوياً', 'Change Password Manually')}
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleToggleStatus(teacher)}>
                                                         <UserX className="w-4 h-4 me-2" />
                                                         {teacher.is_active ? t('تعطيل', 'Disable') : t('تفعيل', 'Enable')}
@@ -669,6 +778,16 @@ export default function TeachersManagement() {
                                 value={createForm.full_name}
                                 onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
                                 required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="create_password">{t('كلمة المرور', 'Password')} ({t('اختياري', 'Optional')})</Label>
+                            <Input
+                                id="create_password"
+                                type="password"
+                                placeholder={t('أترك فارغاً للتوليد التلقائي', 'Leave empty for auto-generation')}
+                                value={createForm.password}
+                                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                             />
                         </div>
                         <div className="space-y-2">
@@ -852,6 +971,63 @@ export default function TeachersManagement() {
                             </Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Manual Password Change Dialog */}
+            <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t('تغيير كلمة المرور يدوياً', 'Change Password Manually')}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                        <div className="bg-amber-50 border border-amber-200 p-3 rounded-md flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-sm text-amber-800">
+                                <p className="font-medium">{t('تحذير للمشرف', 'Admin Warning')}</p>
+                                <p>{t('تغيير كلمة المرور سيؤدي إلى تحديث بيانات الدخول للمعلم فوراً.', 'Changing the password will update the teacher\'s login credentials immediately.')}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{t('المعلم', 'Teacher')}</Label>
+                            <Input value={passwordTargetTeacher?.full_name || ''} disabled />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="new_password">{t('كلمة المرور الجديدة', 'New Password')}</Label>
+                            <Input
+                                id="new_password"
+                                type="password"
+                                placeholder={t('أدخل 6 أحرف على الأقل', 'Enter at least 6 characters')}
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4">
+                            <Button
+                                variant="outline"
+                                onClick={() => setPasswordDialogOpen(false)}
+                                disabled={submitting}
+                            >
+                                {t('إلغاء', 'Cancel')}
+                            </Button>
+                            <Button
+                                onClick={handleManualPasswordChange}
+                                disabled={submitting || newPassword.length < 6}
+                            >
+                                {submitting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 me-2 animate-spin" />
+                                        {t('جاري الحفظ...', 'Saving...')}
+                                    </>
+                                ) : (
+                                    t('تحديث كلمة المرور', 'Update Password')
+                                )}
+                            </Button>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
 

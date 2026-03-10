@@ -47,7 +47,7 @@ export default function TaxonomyManagement() {
 
     // Fetch stages with subject counts via useQuery
     const { data: stages = [], isLoading: loading, error: queryError, refetch } = useQuery({
-        queryKey: queryKeys.stages.all,
+        queryKey: ['admin', 'stages'],
         queryFn: async (): Promise<StageWithSubjectCount[]> => {
             devLog('Fetching stages...');
             const startTime = Date.now();
@@ -109,7 +109,8 @@ export default function TaxonomyManagement() {
     });
 
     const invalidateStages = () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.stages.all });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'stages'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.stages.all }); // also invalidate student cache
     };
 
     const handleRetry = () => {
@@ -250,6 +251,28 @@ export default function TaxonomyManagement() {
         navigate(`/admin/stages/${stage.id}/subjects`);
     };
 
+    // Quick toggle is_active
+    const handleToggleActive = async (stage: StageWithSubjectCount, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newValue = !stage.is_active;
+        try {
+            const result = await verifiedUpdate(
+                'stages',
+                stage.id,
+                { is_active: newValue },
+                {
+                    successMessage: newValue
+                        ? { ar: 'تم تفعيل المرحلة', en: 'Stage activated' }
+                        : { ar: 'تم إخفاء المرحلة', en: 'Stage hidden' },
+                    errorMessage: { ar: 'فشل التحديث', en: 'Update failed' },
+                }
+            );
+            if (result.success) invalidateStages();
+        } catch (err) {
+            toast.error(t('حدث خطأ', 'An error occurred'));
+        }
+    };
+
     // Stage icons with colors
     const stageIcons: Record<string, { icon: typeof GraduationCap; color: string }> = {
         'kindergarten': { icon: BookOpen, color: 'bg-pink-100 text-pink-600' },
@@ -367,11 +390,19 @@ export default function TaxonomyManagement() {
                                     </div>
                                 </div>
 
-                                {!stage.is_active && (
-                                    <div className="mt-3 text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 inline-block">
-                                        {t('غير مفعّل', 'Inactive')}
+                                <div className="mt-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            checked={stage.is_active}
+                                            onCheckedChange={() => { }}
+                                            onClick={(e) => handleToggleActive(stage, e as any)}
+                                            className="scale-75"
+                                        />
+                                        <span className={`text-xs font-medium ${stage.is_active ? 'text-green-600' : 'text-amber-600'}`}>
+                                            {stage.is_active ? t('مفعّل', 'Active') : t('مخفي', 'Hidden')}
+                                        </span>
                                     </div>
-                                )}
+                                </div>
 
                                 <div className="mt-4 text-xs text-primary font-medium group-hover:underline">
                                     {t('إدارة المواد ←', 'Manage subjects →')}

@@ -14,6 +14,8 @@ import {
   Mail,
   Building2,
   Ticket,
+  Award,
+  Megaphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -41,6 +43,8 @@ export const roleLabel: Record<UserRole, { ar: string; en: string }> = {
 const studentNav: NavItem[] = [
   { path: '/student', icon: LayoutDashboard, label: { ar: 'لوحة التحكم', en: 'Dashboard' }, exact: true },
   { path: '/student/subjects', icon: BookOpen, label: { ar: 'موادي', en: 'My Subjects' } },
+  { path: '/student/teachers', icon: Users, label: { ar: 'المعلمون', en: 'My Teachers' } },
+  { path: '/student/certificates', icon: Award, label: { ar: 'شهاداتي', en: 'My Certificates' } },
   { path: '/student/messages', icon: MessageSquare, label: { ar: 'الرسائل', en: 'Messages' } },
   { path: '/student/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },
 ];
@@ -50,6 +54,8 @@ const teacherNav: NavItem[] = [
   { path: '/teacher/subjects', icon: BookMarked, label: { ar: 'موادي', en: 'My Subjects' } },
   { path: '/teacher/lessons', icon: BookOpen, label: { ar: 'دروسي', en: 'My Lessons' } },
   { path: '/teacher/quizzes', icon: ClipboardList, label: { ar: 'الاختبارات', en: 'Quizzes' } },
+  { path: '/teacher/announcements', icon: Megaphone, label: { ar: 'الإعلانات', en: 'Announcements' } },
+  { path: '/teacher/certificates', icon: Award, label: { ar: 'الشهادات', en: 'Certificates' } },
   { path: '/teacher/messages', icon: MessageSquare, label: { ar: 'الرسائل', en: 'Messages' } },
   { path: '/teacher/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },
 ];

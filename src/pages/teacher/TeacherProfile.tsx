@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, User } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { Loader2, Save, User, Camera, Award, BookOpen } from 'lucide-react';
+import type { Profile } from '@/types/database';
 
 export default function TeacherProfile() {
     const { t } = useLanguage();
@@ -13,76 +16,173 @@ export default function TeacherProfile() {
     const [submitting, setSubmitting] = useState(false);
     const [saved, setSaved] = useState(false);
     const [form, setForm] = useState({
-        full_name: profile?.full_name || '',
+        full_name: '',
+        bio_ar: '',
+        bio_en: '',
+        avatar_url: '',
+        qualifications: '',
     });
+
+    useEffect(() => {
+        if (profile) {
+            setForm({
+                full_name: (profile as any).full_name || '',
+                bio_ar: (profile as any).bio_ar || '',
+                bio_en: (profile as any).bio_en || '',
+                avatar_url: (profile as any).avatar_url || '',
+                qualifications: (profile as any).qualifications || '',
+            });
+        }
+    }, [profile]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!profile) return;
+
+        if (!form.full_name.trim()) {
+            toast.error(t('الاسم مطلوب', 'Full name is required'));
+            return;
+        }
+
         setSubmitting(true);
 
-        await supabase
-            .from('profiles')
-            .update({
-                full_name: form.full_name,
+        try {
+            const { error } = await (supabase.from('profiles') as any).update({
+                full_name: form.full_name.trim(),
+                bio_ar: form.bio_ar.trim() || null,
+                bio_en: form.bio_en.trim() || null,
+                avatar_url: form.avatar_url.trim() || null,
+                qualifications: form.qualifications.trim() || null,
                 updated_at: new Date().toISOString(),
-            })
-            .eq('id', profile.id);
+            }).eq('id', profile.id);
 
-        await refreshProfile();
-        setSaved(true);
-        setSubmitting(false);
-        setTimeout(() => setSaved(false), 3000);
+            if (error) throw error;
+
+            await refreshProfile();
+            setSaved(true);
+            toast.success(t('تم حفظ الملف الشخصي بنجاح', 'Profile saved successfully'));
+            setTimeout(() => setSaved(false), 3000);
+        } catch (err: any) {
+            toast.error(t('فشل في حفظ البيانات', 'Failed to save profile'), {
+                description: err.message,
+            });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
+    const p = profile as any;
+
     return (
-        <div className="max-w-xl">
-            <div className="mb-6">
+        <div className="max-w-2xl space-y-6">
+            <div>
                 <h1 className="text-2xl font-semibold text-foreground">
                     {t('ملفي الشخصي', 'My Profile')}
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                    {t('تعديل معلومات حسابك', 'Edit your account information')}
+                    {t('معلوماتك التي تظهر للطلاب', 'Information visible to students')}
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="bg-background rounded-lg border border-border p-6 space-y-4">
-                <div className="flex items-center gap-4 pb-4 border-b border-border">
-                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="w-8 h-8 text-primary" />
+            <form onSubmit={handleSubmit} className="bg-background rounded-xl border border-border p-6 space-y-6">
+                {/* Avatar preview */}
+                <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden ring-2 ring-border flex-shrink-0">
+                        {form.avatar_url ? (
+                            <img src={form.avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                        ) : (
+                            <User className="w-9 h-9 text-primary" />
+                        )}
                     </div>
-                    <div>
-                        <p className="font-medium text-foreground">{profile?.full_name || profile?.email}</p>
-                        <p className="text-sm text-muted-foreground">{t('معلم', 'Teacher')}</p>
+                    <div className="flex-1 space-y-1">
+                        <Label htmlFor="avatar_url" className="flex items-center gap-2">
+                            <Camera className="w-4 h-4" />
+                            {t('رابط الصورة الشخصية', 'Avatar URL')}
+                        </Label>
+                        <Input
+                            id="avatar_url"
+                            type="url"
+                            placeholder="https://example.com/photo.jpg"
+                            value={form.avatar_url}
+                            onChange={(e) => setForm({ ...form, avatar_url: e.target.value })}
+                        />
                     </div>
                 </div>
 
+                {/* Full Name */}
                 <div className="space-y-2">
-                    <Label htmlFor="full_name">{t('الاسم الكامل', 'Full Name')}</Label>
+                    <Label htmlFor="full_name">
+                        {t('الاسم الكامل', 'Full Name')} <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                         id="full_name"
                         value={form.full_name}
                         onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                        required
                     />
                 </div>
 
+                {/* Email (read-only) */}
                 <div className="space-y-2">
                     <Label>{t('البريد الإلكتروني', 'Email')}</Label>
-                    <Input value={profile?.email || ''} disabled />
+                    <Input value={p?.email || ''} disabled className="opacity-60" />
                     <p className="text-xs text-muted-foreground">
                         {t('لا يمكن تغيير البريد الإلكتروني', 'Email cannot be changed')}
                     </p>
                 </div>
 
-                <Button type="submit" disabled={submitting}>
+                {/* Qualifications */}
+                <div className="space-y-2">
+                    <Label htmlFor="qualifications" className="flex items-center gap-2">
+                        <Award className="w-4 h-4" />
+                        {t('المؤهلات والخبرات', 'Qualifications & Experience')}
+                    </Label>
+                    <Input
+                        id="qualifications"
+                        placeholder={t('مثال: ماجستير رياضيات، خبرة 10 سنوات', 'e.g. M.Sc. Mathematics, 10 years experience')}
+                        value={form.qualifications}
+                        onChange={(e) => setForm({ ...form, qualifications: e.target.value })}
+                    />
+                </div>
+
+                {/* Bio Arabic */}
+                <div className="space-y-2">
+                    <Label htmlFor="bio_ar" className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4" />
+                        {t('نبذة تعريفية بالعربية', 'Arabic Bio')}
+                    </Label>
+                    <Textarea
+                        id="bio_ar"
+                        dir="rtl"
+                        rows={4}
+                        placeholder={t('اكتب نبذة عن نفسك بالعربية...', 'Write about yourself in Arabic...')}
+                        value={form.bio_ar}
+                        onChange={(e) => setForm({ ...form, bio_ar: e.target.value })}
+                    />
+                </div>
+
+                {/* Bio English */}
+                <div className="space-y-2">
+                    <Label htmlFor="bio_en">
+                        {t('نبذة تعريفية بالإنجليزية', 'English Bio')}
+                    </Label>
+                    <Textarea
+                        id="bio_en"
+                        dir="ltr"
+                        rows={4}
+                        placeholder="Write about yourself in English..."
+                        value={form.bio_en}
+                        onChange={(e) => setForm({ ...form, bio_en: e.target.value })}
+                    />
+                </div>
+
+                <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
                     {submitting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin me-2" />
                     ) : (
-                        <>
-                            <Save className="w-4 h-4 me-2" />
-                            {saved ? t('تم الحفظ', 'Saved!') : t('حفظ التغييرات', 'Save Changes')}
-                        </>
+                        <Save className="w-4 h-4 me-2" />
                     )}
+                    {saved ? t('✓ تم الحفظ', '✓ Saved!') : t('حفظ التغييرات', 'Save Changes')}
                 </Button>
             </form>
         </div>

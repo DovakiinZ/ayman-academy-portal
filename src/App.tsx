@@ -7,7 +7,7 @@ import { queryClient, queryPersister, PERSIST_MAX_AGE, CACHE_BUSTER } from "@/li
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminRoute, TeacherRoute, StudentRoute } from "@/components/auth/RoleRoutes";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 // Public pages
@@ -19,6 +19,7 @@ import LessonPage from "./pages/LessonPage";
 import Plans from "./pages/Plans";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
+import VerifyCertificate from "./pages/VerifyCertificate";
 
 // Auth pages
 import Login from "./pages/auth/Login";
@@ -31,6 +32,7 @@ import TeacherProfilePublic from "./pages/TeacherProfilePublic";
 // Student pages
 import StudentLayout from "./components/student/StudentLayout";
 import StudentDashboard from "./pages/student/StudentDashboard";
+import StudentOnboarding from "./pages/student/StudentOnboarding";
 import StudentStages from "./pages/student/StudentStages";
 import StudentSubjects from "./pages/student/StudentSubjects";
 import StudentLessons from "./pages/student/StudentLessons";
@@ -40,6 +42,7 @@ import StudentProfile from "./pages/student/StudentProfile";
 import Messages from "./pages/student/Messages";
 import LessonPlayer from "./pages/student/LessonPlayer";
 import QuizPlayer from "./pages/student/QuizPlayer";
+import MyCertificates from "./pages/student/MyCertificates";
 
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -61,10 +64,10 @@ import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherSubjects from "./pages/teacher/TeacherSubjects";
 import TeacherLessons from "./pages/teacher/TeacherLessons";
 import TeacherQuizzes from "./pages/teacher/TeacherQuizzes";
-// import LessonEditor from "./pages/teacher/LessonEditor"; // Deprecated
 import LessonEditor from "./components/admin/lessons/LessonEditor";
 import TeacherProfile from "./pages/teacher/TeacherProfile";
-
+import TeacherAnnouncements from "./pages/teacher/TeacherAnnouncements";
+import TeacherCertificates from "./pages/teacher/TeacherCertificates";
 
 import { TemplateProvider } from "./contexts/TemplateContext";
 
@@ -77,14 +80,14 @@ const App = () => (
       buster: CACHE_BUSTER,
     }}
   >
-    <AuthProvider>
-      <SettingsProvider>
-        <LanguageProvider>
-          <TemplateProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <SettingsProvider>
+          <LanguageProvider>
+            <TemplateProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
                 <Routes>
                   {/* Public routes */}
                   <Route path="/" element={<Index />} />
@@ -95,6 +98,7 @@ const App = () => (
                   <Route path="/plans" element={<Plans />} />
                   <Route path="/account" element={<Account />} />
                   <Route path="/teacher/:id" element={<TeacherProfilePublic />} />
+                  <Route path="/verify/:code" element={<VerifyCertificate />} />
 
                   {/* Auth routes */}
                   <Route path="/login" element={<Login />} />
@@ -103,11 +107,18 @@ const App = () => (
                   <Route path="/invite/:token" element={<AcceptInvite />} />
                   <Route path="/access-denied" element={<AccessDenied />} />
 
+                  {/* Student Onboarding (outside protected layout so it can redirect) */}
+                  <Route path="/student/onboarding" element={
+                    <StudentRoute allowOnboarding>
+                      <StudentOnboarding />
+                    </StudentRoute>
+                  } />
+
                   {/* Admin routes (Super Admin only) */}
                   <Route path="/admin" element={
-                    <ProtectedRoute allowedRoles={['super_admin']}>
+                    <AdminRoute>
                       <AdminLayout />
-                    </ProtectedRoute>
+                    </AdminRoute>
                   }>
                     <Route index element={<AdminDashboard />} />
                     <Route path="teachers" element={<TeachersManagement />} />
@@ -129,9 +140,9 @@ const App = () => (
 
                   {/* Teacher routes (accessible by teacher and super_admin) */}
                   <Route path="/teacher" element={
-                    <ProtectedRoute allowedRoles={['teacher', 'super_admin']}>
+                    <TeacherRoute>
                       <TeacherLayout />
-                    </ProtectedRoute>
+                    </TeacherRoute>
                   }>
                     <Route index element={<TeacherDashboard />} />
                     <Route path="subjects" element={<TeacherSubjects />} />
@@ -139,14 +150,16 @@ const App = () => (
                     <Route path="lessons/:id" element={<ErrorBoundary><LessonEditor /></ErrorBoundary>} />
                     <Route path="quizzes" element={<TeacherQuizzes />} />
                     <Route path="messages" element={<Messages />} />
+                    <Route path="announcements" element={<TeacherAnnouncements />} />
+                    <Route path="certificates" element={<TeacherCertificates />} />
                     <Route path="profile" element={<TeacherProfile />} />
                   </Route>
 
                   {/* Student Routes */}
                   <Route path="/student" element={
-                    <ProtectedRoute allowedRoles={['student']}>
+                    <StudentRoute>
                       <StudentLayout />
-                    </ProtectedRoute>
+                    </StudentRoute>
                   }>
                     <Route index element={<StudentDashboard />} />
                     <Route path="stages" element={<StudentStages />} />
@@ -154,6 +167,7 @@ const App = () => (
                     <Route path="subjects" element={<MySubjects />} />
                     <Route path="subjects/:subjectId" element={<StudentLessons />} />
                     <Route path="teachers" element={<StudentTeachers />} />
+                    <Route path="certificates" element={<MyCertificates />} />
                     <Route path="messages" element={<Messages />} />
                     <Route path="profile" element={<StudentProfile />} />
                     <Route path="lesson/:id" element={<LessonPlayer />} />
@@ -163,12 +177,12 @@ const App = () => (
                   {/* Catch-all */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
-              </BrowserRouter>
-            </TooltipProvider>
-          </TemplateProvider>
-        </LanguageProvider>
-      </SettingsProvider>
-    </AuthProvider>
+              </TooltipProvider>
+            </TemplateProvider>
+          </LanguageProvider>
+        </SettingsProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </PersistQueryClientProvider>
 );
 

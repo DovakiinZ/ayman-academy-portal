@@ -277,6 +277,89 @@ export async function revokeCertificateViaRPC(
 }
 
 // ============================================
+// STUDENT REQUEST REISSUE (via RPC)
+// ============================================
+
+export interface ReissueResult {
+    certificate: Certificate | null;
+    status: 'issued' | 'rate_limited' | 'not_eligible' | 'error';
+    error: string | null;
+    newVersion?: number;
+}
+
+/**
+ * Student-facing certificate reissue.
+ * Creates a new version with fresh snapshot data from current profile.
+ * Rate limited to 2 per day per student.
+ */
+export async function studentRequestReissueViaRPC(
+    certificateId: string,
+): Promise<ReissueResult> {
+    const { data, error } = await (supabase.rpc as any)('student_request_reissue', {
+        p_certificate_id: certificateId,
+    });
+
+    if (error) {
+        console.error('RPC student_request_reissue error:', error);
+        return { certificate: null, status: 'error', error: error.message };
+    }
+
+    const result = data as any;
+
+    if (result.error) {
+        return {
+            certificate: null,
+            status: result.status || 'error',
+            error: result.error,
+        };
+    }
+
+    // Fetch the full new certificate record
+    if (result.certificate_id) {
+        const { data: cert } = await supabase
+            .from('certificates')
+            .select('*')
+            .eq('id', result.certificate_id)
+            .single() as any;
+
+        return {
+            certificate: cert as Certificate || null,
+            status: 'issued',
+            error: null,
+            newVersion: result.version,
+        };
+    }
+
+    return { certificate: null, status: 'error', error: 'Unknown error' };
+}
+
+// ============================================
+// FETCH LATEST CERTIFICATE VERSION
+// ============================================
+
+/**
+ * Given a certificate ID (possibly revoked/superseded),
+ * find the latest version in the chain via RPC.
+ */
+export async function fetchLatestCertificateVersion(
+    certificateId: string,
+): Promise<Certificate | null> {
+    const { data: latestId, error } = await (supabase.rpc as any)('get_latest_certificate_version', {
+        p_certificate_id: certificateId,
+    });
+
+    if (error || !latestId) return null;
+
+    const { data: cert } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('id', latestId)
+        .single() as any;
+
+    return cert as Certificate || null;
+}
+
+// ============================================
 // DUPLICATE CHECK (still useful for UI)
 // ============================================
 
