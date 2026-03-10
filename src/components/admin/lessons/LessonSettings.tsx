@@ -112,24 +112,35 @@ export default function LessonSettings({ lesson, onUpdate }: LessonSettingsProps
 
             {/* Publish Tab */}
             <TabsContent value="publish" className="space-y-4 pt-4">
-                <div className="flex items-center justify-between py-2">
-                    <div>
-                        <Label className="text-sm">{t('نشر الدرس', 'Publish Lesson')}</Label>
-                        <p className="text-xs text-muted-foreground">{t('إظهار للطلاب', 'Visible to students')}</p>
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <Label>{t('نشر الدرس', 'Publish Lesson')}</Label>
+                        <p className="text-xs text-muted-foreground">
+                            {t('اجعل هذا الدرس مرئياً للطلاب', 'Make this lesson visible to students')}
+                        </p>
                     </div>
                     <Switch
                         checked={localLesson.is_published}
-                        onCheckedChange={c => handleLessonChange('is_published', c)}
+                        onCheckedChange={c => {
+                            handleLessonChange('is_published', c);
+                            onUpdate({ is_published: c });
+                        }}
                     />
                 </div>
-                <div className="flex items-center justify-between py-2">
-                    <div>
-                        <Label className="text-sm">{t('درس مدفوع', 'Paid Lesson')}</Label>
-                        <p className="text-xs text-muted-foreground">{t('يحتاج اشتراك', 'Requires subscription')}</p>
+
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <Label>{t('درس مدفوع', 'Paid Lesson')}</Label>
+                        <p className="text-xs text-muted-foreground">
+                            {t('تطلب اشتراكاً لمشاهدة هذا الدرس', 'Requires subscription to view this lesson')}
+                        </p>
                     </div>
                     <Switch
                         checked={localLesson.is_paid}
-                        onCheckedChange={c => handleLessonChange('is_paid', c)}
+                        onCheckedChange={c => {
+                            handleLessonChange('is_paid', c);
+                            onUpdate({ is_paid: c });
+                        }}
                     />
                 </div>
                 <div className="flex items-center justify-between py-2">

@@ -144,7 +144,7 @@ export function useStudentDashboard(userId?: string) {
             const { data: subjects } = await supabase
                 .from('subjects')
                 .select('*, stage:stages(title_ar, title_en)')
-                .eq('is_published', true)
+                .eq('is_active', true)
                 .order('order_index', { ascending: true });
 
             return {

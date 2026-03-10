@@ -92,17 +92,17 @@ export default function StudentLessons() {
     const { t, direction } = useLanguage();
     const { profile } = useAuth();
 
-    const { data, isLoading: loading, error } = useLessons(subjectId, profile?.id);
-
-    // ── Access Guard ──────────────────────────────────────
     const isStudentRole = profile?.role === 'student';
     const { data: accessResult, isLoading: accessLoading } = useCheckSubjectAccess(
         isStudentRole ? profile?.id : undefined,
         isStudentRole ? subjectId : undefined,
     );
+    const hasAccess = accessResult?.has_access ?? false;
 
-    const subject = data?.subject || null;
-    const lessons = data?.lessons || [];
+    const { data: lessonsData, isLoading: loading, error } = useLessons(subjectId, profile?.id);
+
+    const subject = (lessonsData?.subject || null) as any;
+    const lessons = (lessonsData?.lessons || []) as any[];
 
     const BackIcon = direction === 'rtl' ? ArrowRight : ArrowLeft;
 
