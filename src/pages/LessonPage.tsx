@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Layout from '@/components/layout/Layout';
-import { ChevronLeft, ChevronRight, FileText, Download, CheckCircle, Clock, Lock, Loader2, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Download, CheckCircle, Clock, Lock, Loader2, Play, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLesson } from '@/hooks/useQueryHooks';
 import { LessonBlock, LessonSection } from '@/types/database';
@@ -22,6 +23,8 @@ const LessonPage = () => {
 
   const { data: currentLessonData, isLoading: loading, error } = useLesson(lessonId);
   const lesson = currentLessonData?.lesson || null;
+
+  const [isExpanded, setIsExpanded] = useState(false);
 
   if (loading) {
       return (
@@ -77,72 +80,96 @@ const LessonPage = () => {
 
   return (
     <Layout>
-      {/* Video Section */}
-      <section className="bg-foreground">
-        <div className="container-academic py-3">
+      {/* Dark Hero Section */}
+      <section className="bg-slate-950 dark:bg-background border-b border-border text-slate-50 pt-8 pb-12">
+        <div className="container-academic">
+          {/* Breadcrumb / Back Link */}
           <Link
             to={`/stages/${lesson.subject?.stage_id || lesson.subject?.level_id}/${lesson.subject_id}`}
-            className="inline-flex items-center gap-1 text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+            className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors mb-8"
           >
             <BackIcon className="w-4 h-4" />
             {t('العودة للمادة', 'Back to Subject')}
           </Link>
-        </div>
-        <div className="aspect-video lg:max-h-[70vh] bg-black flex items-center justify-center shrink-0 border-y border-border">
-          {youtubeId ? (
-              <iframe
-                  width="100%"
-                  height="100%"
-                  src={`https://www.youtube.com/embed/${youtubeId}?enablejsapi=1`}
-                  title="Video player"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full h-full"
-              ></iframe>
-          ) : (
-            <div className="text-center text-muted-foreground p-8">
-                <Lock className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>{t('الفيديو غير متاح', 'Video not available')}</p>
-            </div>
-          )}
-        </div>
-      </section>
 
-      {/* Lesson Content */}
-      <section className="section-academic">
-        <div className="container-academic">
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Title & Meta */}
-              <div>
-                <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-                  <span>{t(lesson.subject?.stage?.title_ar, lesson.subject?.stage?.title_en)}</span>
-                  <span>·</span>
-                  <span className="text-primary">{t(lesson.subject?.title_ar, lesson.subject?.title_en)}</span>
-                  <span>·</span>
-                  <span>{lesson.teacher?.full_name || t('المعلم', 'Teacher')}</span>
-                </div>
-                <h1 className="text-xl md:text-2xl font-medium text-foreground mb-3">
-                  {t(lesson.title_ar, lesson.title_en || lesson.title_ar)}
-                </h1>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-stretch">
+             {/* Left (Meta Information) */}
+             <div className="lg:w-1/3 flex flex-col justify-center space-y-6 order-2 lg:order-1">
+               <div>
+                  <div className="flex items-center gap-2 mb-3 text-sm text-slate-400">
+                    <span>{t(lesson.subject?.stage?.title_ar, lesson.subject?.stage?.title_en)}</span>
+                    <span>·</span>
+                    <span className="text-primary">{t(lesson.subject?.title_ar, lesson.subject?.title_en)}</span>
+                  </div>
+                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
+                    {t(lesson.title_ar, lesson.title_en || lesson.title_ar)}
+                  </h1>
+               </div>
+               
+               <div className="flex items-center gap-4 text-sm text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-primary font-bold">
+                      {lesson.teacher?.full_name?.charAt(0) || 'T'}
+                    </div>
+                    <span>{lesson.teacher?.full_name || t('المعلم', 'Teacher')}</span>
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-slate-700" />
                   <span className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
                     {duration}
                   </span>
-                  {isPreview && (
-                    <span className="badge-gold">
-                      {t('معاينة مجانية', 'Free Preview')}
-                    </span>
-                  )}
-                </div>
-              </div>
+               </div>
+               
+               {isPreview && (
+                 <div className="inline-flex text-sm pt-2">
+                   <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-4 py-1.5 rounded-full flex items-center gap-2 font-medium">
+                     <Play className="w-4 h-4" />
+                     {t('معاينة مجانية', 'Free Preview')}
+                   </span>
+                 </div>
+               )}
+             </div>
 
-              {/* Overview */}
+             {/* Right (Video) */}
+             <div className="lg:w-2/3 w-full order-1 lg:order-2">
+               <div className="rounded-xl overflow-hidden shadow-2xl bg-black aspect-video relative border border-slate-800">
+                 {youtubeId ? (
+                     <iframe
+                         width="100%"
+                         height="100%"
+                         src={`https://www.youtube.com/embed/${youtubeId}?enablejsapi=1`}
+                         title="Video player"
+                         frameBorder="0"
+                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                         allowFullScreen
+                         className="w-full h-full"
+                     ></iframe>
+                 ) : (
+                   <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-8">
+                       <Lock className="w-12 h-12 mb-4 opacity-30" />
+                       <p className="text-sm font-medium">{t('الفيديو غير متاح للمعاينة', 'Video not available for preview')}</p>
+                   </div>
+                 )}
+               </div>
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Lesson Content Section */}
+      <section className="section-academic bg-background">
+        <div className="container-academic">
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Overview & Blocks Wrapper */}
               <div>
-              {/* Content Renderer (Rich text, images, etc.) */}
+                <h2 className="text-xl font-bold text-foreground mb-6">
+                  {t('محتوى الدرس', 'Lesson Content')}
+                </h2>
+
+                <div className={`relative transition-all duration-300 ${!isExpanded ? 'max-h-[300px] overflow-hidden' : ''}`}>
+                  {/* Content Renderer (Rich text, images, etc.) */}
               {(lesson.blocks && lesson.blocks.length > 0) || (lesson.sections && lesson.sections.length > 0) ? (
                   <LessonContentRenderer lesson={lesson} isPublicPreview={true} />
               ) : (
@@ -173,6 +200,32 @@ const LessonPage = () => {
                     )}
                   </div>
               )}
+
+                  {/* Gradient Overlay when not expanded */}
+                  {!isExpanded && (
+                    <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+                  )}
+                </div>
+
+                <div className="pt-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                  >
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp className="w-4 h-4 me-2" />
+                        {t('عرض أقل', 'Show Less')}
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4 me-2" />
+                        {t('عرض المزيد', 'Show More')}
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
 
