@@ -19,6 +19,7 @@ export default function FeaturedSubjectsSection() {
         title_en: item.title_en,
         teaser_ar: item.teaser_ar,
         teaser_en: item.teaser_en,
+        stage_id: item.stage_id,
         stage_ar: item.stage?.title_ar,
         stage_en: item.stage?.title_en,
         lessons_count: 0,
@@ -57,7 +58,7 @@ export default function FeaturedSubjectsSection() {
                     {subjects.map((subject: any) => (
                         <Link
                             key={subject.id}
-                            to={`/subject/${subject.id}`}
+                            to={`/stages/${subject.stage_id}/${subject.id}`}
                             className="academic-card group hover:border-primary/30 transition-colors"
                         >
                             <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
@@ -83,7 +84,7 @@ export default function FeaturedSubjectsSection() {
                 </div>
 
                 <div className="text-center mt-8">
-                    <Link to="/stages">
+                    <Link to="/subjects">
                         <Button variant="outline" size="sm">
                             {t('استعرض جميع المواد', 'Browse All Subjects')}
                             <ChevronIcon className="w-4 h-4 ms-2" />

@@ -95,16 +95,22 @@ export function useLessons(subjectId: string | undefined, userId: string | undef
 
       if (subjectError || !subjectData) throw subjectError || new Error('Subject not found');
 
-      // Fetch published lessons
-      const { data: lessonsData, error: lessonsError } = await supabase
+      // Fetch lessons
+      let lessonsQuery = supabase
         .from('lessons')
         .select('*')
-        .eq('subject_id', subjectId!)
-        .eq('is_published', true)
+        .eq('subject_id', subjectId!);
+
+      // If not userId provided (guest), only show published
+      if (!userId) {
+        lessonsQuery = lessonsQuery.eq('is_published', true);
+      }
+
+      const { data: lessonsData, error: lessonsError } = await lessonsQuery
         .order('order_index', { ascending: true });
 
       if (lessonsError) throw lessonsError;
-      const lessons = lessonsData || [];
+      const lessons = (lessonsData || []) as any[];
 
       // Fetch user progress if logged in
       let progressMap: Record<string, any> = {};
@@ -113,7 +119,7 @@ export function useLessons(subjectId: string | undefined, userId: string | undef
           .from('lesson_progress')
           .select('*')
           .eq('user_id', userId)
-          .in('lesson_id', lessons.map(l => l.id));
+          .in('lesson_id', lessons.map((l: any) => l.id));
 
         (progressData || []).forEach((p: any) => {
           progressMap[p.lesson_id] = p;
@@ -139,18 +145,24 @@ export function useLesson(lessonId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.lessons.detail(lessonId!),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonId!);
+      
+      let query = supabase
         .from('lessons')
         .select(`
           *,
-          subject:subjects(*),
-          content_items:lesson_content_items(*),
+          subject:subjects(*, stage:stages(*)),
           sections:lesson_sections(*),
           blocks:lesson_blocks(*)
-        `)
-        .eq('id', lessonId!)
-        .eq('is_published', true)
-        .single();
+        `);
+      
+      if (isUuid) {
+          query = query.eq('id', lessonId!);
+      } else {
+          query = query.eq('slug', lessonId!);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) throw error;
 
@@ -162,8 +174,8 @@ export function useLesson(lessonId: string | undefined) {
       const { data: quizData } = await supabase
         .from('lesson_quizzes')
         .select('id')
-        .eq('lesson_id', lessonId!)
-        .single();
+        .eq('lesson_id', d.id)
+        .maybeSingle();
 
       // Fetch next lesson
       const { data: nextData } = await supabase
@@ -174,16 +186,17 @@ export function useLesson(lessonId: string | undefined) {
         .gt('order_index', d.order_index)
         .order('order_index', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       return {
         lesson: d,
-        quizId: quizData?.id || null,
+        quizId: quizData ? (quizData as any).id : null,
         nextLesson: nextData || null,
       };
     },
     enabled: !!lessonId,
     staleTime: STALE.medium,
+    retry: false, // Don't retry on 404/PGRST116
   });
 }
 
@@ -351,7 +364,7 @@ export function useMessageContacts(userId: string | undefined) {
 
       // Get unread counts
       const contactsWithMeta = [];
-      for (const teacher of teachers) {
+      for (const teacher of (teachers || []) as any[]) {
         const { count } = await supabase
           .from('messages')
           .select('id', { count: 'exact' })
@@ -360,7 +373,7 @@ export function useMessageContacts(userId: string | undefined) {
           .is('read_at', null);
 
         contactsWithMeta.push({
-          ...teacher,
+          ...(teacher as any),
           unread_count: count || 0,
         });
       }
@@ -408,7 +421,7 @@ export function useTeacherMessageContacts(userId: string | undefined) {
         const { data: progressData } = await supabase
           .from('lesson_progress')
           .select('user_id')
-          .in('lesson_id', lessons.map(l => l.id));
+          .in('lesson_id', (lessons as any[]).map(l => l.id));
 
         if (progressData) {
           progressData.forEach((p: any) => contactIdSet.add(p.user_id));
@@ -430,7 +443,7 @@ export function useTeacherMessageContacts(userId: string | undefined) {
 
       // Get unread counts
       const contactsWithMeta = [];
-      for (const student of students) {
+      for (const student of (students || []) as any[]) {
         const { count } = await supabase
           .from('messages')
           .select('id', { count: 'exact' })
@@ -439,7 +452,7 @@ export function useTeacherMessageContacts(userId: string | undefined) {
           .is('read_at', null);
 
         contactsWithMeta.push({
-          ...student,
+          ...(student as any),
           unread_count: count || 0,
         });
       }
@@ -459,7 +472,7 @@ export function useFeaturedSubjects() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('subjects')
-        .select('id, title_ar, title_en, teaser_ar, teaser_en, stage:stages(id, title_ar, title_en)')
+        .select('id, title_ar, title_en, stage_id, stage:stages(id, title_ar, title_en)')
         .eq('is_active', true)
         .eq('show_on_home', true)
         .order('home_order', { ascending: true })
@@ -479,13 +492,12 @@ export function useFeaturedLessons() {
       const { data, error } = await supabase
         .from('lessons')
         .select(`
-          id, title_ar, title_en, teaser_ar, teaser_en, preview_video_url, duration_seconds,
+          id, title_ar, title_en, summary_ar, summary_en, preview_video_url, duration_seconds,
           teacher:profiles!created_by(full_name),
           subject:subjects(title_ar, title_en, stage:stages(title_ar, title_en))
         `)
         .eq('is_published', true)
-        .eq('show_on_home', true)
-        .order('home_order', { ascending: true })
+        .order('order_index', { ascending: true })
         .limit(4);
 
       if (error) throw error;
@@ -504,8 +516,7 @@ export function useFeaturedTeachers() {
         .select('id, full_name, avatar_url, bio_ar, bio_en')
         .eq('role', 'teacher')
         .eq('is_active', true)
-        .eq('show_on_home', true)
-        .order('home_order', { ascending: true })
+        .order('full_name', { ascending: true })
         .limit(6);
 
       if (error) throw error;
@@ -521,10 +532,9 @@ export function useHomeStages() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('stages')
-        .select('id, slug, title_ar, title_en, description_ar, description_en, teaser_ar, teaser_en')
-        .eq('show_on_home', true)
+        .select('id, slug, title_ar, title_en, description_ar, description_en')
         .eq('is_active', true)
-        .order('home_order', { ascending: true });
+        .order('sort_order', { ascending: true });
 
       if (error) throw error;
       return data || [];
@@ -547,7 +557,7 @@ export function useSidebarLessons(subjectId: string, userId: string) {
         .order('order_index', { ascending: true });
 
       if (error) throw error;
-      const lessons = lessonsData || [];
+      const lessons = (lessonsData || []) as any[];
 
       let progressMap: Record<string, any> = {};
       if (lessons.length > 0) {
@@ -555,7 +565,7 @@ export function useSidebarLessons(subjectId: string, userId: string) {
           .from('lesson_progress')
           .select('*')
           .eq('user_id', userId)
-          .in('lesson_id', lessons.map(l => l.id));
+          .in('lesson_id', lessons.map((l: any) => l.id));
 
         (progressData || []).forEach((p: any) => {
           progressMap[p.lesson_id] = p;
@@ -605,8 +615,8 @@ export function useTeacherPublicSubjects(teacherId: string | undefined) {
             id, 
             title_ar, 
             title_en,
-            teaser_ar,
-            teaser_en,
+            description_ar,
+            description_en,
             stage:stages(id, title_ar, title_en)
           )
         `)

@@ -84,10 +84,6 @@ export default function SubjectsManagement() {
         slug: '',
         sort_order: 0,
         is_active: true,
-        show_on_home: false,
-        home_order: 0,
-        teaser_ar: '',
-        teaser_en: '',
         access_type: 'stage' as string,
     });
 
@@ -209,10 +205,6 @@ export default function SubjectsManagement() {
             slug: '',
             sort_order: subjects.length + 1,
             is_active: true,
-            show_on_home: false,
-            home_order: 0,
-            teaser_ar: '',
-            teaser_en: '',
             access_type: 'stage',
         });
         setDialogOpen(true);
@@ -229,10 +221,6 @@ export default function SubjectsManagement() {
             slug: subject.slug || '',
             sort_order: subject.sort_order || 0,
             is_active: !!subject.is_active,
-            show_on_home: !!subject.show_on_home,
-            home_order: subject.home_order || 0,
-            teaser_ar: subject.teaser_ar || '',
-            teaser_en: subject.teaser_en || '',
             access_type: subject.access_type || 'stage',
         });
         setDialogOpen(true);
@@ -268,10 +256,6 @@ export default function SubjectsManagement() {
                         access_type: form.access_type,
                         sort_order: form.sort_order,
                         is_active: form.is_active,
-                        show_on_home: form.show_on_home,
-                        home_order: form.home_order,
-                        teaser_ar: form.teaser_ar || null,
-                        teaser_en: form.teaser_en || null,
                     },
                     {
                         successMessage: { ar: 'تم تحديث المادة بنجاح', en: 'Subject updated successfully' },
@@ -296,10 +280,6 @@ export default function SubjectsManagement() {
                         access_type: form.access_type,
                         sort_order: form.sort_order,
                         is_active: form.is_active,
-                        show_on_home: form.show_on_home,
-                        home_order: form.home_order,
-                        teaser_ar: form.teaser_ar || null,
-                        teaser_en: form.teaser_en || null,
                     },
                     {
                         successMessage: { ar: 'تمت إضافة المادة بنجاح', en: 'Subject added successfully' },
@@ -745,48 +725,6 @@ export default function SubjectsManagement() {
                             />
                         </div>
 
-                        <div className="border-t pt-4 mt-4">
-                            <h3 className="font-medium mb-3">{t('إعدادات الصفحة الرئيسية', 'Homepage Settings')}</h3>
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="show_on_home">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>
-                                    <Switch
-                                        id="show_on_home"
-                                        checked={form.show_on_home}
-                                        onCheckedChange={(checked) => setForm({ ...form, show_on_home: checked })}
-                                    />
-                                </div>
-                                {form.show_on_home && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="home_order">{t('ترتيب الظهور', 'Display Order')}</Label>
-                                            <Input
-                                                id="home_order"
-                                                type="number"
-                                                value={form.home_order}
-                                                onChange={(e) => setForm({ ...form, home_order: parseInt(e.target.value) || 0 })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="teaser_ar">{t('نص ترويجي (عربي)', 'Teaser Text (Arabic)')}</Label>
-                                            <Input
-                                                id="teaser_ar"
-                                                value={form.teaser_ar}
-                                                onChange={(e) => setForm({ ...form, teaser_ar: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="teaser_en">{t('نص ترويجي (إنجليزي)', 'Teaser Text (English)')}</Label>
-                                            <Input
-                                                id="teaser_en"
-                                                value={form.teaser_en}
-                                                onChange={(e) => setForm({ ...form, teaser_en: e.target.value })}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
                         <div className="flex gap-2 pt-4">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
                                 {t('إلغاء', 'Cancel')}

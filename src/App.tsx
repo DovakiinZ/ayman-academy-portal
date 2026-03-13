@@ -15,6 +15,7 @@ import Index from "./pages/Index";
 import Stages from "./pages/Stages";
 import StageDetail from "./pages/StageDetail";
 import SubjectDetail from "./pages/SubjectDetail";
+import Subjects from "./pages/Subjects";
 import LessonPage from "./pages/LessonPage";
 import Plans from "./pages/Plans";
 import Account from "./pages/Account";
@@ -94,6 +95,7 @@ const App = () => (
                   <Route path="/stages" element={<Stages />} />
                   <Route path="/stages/:stageId" element={<StageDetail />} />
                   <Route path="/stages/:stageId/:subjectId" element={<SubjectDetail />} />
+                  <Route path="/subjects" element={<Subjects />} />
                   <Route path="/lesson/:lessonId" element={<LessonPage />} />
                   <Route path="/plans" element={<Plans />} />
                   <Route path="/account" element={<Account />} />

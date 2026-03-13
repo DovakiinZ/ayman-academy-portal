@@ -54,14 +54,8 @@ interface Stage {
     sort_order: number;
 }
 
-interface LessonWithJoins extends Lesson {
-    subject?: {
-        id: string;
-        title_ar: string;
-        title_en?: string | null;
-        stage_id?: string;
-        stage?: Stage | null;
-    } | null;
+interface LessonWithJoins extends Omit<Lesson, 'subject'> {
+    subject?: (Subject & { stage?: Stage | null }) | null;
 }
 
 export default function LessonsManagement() {
@@ -85,7 +79,7 @@ export default function LessonsManagement() {
     const [showFilters, setShowFilters] = useState(!subjectId);
 
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+    const [editingLesson, setEditingLesson] = useState<LessonWithJoins | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Lesson | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
@@ -101,10 +95,6 @@ export default function LessonsManagement() {
         order_index: 0,
         is_published: false,
         is_paid: true,
-        show_on_home: false,
-        home_order: 0,
-        teaser_ar: '',
-        teaser_en: '',
     });
 
     const { isTranslating: titleAutoTranslating } = useAutoTranslate(
@@ -208,8 +198,6 @@ export default function LessonsManagement() {
             summary_ar: '', summary_en: '',
             order_index: lessons.length + 1,
             is_published: false, is_paid: true,
-            show_on_home: false, home_order: 0,
-            teaser_ar: '', teaser_en: '',
         });
         setDialogOpen(true);
     };
@@ -227,10 +215,6 @@ export default function LessonsManagement() {
             order_index: lesson.order_index,
             is_published: lesson.is_published ?? false,
             is_paid: lesson.is_paid,
-            show_on_home: lesson.show_on_home || false,
-            home_order: lesson.home_order || 0,
-            teaser_ar: lesson.teaser_ar || '',
-            teaser_en: lesson.teaser_en || '',
         });
         setDialogOpen(true);
     };
@@ -259,10 +243,6 @@ export default function LessonsManagement() {
                     order_index: form.order_index,
                     is_published: form.is_published,
                     is_paid: form.is_paid,
-                    show_on_home: form.show_on_home,
-                    home_order: form.home_order,
-                    teaser_ar: form.teaser_ar || null,
-                    teaser_en: form.teaser_en || null,
                 }, {
                     successMessage: { ar: 'تم تحديث الدرس بنجاح', en: 'Lesson updated' },
                     errorMessage: { ar: 'فشل في تحديث الدرس', en: 'Failed to update lesson' },
@@ -281,10 +261,6 @@ export default function LessonsManagement() {
                     order_index: form.order_index,
                     is_published: form.is_published,
                     is_paid: form.is_paid,
-                    show_on_home: form.show_on_home,
-                    home_order: form.home_order,
-                    teaser_ar: form.teaser_ar || null,
-                    teaser_en: form.teaser_en || null,
                 }, {
                     successMessage: { ar: 'تمت إضافة الدرس', en: 'Lesson added' },
                     errorMessage: { ar: 'فشل في إضافة الدرس', en: 'Failed to add lesson' },
@@ -588,31 +564,6 @@ export default function LessonsManagement() {
                         <div className="flex items-center justify-between">
                             <Label htmlFor="is_published">{t('منشور', 'Published')}</Label>
                             <Switch id="is_published" checked={form.is_published} onCheckedChange={(checked) => setForm({ ...form, is_published: checked })} />
-                        </div>
-                        <div className="border-t pt-4 mt-4">
-                            <h3 className="font-medium mb-3">{t('إعدادات الصفحة الرئيسية', 'Homepage Settings')}</h3>
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="show_on_home">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>
-                                    <Switch id="show_on_home" checked={form.show_on_home} onCheckedChange={(checked) => setForm({ ...form, show_on_home: checked })} />
-                                </div>
-                                {form.show_on_home && (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="home_order">{t('ترتيب الظهور', 'Display Order')}</Label>
-                                            <Input id="home_order" type="number" value={form.home_order} onChange={(e) => setForm({ ...form, home_order: parseInt(e.target.value) || 0 })} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="teaser_ar">{t('نص ترويجي (عربي)', 'Teaser (Arabic)')}</Label>
-                                            <Input id="teaser_ar" value={form.teaser_ar} onChange={(e) => setForm({ ...form, teaser_ar: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="teaser_en">{t('نص ترويجي (إنجليزي)', 'Teaser (English)')}</Label>
-                                            <Input id="teaser_en" value={form.teaser_en} onChange={(e) => setForm({ ...form, teaser_en: e.target.value })} />
-                                        </div>
-                                    </>
-                                )}
-                            </div>
                         </div>
                         <div className="flex gap-2 pt-4">
                             <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>{t('إلغاء', 'Cancel')}</Button>

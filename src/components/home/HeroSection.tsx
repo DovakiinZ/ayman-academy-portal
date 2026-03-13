@@ -17,7 +17,7 @@ const HeroSection = () => {
     'منهج تعليمي متكامل يجمع بين الأساليب الأكاديمية الحديثة والقيم التربوية الراسخة.',
     'A comprehensive curriculum combining modern academic methods with established educational values.'
   );
-  const ctaText = useTemplate('home.hero.cta', 'استعرض المراحل', 'Explore Stages');
+  const ctaText = useTemplate('home.hero.cta', 'استعرض المواد الدراسية', 'Explore Subjects');
   const subCtaText = useTemplate('home.hero.subcta', 'معلومات الاشتراك', 'Subscription Info');
 
   return (
@@ -45,7 +45,7 @@ const HeroSection = () => {
             {descText}
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link to="/stages">
+            <Link to="/subjects">
               <Button size="default" className="gap-2">
                 {ctaText}
                 <ArrowIcon className="w-4 h-4" />

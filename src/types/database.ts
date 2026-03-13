@@ -114,6 +114,7 @@ export interface Lesson {
     is_published: boolean;
     created_by: string | null;
     created_at: string;
+    updated_at?: string;
     // Metadata
     objectives_ar?: string | null;
     objectives_en?: string | null;

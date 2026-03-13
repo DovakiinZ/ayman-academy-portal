@@ -17,6 +17,7 @@ import LessonOutline from './LessonOutline';
 import BlockEditor from './BlockEditor';
 import LessonSettings from './LessonSettings';
 import DraftRecoveryDialog from './DraftRecoveryDialog';
+import PublishLessonDialog from './PublishLessonDialog';
 
 // Utilities
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
@@ -47,6 +48,7 @@ export default function LessonEditor() {
     const [showDraftDialog, setShowDraftDialog] = useState(false);
     const [pendingDraft, setPendingDraft] = useState<LessonDraft | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
 
     // Auto-save timers
     const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -112,22 +114,24 @@ export default function LessonEditor() {
     const fetchLessonData = async () => {
         setLoading(true);
         try {
-            const { data: lessonData, error: lessonError } = await supabase
+            const { data: lessonDataResult, error: lessonError } = await supabase
                 .from('lessons')
                 .select('*')
                 .eq('id', id!)
                 .single();
 
             if (lessonError) throw lessonError;
+            if (!lessonDataResult) throw new Error('Lesson not found');
+            const lessonResult = lessonDataResult as Lesson;
 
             // Check teacher access - teachers can only edit their own lessons
-            if (profile?.role === 'teacher' && lessonData.created_by !== profile.id) {
+            if (profile?.role === 'teacher' && lessonResult.created_by !== profile.id) {
                 toast.error(t('ليس لديك صلاحية لتعديل هذا الدرس', 'You do not have permission to edit this lesson'));
                 navigate('/teacher/lessons');
                 return;
             }
 
-            setLesson(lessonData);
+            setLesson(lessonResult);
 
             const { data: sectionsData, error: sectionsError} = await supabase
                 .from('lesson_sections')
@@ -136,7 +140,7 @@ export default function LessonEditor() {
                 .order('order_index');
 
             if (sectionsError) throw sectionsError;
-            setSections((sectionsData as any) || []);
+            setSections((sectionsData as LessonSection[]) || []);
 
             const { data: blocksData, error: blocksError } = await supabase
                 .from('lesson_blocks')
@@ -145,7 +149,7 @@ export default function LessonEditor() {
                 .order('order_index');
 
             if (blocksError) throw blocksError;
-            setBlocks((blocksData as any) || []);
+            setBlocks((blocksData as LessonBlock[]) || []);
 
             if (sectionsData && sectionsData.length > 0) {
                 setActiveSectionId((sectionsData as any)[0].id);
@@ -381,7 +385,30 @@ export default function LessonEditor() {
             setBlocks(blocks.filter(b => b.id !== blockId));
             toast.success(t('تم الحذف', 'Deleted'));
         } catch (error) {
-            toast.error(t('فشل في الحذف', 'Failed to delete'));
+            toast.error(t('فشل الحذف', 'Failed to delete'));
+        }
+    };
+
+    const handlePublishLesson = async (settings: { is_published: boolean; is_paid: boolean; is_free_preview: boolean }) => {
+        if (!lesson) return;
+
+        try {
+            const { error } = await supabase
+                .from('lessons')
+                .update({
+                    ...settings,
+                    updated_at: new Date().toISOString()
+                } as any)
+                .eq('id', lesson.id);
+
+            if (error) throw error;
+
+            setLesson({ ...lesson, ...settings });
+            toast.success(t('تم تحديث حالة الدرس بنجاح', 'Lesson status updated successfully'));
+        } catch (error) {
+            console.error('Error publishing lesson:', error);
+            toast.error(t('فشل في تحديث حالة الدرس', 'Failed to update lesson status'));
+            throw error;
         }
     };
 
@@ -469,6 +496,15 @@ export default function LessonEditor() {
                 onDiscard={handleDiscardDraft}
             />
 
+            <PublishLessonDialog
+                open={isPublishDialogOpen}
+                onOpenChange={setIsPublishDialogOpen}
+                lesson={lesson}
+                sections={sections}
+                blocks={blocks}
+                onPublish={handlePublishLesson}
+            />
+
             <div className="flex h-screen bg-background overflow-hidden">
             {/* Left Sidebar: Outline */}
             <div className="w-64 border-e border-border bg-card flex flex-col">
@@ -509,6 +545,15 @@ export default function LessonEditor() {
                         >
                             {previewMode ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                             {previewMode ? t('تحرير', 'Edit') : t('معاينة', 'Preview')}
+                        </Button>
+
+                        <Button
+                            size="sm"
+                            onClick={() => setIsPublishDialogOpen(true)}
+                            className="gap-1.5"
+                        >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            {t('إنهاء ونشر', 'Finalize & Publish')}
                         </Button>
                     </div>
                 </div>

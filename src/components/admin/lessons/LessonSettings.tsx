@@ -153,16 +153,6 @@ export default function LessonSettings({ lesson, onUpdate }: LessonSettingsProps
                         onCheckedChange={c => handleLessonChange('is_free_preview', c)}
                     />
                 </div>
-                <div className="flex items-center justify-between py-2">
-                    <div>
-                        <Label className="text-sm">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>
-                        <p className="text-xs text-muted-foreground">{t('إظهار في المميز', 'Display in featured')}</p>
-                    </div>
-                    <Switch
-                        checked={(localLesson as any).show_on_home || false}
-                        onCheckedChange={c => handleLessonChange('show_on_home' as any, c)}
-                    />
-                </div>
 
                 <Button onClick={handleSaveLesson} className="w-full mt-4">
                     {t('حفظ التغييرات', 'Save Changes')}

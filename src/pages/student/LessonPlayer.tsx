@@ -26,7 +26,6 @@ const getYoutubeId = (url: string) => {
 
 interface LessonWithDetails extends Lesson {
     subject: Subject;
-    content_items: LessonContentItem[];
     sections: LessonSection[];
     blocks: LessonBlock[];
 }
@@ -57,7 +56,7 @@ export default function LessonPlayer() {
     const [scrollProgress, setScrollProgress] = useState(0);
 
     // Use the custom hook for progress
-    const { progress, updateProgress, isCompleted } = useLessonProgress(id || '');
+    const { progress, updateProgress, isCompleted } = useLessonProgress(lesson?.id || '');
 
     // Sync scroll progress to database (debounced)
     const progressSyncRef = useRef<NodeJS.Timeout | null>(null);
@@ -120,8 +119,8 @@ export default function LessonPlayer() {
     const BackIcon = direction === 'rtl' ? ChevronRight : ChevronLeft;
     const NextIcon = direction === 'rtl' ? ArrowLeft : ArrowRight;
 
-    const resources = lesson.content_items?.filter(i => ['file', 'link'].includes(i.type)) || [];
     const publishedBlocks = lesson.blocks?.filter(b => b.is_published !== false) || [];
+    const resources = publishedBlocks.filter(b => ['file', 'link'].includes(b.type)) || [];
     const totalBlocks = publishedBlocks.length;
     const displayProgress = isCompleted ? 100 : scrollProgress;
 
@@ -339,8 +338,12 @@ export default function LessonPlayer() {
                                                     rel="noopener noreferrer"
                                                     className="flex items-center p-3 bg-secondary/10 border border-border rounded-md hover:border-primary transition-colors group"
                                                 >
-                                                    <Download className="w-4 h-4 text-primary shrink-0" />
-                                                    <span className="mx-3 text-sm truncate">{t(res.title_ar, res.title_en || res.title_ar)}</span>
+                                                    {res.type === 'file' ? (
+                                                        <Download className="w-4 h-4 text-primary shrink-0" />
+                                                    ) : (
+                                                        <FileText className="w-4 h-4 text-primary shrink-0" />
+                                                    )}
+                                                    <span className="mx-3 text-sm truncate">{t(res.title_ar || '', res.title_en || res.title_ar || '')}</span>
                                                 </a>
                                             ))}
                                         </div>

@@ -210,32 +210,20 @@ CREATE POLICY "lessons_teacher_delete" ON public.lessons
     )
   );
 
--- Students: read published lessons from published courses
+-- Students: read published lessons
 CREATE POLICY "lessons_student_read" ON public.lessons
   FOR SELECT
   TO authenticated
   USING (
     is_published = true
     AND public.get_user_role() = 'student'
-    AND EXISTS (
-      SELECT 1 FROM public.courses
-      WHERE courses.id = lessons.course_id
-      AND courses.is_published = true
-    )
   );
 
--- Public/anonymous: read published lessons from published courses
+-- Public/anonymous: read published lessons
 CREATE POLICY "lessons_public_read" ON public.lessons
   FOR SELECT
   TO anon
-  USING (
-    is_published = true
-    AND EXISTS (
-      SELECT 1 FROM public.courses
-      WHERE courses.id = lessons.course_id
-      AND courses.is_published = true
-    )
-  );
+  USING (is_published = true);
 
 -- ============================================================
 -- TEACHER_INVITES TABLE (if exists)
