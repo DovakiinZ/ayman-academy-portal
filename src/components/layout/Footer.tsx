@@ -16,6 +16,8 @@ const Footer = () => {
     legal: [
       { path: '/privacy', label: { ar: 'سياسة الخصوصية', en: 'Privacy Policy' } },
       { path: '/terms', label: { ar: 'الشروط والأحكام', en: 'Terms of Service' } },
+      { path: '/refund-policy', label: { ar: 'سياسة الاسترداد', en: 'Refund Policy' } },
+      { path: '/certificate-policy', label: { ar: 'سياسة الشهادات', en: 'Certificate Policy' } },
     ],
   };
 

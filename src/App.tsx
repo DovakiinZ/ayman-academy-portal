@@ -22,6 +22,12 @@ import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
 import VerifyCertificate from "./pages/VerifyCertificate";
 
+// Legal pages
+import TermsPage from "./pages/legal/TermsPage";
+import PrivacyPage from "./pages/legal/PrivacyPage";
+import RefundPolicyPage from "./pages/legal/RefundPolicyPage";
+import CertificatePolicyPage from "./pages/legal/CertificatePolicyPage";
+
 // Auth pages
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -101,6 +107,10 @@ const App = () => (
                   <Route path="/account" element={<Account />} />
                   <Route path="/teacher/:id" element={<TeacherProfilePublic />} />
                   <Route path="/verify/:code" element={<VerifyCertificate />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/refund-policy" element={<RefundPolicyPage />} />
+                  <Route path="/certificate-policy" element={<CertificatePolicyPage />} />
 
                   {/* Auth routes */}
                   <Route path="/login" element={<Login />} />

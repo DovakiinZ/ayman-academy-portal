@@ -145,7 +145,12 @@ export function useLesson(lessonId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.lessons.detail(lessonId!),
     queryFn: async () => {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonId!);
+      if (!lessonId) return null;
+
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonId);
+      if (!isUuid) {
+        throw new Error('Invalid lesson ID format');
+      }
       
       let query = supabase
         .from('lessons')
@@ -154,13 +159,8 @@ export function useLesson(lessonId: string | undefined) {
           subject:subjects(*, stage:stages(*)),
           sections:lesson_sections(*),
           blocks:lesson_blocks(*)
-        `);
-      
-      if (isUuid) {
-          query = query.eq('id', lessonId!);
-      } else {
-          query = query.eq('slug', lessonId!);
-      }
+        `)
+        .eq('id', lessonId);
 
       const { data, error } = await query.maybeSingle();
 
@@ -645,6 +645,130 @@ export function useTeacherPublicSubjects(teacherId: string | undefined) {
       }
 
       return Array.from(subjectMap.values());
+    },
+  });
+}
+
+// ─── Teacher Showcase Landing Data ───────────────────────
+
+export function useTeacherShowcaseData(teacherId: string | undefined) {
+  return useQuery({
+    queryKey: ['teacher-showcase', teacherId],
+    queryFn: async () => {
+      // 1. Fetch Teacher Profile
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', teacherId!)
+        .eq('role', 'teacher')
+        .single();
+        
+      if (profileErr || !profile) throw profileErr || new Error('Teacher not found');
+
+      // 2. Fetch Public Lessons & Subjects taught by the teacher
+      const { data: lessons, error: lessonsErr } = await supabase
+        .from('lessons')
+        .select(`
+          id,
+          title_ar,
+          title_en,
+          duration_minutes,
+          duration_seconds,
+          is_paid,
+          preview_video_url,
+          subject_id,
+          subject:subjects(
+            id, 
+            title_ar, 
+            title_en,
+            description_ar,
+            description_en,
+            teaser_ar,
+            teaser_en,
+            stage:stages(id, title_ar, title_en)
+          )
+        `)
+        .eq('created_by', teacherId!)
+        .eq('is_published', true);
+
+      // 3. Calculate Stats & Fetch Reviews
+      let totalStudents = 0;
+      let totalReviews = 0;
+      let averageRating = 0;
+      let reviews: any[] = [];
+
+      const lessonIds = (lessons || []).map((l: any) => l.id);
+
+      if (lessonIds.length > 0) {
+        // Students: distinct user_id in lesson_progress
+        const { data: progressData } = await supabase
+          .from('lesson_progress')
+          .select('user_id')
+          .in('lesson_id', lessonIds);
+        
+        if (progressData) {
+          const uniqueStudents = new Set(progressData.map((p: any) => p.user_id));
+          totalStudents = uniqueStudents.size;
+        }
+
+        // Ratings & Reviews
+        const { data: ratingsData } = await supabase
+          .from('lesson_ratings')
+          .select(`
+            id,
+            rating,
+            comment,
+            created_at,
+            user:profiles(full_name, avatar_url),
+            lesson:lessons(id, title_ar, title_en)
+          `)
+          .in('lesson_id', lessonIds)
+          //.not('comment', 'is', null) - supabase js syntax issue, fetch all and filter in memory
+          .order('created_at', { ascending: false });
+        
+        const allRatings = (ratingsData as any[]) || [];
+        if (allRatings.length > 0) {
+          totalReviews = allRatings.length;
+          averageRating = allRatings.reduce((acc, curr) => acc + curr.rating, 0) / allRatings.length;
+          // Only show top recent ones with comments for testimonials
+          reviews = allRatings.filter(r => r.comment && r.comment.trim() !== '').slice(0, 6);
+        }
+      }
+
+      // Group subjects (Course equivalents)
+      const subjectMap = new Map<string, any>();
+      for (const lesson of (lessons || [])) {
+        const anyLesson = lesson as any;
+        if (!anyLesson.subject) continue;
+        const subj = Array.isArray(anyLesson.subject) ? anyLesson.subject[0] : anyLesson.subject;
+        if (!subj) continue;
+
+        if (!subjectMap.has(subj.id)) {
+          subjectMap.set(subj.id, {
+            ...subj,
+            lessons_count: 0,
+            total_duration_seconds: 0
+          });
+        }
+        
+        const mapEntry = subjectMap.get(subj.id);
+        mapEntry.lessons_count++;
+        // Calculate estimated duration
+        const durationSecs = anyLesson.duration_seconds || (anyLesson.duration_minutes ? anyLesson.duration_minutes * 60 : 0);
+        mapEntry.total_duration_seconds += durationSecs;
+      }
+
+      return {
+        profile,
+        courses: Array.from(subjectMap.values()),
+        stats: {
+          totalStudents,
+          totalCourses: subjectMap.size,
+          averageRating: Number(averageRating.toFixed(1)),
+          totalReviews
+        },
+        reviews
+      };
     },
     enabled: !!teacherId,
     staleTime: STALE.static,
