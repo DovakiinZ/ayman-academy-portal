@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, FileText, Download, CheckCircle, Clock, Lock
 import { Button } from '@/components/ui/button';
 import { useLesson } from '@/hooks/useQueryHooks';
 import { LessonBlock, LessonSection } from '@/types/database';
+import { LessonContentRenderer } from '@/components/shared/LessonContentRenderer';
 
 // Helper to extract YouTube ID
 const getYoutubeId = (url: string) => {
@@ -67,9 +68,12 @@ const LessonPage = () => {
   const publishedBlocks = lesson.blocks?.filter((b: LessonBlock) => b.is_published !== false) || [];
   const resources = publishedBlocks.filter((b: LessonBlock) => ['file', 'link'].includes(b.type)) || [];
   
-  const currentVideoUrl = lesson.video_url || lesson.full_video_url || lesson.preview_video_url || null;
+  // Find the first video block from the new schema
+  const videoBlock = publishedBlocks.find((b: LessonBlock) => b.type === 'video');
+  const currentVideoUrl = videoBlock?.url || lesson.video_url || lesson.full_video_url || lesson.preview_video_url || null;
+  
   const youtubeId = currentVideoUrl ? getYoutubeId(currentVideoUrl) : null;
-  const isPreview = !!lesson.preview_video_url;
+  const isPreview = !!lesson.preview_video_url || (videoBlock?.metadata as any)?.is_preview;
 
   return (
     <Layout>
@@ -138,29 +142,38 @@ const LessonPage = () => {
 
               {/* Overview */}
               <div>
-                <h2 className="text-base font-medium text-foreground mb-2">
-                  {t('نظرة عامة', 'Overview')}
-                </h2>
-                <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
-                  <p className="whitespace-pre-wrap">
-                      {t(lesson.summary_ar || '', lesson.summary_en || lesson.summary_ar || '')}
-                  </p>
-                </div>
-              </div>
-
-              {/* Objectives (If using old objectives column or block) */}
-              {(lesson.objectives_ar || lesson.objectives_en) && (
-                <div>
-                  <h2 className="text-base font-medium text-foreground mb-2">
-                    {t('أهداف الدرس', 'Lesson Objectives')}
-                  </h2>
-                  <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
-                      <p className="whitespace-pre-wrap">
-                          {t(lesson.objectives_ar || '', lesson.objectives_en || '')}
-                      </p>
+              {/* Content Renderer (Rich text, images, etc.) */}
+              {(lesson.blocks && lesson.blocks.length > 0) || (lesson.sections && lesson.sections.length > 0) ? (
+                  <LessonContentRenderer lesson={lesson} isPublicPreview={true} />
+              ) : (
+                  <div>
+                    {lesson.summary_ar && (
+                        <>
+                          <h2 className="text-base font-medium text-foreground mb-2">
+                            {t('نظرة عامة', 'Overview')}
+                          </h2>
+                          <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm mb-6">
+                            <p className="whitespace-pre-wrap">
+                                {t(lesson.summary_ar || '', lesson.summary_en || lesson.summary_ar || '')}
+                            </p>
+                          </div>
+                        </>
+                    )}
+                    {lesson.objectives_ar && (
+                        <>
+                          <h2 className="text-base font-medium text-foreground mb-2">
+                            {t('أهداف الدرس', 'Lesson Objectives')}
+                          </h2>
+                          <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
+                              <p className="whitespace-pre-wrap">
+                                  {t(lesson.objectives_ar || '', lesson.objectives_en || '')}
+                              </p>
+                          </div>
+                        </>
+                    )}
                   </div>
-                </div>
               )}
+              </div>
             </div>
 
             {/* Sidebar */}
@@ -198,25 +211,27 @@ const LessonPage = () => {
               )}
 
               {/* Subscription CTA */}
-              <div className="academic-card bg-secondary/40">
-                <div className="flex items-center gap-2 mb-2">
-                  <Lock className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
-                  <h3 className="font-medium text-foreground text-sm">
-                    {t('هذا المحتوى مخصص للمشتركين', 'Subscriber Content')}
-                  </h3>
+              {(!currentVideoUrl || isPreview) && (
+                <div className="academic-card bg-secondary/40">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lock className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
+                    <h3 className="font-medium text-foreground text-sm">
+                      {t('هذا المحتوى مخصص للمشتركين', 'Subscriber Content')}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {t(
+                      'اشترك للحصول على جميع الدروس والمواد التعليمية',
+                      'Subscribe to access all lessons and educational materials'
+                    )}
+                  </p>
+                  <Link to="/plans">
+                    <Button className="w-full" size="sm">
+                      {t('طلب اشتراك', 'Request Subscription')}
+                    </Button>
+                  </Link>
                 </div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  {t(
-                    'اشترك للحصول على جميع الدروس والمواد التعليمية',
-                    'Subscribe to access all lessons and educational materials'
-                  )}
-                </p>
-                <Link to="/plans">
-                  <Button className="w-full" size="sm">
-                    {t('طلب اشتراك', 'Request Subscription')}
-                  </Button>
-                </Link>
-              </div>
+              )}
             </div>
           </div>
         </div>
