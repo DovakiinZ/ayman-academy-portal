@@ -21,6 +21,7 @@ import {
   studentBottomNavItems,
 } from '@/config/nav';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import { cn } from '@/lib/utils';
 
 interface MobileLayoutProps {
   role: UserRole;
@@ -73,8 +74,13 @@ export default function MobileLayout({ role }: MobileLayoutProps) {
       </header>
 
       {/* Main content */}
-      <main className={`flex-1 ${isStudent ? 'pb-16' : ''}`}>
-        <div className="px-4 py-4">
+      <main className={cn(
+        "flex-1",
+        isStudent ? 'pb-16' : '',
+        // Disable default padding for the lesson editor to allow it to be full-screen
+        location.pathname.includes('/lessons/') && !location.pathname.endsWith('/lessons') && "px-0 py-0"
+      )}>
+        <div className={cn("px-4 py-4", location.pathname.includes('/lessons/') && !location.pathname.endsWith('/lessons') && "px-0 py-0")}>
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

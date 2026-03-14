@@ -169,24 +169,36 @@ export default function VerifyCertificate() {
                                         value={certificate.subject_name}
                                     />
                                 )}
-                                {certificate.score !== null && (
+                                {(certificate.snapshot_json?.score != null || certificate.score !== null) && (
                                     <DetailRow
                                         label={t('الدرجة', 'Score')}
                                         value={`${certificate.snapshot_json?.score ?? certificate.score}%`}
                                     />
                                 )}
+                                {certificate.snapshot_json?.average_rating != null && (
+                                    <DetailRow
+                                        label={t('التقييم', 'Rating')}
+                                        value={`${certificate.snapshot_json.average_rating}/5`}
+                                    />
+                                )}
                                 <DetailRow
                                     label={t('تاريخ الإتمام', 'Completion Date')}
-                                    value={new Date(certificate.snapshot_json?.completion_date || certificate.issued_at).toLocaleDateString('ar-EG', {
+                                    value={new Date(certificate.snapshot_json?.completion_date || certificate.issued_at).toLocaleDateString(t('ar-EG', 'en-US'), {
                                         year: 'numeric',
                                         month: 'long',
                                         day: 'numeric',
                                     })}
                                 />
-                                {certificate.snapshot_json?.teacher_name && (
+                                {(certificate.snapshot_json?.teacher_name || certificate.course_name) && (
                                     <DetailRow
                                         label={t('المعلم', 'Teacher')}
-                                        value={certificate.snapshot_json.teacher_name}
+                                        value={certificate.snapshot_json?.teacher_name || certificate.course_name}
+                                    />
+                                )}
+                                {certificate.snapshot_json?.teacher_remarks && (
+                                    <DetailRow
+                                        label={t('ملاحظات المعلم', 'Teacher Remarks')}
+                                        value={certificate.snapshot_json.teacher_remarks}
                                     />
                                 )}
                             </div>

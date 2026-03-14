@@ -45,6 +45,7 @@ import StudentSubjects from "./pages/student/StudentSubjects";
 import StudentLessons from "./pages/student/StudentLessons";
 import MySubjects from "./pages/student/MySubjects";
 import StudentTeachers from "./pages/student/StudentTeachers";
+import TeacherCourses from "./pages/student/TeacherCourses";
 import StudentProfile from "./pages/student/StudentProfile";
 import Messages from "./pages/student/Messages";
 import LessonPlayer from "./pages/student/LessonPlayer";
@@ -75,6 +76,7 @@ import LessonEditor from "./components/admin/lessons/LessonEditor";
 import TeacherProfile from "./pages/teacher/TeacherProfile";
 import TeacherAnnouncements from "./pages/teacher/TeacherAnnouncements";
 import TeacherCertificates from "./pages/teacher/TeacherCertificates";
+import TeacherReviews from "./pages/teacher/TeacherReviews";
 
 import { TemplateProvider } from "./contexts/TemplateContext";
 
@@ -163,6 +165,7 @@ const App = () => (
                     <Route path="quizzes" element={<TeacherQuizzes />} />
                     <Route path="messages" element={<Messages />} />
                     <Route path="announcements" element={<TeacherAnnouncements />} />
+                    <Route path="reviews" element={<TeacherReviews />} />
                     <Route path="certificates" element={<TeacherCertificates />} />
                     <Route path="profile" element={<TeacherProfile />} />
                   </Route>
@@ -179,6 +182,7 @@ const App = () => (
                     <Route path="subjects" element={<MySubjects />} />
                     <Route path="subjects/:subjectId" element={<StudentLessons />} />
                     <Route path="teachers" element={<StudentTeachers />} />
+                    <Route path="teachers/:teacherId/courses" element={<TeacherCourses />} />
                     <Route path="certificates" element={<MyCertificates />} />
                     <Route path="messages" element={<Messages />} />
                     <Route path="profile" element={<StudentProfile />} />

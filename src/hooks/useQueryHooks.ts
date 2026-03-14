@@ -774,3 +774,109 @@ export function useTeacherShowcaseData(teacherId: string | undefined) {
     staleTime: STALE.static,
   });
 }
+// ─── Teacher Feedback ────────────────────────────────────
+
+export function useTeacherFeedback(teacherId: string | undefined) {
+  return useQuery({
+    queryKey: ['teacher-feedback', teacherId!],
+    queryFn: async () => {
+      // 1. Fetch all lessons created by this teacher
+      const { data: lessons, error: lessonsErr } = await (supabase
+        .from('lessons')
+        .select(`
+          id, 
+          title_ar, 
+          title_en,
+          subject:subjects(id, title_ar, title_en)
+        `)
+        .eq('created_by', teacherId!) as any);
+
+      if (lessonsErr) throw lessonsErr;
+      const lessonIds = (lessons || []).map(l => l.id);
+
+      if (lessonIds.length === 0) {
+        return {
+          stats: { averageRating: 0, totalReviews: 0 },
+          reviews: [],
+          subjects: []
+        };
+      }
+
+      // 2. Fetch all ratings for these lessons
+      const { data: ratings, error: ratingsErr } = await supabase
+        .from('lesson_ratings')
+        .select(`
+          *,
+          user:profiles(full_name, avatar_url),
+          lesson:lessons(id, title_ar, title_en)
+        `)
+        .in('lesson_id', lessonIds)
+        .order('created_at', { ascending: false });
+
+      if (ratingsErr) throw ratingsErr;
+
+      // 3. Fetch certificates to get re-issue remarks (Historical feedback)
+      const { data: certs, error: certErr } = await supabase
+        .from('certificates')
+        .select(`
+          id,
+          student_name,
+          snapshot_json,
+          created_at,
+          lesson:lessons(id, title_ar, title_en)
+        `)
+        .in('lesson_id', lessonIds)
+        .not('snapshot_json', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (certErr) throw certErr;
+
+      const allRatings = (ratings || []) as any[];
+      const allCerts = (certs || []) as any[];
+
+      // Extract system remarks from certificates (where reissue_reason exists)
+      const systemRemarks = allCerts
+        .filter(c => c.snapshot_json?.reissue_reason)
+        .map(c => ({
+          id: `sys-${c.id}`,
+          type: 'system',
+          student_name: c.student_name,
+          comment: c.snapshot_json.reissue_reason,
+          created_at: c.created_at,
+          lesson: c.lesson
+        }));
+      
+      // Calculate Stats
+      const totalReviews = allRatings.length;
+      const averageRating = totalReviews > 0 
+        ? allRatings.reduce((acc, curr) => acc + curr.rating, 0) / totalReviews 
+        : 0;
+
+      // Group subjects with their lessons for the health panel integration
+      const subjectMap = new Map<string, any>();
+      (lessons || []).forEach((l: any) => {
+        if (!l.subject) return;
+        const s = l.subject as any;
+        if (!subjectMap.has(s.id)) {
+          subjectMap.set(s.id, {
+            id: s.id,
+            title_ar: s.title_ar,
+            title_en: s.title_en,
+          });
+        }
+      });
+
+      return {
+        stats: {
+          averageRating: Number(averageRating.toFixed(1)),
+          totalReviews
+        },
+        reviews: allRatings,
+        systemRemarks,
+        subjects: Array.from(subjectMap.values())
+      };
+    },
+    enabled: !!teacherId,
+    staleTime: STALE.medium
+  });
+}

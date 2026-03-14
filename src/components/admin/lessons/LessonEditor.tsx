@@ -22,6 +22,9 @@ import PublishLessonDialog from './PublishLessonDialog';
 // Utilities
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import { LessonDraftManager, LessonDraft } from '@/lib/draftManager';
+import { useIsMobileLayout } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { List, Settings as SettingsIcon } from 'lucide-react';
 
 // Save status type
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
@@ -49,6 +52,9 @@ export default function LessonEditor() {
     const [pendingDraft, setPendingDraft] = useState<LessonDraft | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+    const [isOutlineOpen, setIsOutlineOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const isMobile = useIsMobileLayout();
 
     // Auto-save timers
     const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -505,9 +511,9 @@ export default function LessonEditor() {
                 onPublish={handlePublishLesson}
             />
 
-            <div className="flex h-screen bg-background overflow-hidden">
-            {/* Left Sidebar: Outline */}
-            <div className="w-64 border-e border-border bg-card flex flex-col">
+            <div className="flex bg-background overflow-hidden relative h-full">
+            {/* Left Sidebar: Outline (Fixed width on desktop, hidden on mobile) */}
+            <div className="hidden lg:flex w-64 border-e border-border bg-card flex-col">
                 <div className="p-4 border-b border-border flex items-center justify-between">
                     <h2 className="font-semibold text-sm">{t('محتوى الدرس', 'Lesson Content')}</h2>
                 </div>
@@ -537,29 +543,90 @@ export default function LessonEditor() {
                         <SaveStatusIndicator />
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* Mobile Outline Trigger */}
+                        <div className="lg:hidden">
+                            <Sheet open={isOutlineOpen} onOpenChange={setIsOutlineOpen}>
+                                <SheetTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                                        <List className="w-5 h-5" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent side={direction === 'rtl' ? 'right' : 'left'} className="w-72 p-0">
+                                    <SheetHeader className="p-4 border-b">
+                                        <SheetTitle className="text-sm font-semibold">{t('محتوى الدرس', 'Lesson Content')}</SheetTitle>
+                                    </SheetHeader>
+                                    <div className="flex-1 overflow-y-auto p-2">
+                                        <LessonOutline
+                                            sections={sections}
+                                            blocks={blocks}
+                                            activeSectionId={activeSectionId}
+                                            onSelectSection={(id) => {
+                                                setActiveSectionId(id);
+                                                setIsOutlineOpen(false);
+                                            }}
+                                            onReorder={handleSectionReorder}
+                                            onCreateSection={handleCreateSection}
+                                            onUpdateSection={handleUpdateSection}
+                                            onDeleteSection={handleDeleteSection}
+                                        />
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
+                        </div>
+
                         <Button
                             size="sm"
                             variant={previewMode ? "default" : "outline"}
                             onClick={() => setPreviewMode(!previewMode)}
-                            className="gap-1.5"
+                            className="gap-1.5 h-9 md:h-8"
                         >
-                            {previewMode ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                            {previewMode ? t('تحرير', 'Edit') : t('معاينة', 'Preview')}
+                            {previewMode ? <EyeOff className="w-4 h-4 md:w-3.5 md:h-3.5" /> : <Eye className="w-4 h-4 md:w-3.5 md:h-3.5" />}
+                            <span className="hidden md:inline">{previewMode ? t('تحرير', 'Edit') : t('معاينة', 'Preview')}</span>
                         </Button>
 
                         <Button
                             size="sm"
                             onClick={() => setIsPublishDialogOpen(true)}
-                            className="gap-1.5"
+                            className="gap-1.5 h-9 md:h-8"
                         >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            {t('إنهاء ونشر', 'Finalize & Publish')}
+                            <CheckCircle className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                            <span className="hidden md:inline">{t('إنهاء ونشر', 'Finalize & Publish')}</span>
                         </Button>
+
+                        {/* Mobile Settings Trigger */}
+                        <div className="lg:hidden">
+                            <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                                <SheetTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                                        <SettingsIcon className="w-5 h-5" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent side={direction === 'rtl' ? 'left' : 'right'} className="w-80 p-0">
+                                    <SheetHeader className="p-4 border-b">
+                                        <SheetTitle className="text-sm font-semibold">{t('إعدادات الدرس', 'Lesson Settings')}</SheetTitle>
+                                    </SheetHeader>
+                                    <div className="p-4 overflow-y-auto h-full">
+                                        <LessonSettings
+                                            lesson={lesson}
+                                            onUpdate={async (updates) => {
+                                                const { error } = await supabase.from('lessons').update(updates as any).eq('id', lesson.id);
+                                                if (error) {
+                                                    console.error(error);
+                                                    toast.error(t('فشل التحديث', 'Update failed'));
+                                                } else {
+                                                    setLesson({ ...lesson, ...updates });
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
+                        </div>
                     </div>
                 </div>
 
                 {/* Editor Canvas */}
-                <div className="flex-1 overflow-y-auto p-8">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8">
                     <div className="max-w-3xl mx-auto min-h-[500px]">
                         {previewMode ? (
                             <PreviewRenderer blocks={filteredBlocks} sections={sections} activeSectionId={activeSectionId} />
@@ -574,7 +641,7 @@ export default function LessonEditor() {
                                 />
 
                                 {filteredBlocks.length === 0 && (
-                                    <div className="border border-dashed border-border rounded-lg p-12 text-center">
+                                    <div className="border border-dashed border-border rounded-lg p-6 md:p-12 text-center">
                                         <p className="text-muted-foreground text-sm mb-4">
                                             {t('لا يوجد محتوى في هذا القسم', 'No content in this section')}
                                         </p>
@@ -590,8 +657,8 @@ export default function LessonEditor() {
                 </div>
             </div>
 
-            {/* Right Sidebar: Settings */}
-            <div className="w-80 border-s border-border bg-card flex flex-col">
+            {/* Right Sidebar: Settings (Fixed width on desktop, hidden on mobile) */}
+            <div className="hidden lg:flex w-80 border-s border-border bg-card flex-col">
                 <div className="p-4 border-b border-border">
                     <h2 className="font-semibold text-sm">{t('إعدادات الدرس', 'Lesson Settings')}</h2>
                 </div>

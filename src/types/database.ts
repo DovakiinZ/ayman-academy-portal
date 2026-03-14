@@ -365,6 +365,10 @@ export interface CertificateSnapshot {
     signer_role?: string;
     template_version: string;
     reissue_reason?: string;
+    // Ratings & remarks (snapshotted at issuance)
+    average_rating?: number | null;
+    total_ratings?: number | null;
+    teacher_remarks?: string | null;
 }
 
 export interface Certificate {

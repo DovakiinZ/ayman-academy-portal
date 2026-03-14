@@ -34,6 +34,8 @@ export const CERTIFICATE_TOKENS: TokenDefinition[] = [
 
     // Certificate tokens
     { token: '{{score}}', label_ar: 'الدرجة', label_en: 'Score', category: 'certificate' },
+    { token: '{{average_rating}}', label_ar: 'متوسط التقييم', label_en: 'Average Rating', category: 'certificate' },
+    { token: '{{teacher_remarks}}', label_ar: 'ملاحظات المعلم', label_en: 'Teacher Remarks', category: 'certificate' },
     { token: '{{date}}', label_ar: 'تاريخ الإتمام', label_en: 'Completion Date', category: 'certificate' },
     { token: '{{verification_code}}', label_ar: 'رمز التحقق', label_en: 'Verification Code', category: 'certificate' },
     { token: '{{version}}', label_ar: 'رقم الإصدار', label_en: 'Version Number', category: 'certificate' },
@@ -55,6 +57,8 @@ export interface ResolvedTokenData {
     subject_name: string;
     teacher_name: string;
     score: string;
+    average_rating: string;
+    teacher_remarks: string;
     date: string;
     verification_code: string;
     version: string;
@@ -79,7 +83,9 @@ export function resolveTokensFromSnapshot(
         course_name: snap?.course_name || cert.course_name || '',
         subject_name: cert.subject_name || snap?.course_name || '',
         teacher_name: snap?.teacher_name || '',
-        score: snap?.score != null ? `${snap.score}%` : '',
+        score: snap?.score != null ? `${snap.score}%` : (cert.score != null ? `${cert.score}%` : ''),
+        average_rating: snap?.average_rating != null ? String(snap.average_rating) : '',
+        teacher_remarks: snap?.teacher_remarks || '',
         date: formatDate(snap?.completion_date || cert.issued_at),
         verification_code: cert.verification_code || '',
         version: String(cert.version || 1),
@@ -158,6 +164,64 @@ export async function buildLiveSnapshot(
             }
         }
 
+        // Fetch average lesson rating for the subject
+        if (cert.subject_id) {
+            try {
+                const { data: lessons } = await supabase
+                    .from('lessons')
+                    .select('id')
+                    .eq('subject_id', cert.subject_id) as any;
+
+                if (lessons && lessons.length > 0) {
+                    const lessonIds = lessons.map((l: any) => l.id);
+                    const { data: ratings } = await supabase
+                        .from('lesson_ratings')
+                        .select('rating')
+                        .eq('user_id', cert.student_id)
+                        .in('lesson_id', lessonIds) as any;
+
+                    if (ratings && ratings.length > 0) {
+                        const avg = ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / ratings.length;
+                        result.average_rating = String(Math.round(avg * 10) / 10);
+                    }
+                }
+            } catch {
+                // Keep snapshot fallback
+            }
+        }
+
+        // Fetch teacher remarks (latest pinned comment from the teacher on this subject's lessons)
+        if (cert.subject_id) {
+            try {
+                const { data: lessons } = await supabase
+                    .from('lessons')
+                    .select('id, created_by')
+                    .eq('subject_id', cert.subject_id) as any;
+
+                if (lessons && lessons.length > 0) {
+                    const lessonIds = lessons.map((l: any) => l.id);
+                    const teacherIds = Array.from(new Set(lessons.map((l: any) => l.created_by).filter(Boolean)));
+
+                    if (teacherIds.length > 0) {
+                        const { data: comments } = await supabase
+                            .from('lesson_comments')
+                            .select('content')
+                            .in('lesson_id', lessonIds)
+                            .in('user_id', teacherIds)
+                            .eq('is_pinned', true)
+                            .order('created_at', { ascending: false })
+                            .limit(1) as any;
+
+                        if (comments && comments.length > 0) {
+                            result.teacher_remarks = comments[0].content;
+                        }
+                    }
+                }
+            } catch {
+                // Keep snapshot fallback
+            }
+        }
+
         // Fetch latest signer info from template settings
         const { data: settings } = await supabase
             .from('certificate_template_settings')
@@ -197,6 +261,8 @@ export function resolveTemplateString(
     result = result.replace(/\{\{subject_name\}\}/g, data.subject_name);
     result = result.replace(/\{\{teacher_name\}\}/g, data.teacher_name);
     result = result.replace(/\{\{score\}\}/g, data.score);
+    result = result.replace(/\{\{average_rating\}\}/g, data.average_rating);
+    result = result.replace(/\{\{teacher_remarks\}\}/g, data.teacher_remarks);
     result = result.replace(/\{\{date\}\}/g, data.date);
     result = result.replace(/\{\{verification_code\}\}/g, data.verification_code);
     result = result.replace(/\{\{version\}\}/g, data.version);

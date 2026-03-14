@@ -18,7 +18,7 @@ import {
 } from '@/lib/certificateTokens';
 import CertificateTemplate from '@/components/certificate/CertificateTemplate';
 import type { Certificate } from '@/types/database';
-import { Loader2, Download, ExternalLink, Award, FileCheck, CalendarDays, Share2, Copy, Linkedin, Twitter, RefreshCw, Eye, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Loader2, Download, ExternalLink, Award, FileCheck, CalendarDays, Share2, Copy, Linkedin, Twitter, RefreshCw, Eye, AlertTriangle, ArrowRight, Star, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -426,13 +426,13 @@ function CertificateCard({
                         )}
                         <Badge
                             variant={
-                                cert.status === 'issued' ? 'default'
+                                (cert.status === 'issued' || cert.status === 'valid') ? 'default'
                                     : cert.status === 'pending_approval' ? 'secondary'
                                         : cert.status === 'revoked' ? 'destructive'
                                             : 'outline'
                             }
                         >
-                            {cert.status === 'issued'
+                            {(cert.status === 'issued' || cert.status === 'valid')
                                 ? t('صادرة', 'Issued')
                                 : cert.status === 'pending_approval'
                                     ? t('بانتظار الموافقة', 'Pending')
@@ -462,34 +462,40 @@ function CertificateCard({
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CalendarDays className="w-4 h-4 shrink-0" />
-                    {new Date(cert.issued_at).toLocaleDateString('ar-EG', {
+                    {displayData.date || new Date(cert.snapshot_json?.completion_date || cert.issued_at).toLocaleDateString(t('ar-EG', 'en-US'), {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
                     })}
                 </div>
 
-                {cert.score !== null && (
+                {(displayData.score || cert.score !== null) && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <FileCheck className="w-4 h-4 shrink-0" />
-                        {t('الدرجة:', 'Score:')} <strong className="text-foreground">{cert.score}%</strong>
+                        {t('الدرجة:', 'Score:')} <strong className="text-foreground">{displayData.score || `${cert.score}%`}</strong>
                     </div>
                 )}
 
-                {/* Data changed indicator */}
-                {dataChanged && !isLivePreview && cert.status === 'issued' && (
-                    <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        {t('بياناتك تغيّرت منذ إصدار الشهادة', 'Your data has changed since this certificate was issued')}
+                {displayData.average_rating && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Star className="w-4 h-4 shrink-0 text-amber-500" />
+                        {t('التقييم:', 'Rating:')} <strong className="text-foreground">{displayData.average_rating}/5</strong>
+                    </div>
+                )}
+
+                {displayData.teacher_remarks && (
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <MessageSquare className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span className="text-foreground text-xs line-clamp-2">{displayData.teacher_remarks}</span>
                     </div>
                 )}
 
                 {/* Action buttons */}
-                <div className="flex gap-2 pt-2 flex-wrap">
+                <div className="grid grid-cols-2 gap-2 pt-2">
                     {/* Download Official PDF */}
                     <Button
                         size="sm"
-                        className="flex-1 gap-1.5"
+                        className="gap-1.5 h-9"
                         onClick={() => onDownload(cert)}
                         disabled={generating === cert.id || cert.status === 'revoked'}
                     >
@@ -506,7 +512,7 @@ function CertificateCard({
                         <Button
                             size="sm"
                             variant={dataChanged ? 'default' : 'outline'}
-                            className={`gap-1.5 ${dataChanged ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}`}
+                            className={`gap-1.5 h-9 ${dataChanged ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}`}
                             onClick={onReissue}
                             disabled={reissuing === cert.id}
                         >
@@ -519,71 +525,76 @@ function CertificateCard({
                         </Button>
                     )}
 
-                    {/* Live Preview Toggle */}
-                    {cert.status === 'issued' && (
+                    {/* Actions Row */}
+                    <div className="col-span-2 flex gap-2">
+                        {/* Live Preview Toggle */}
+                        {cert.status === 'issued' && (
+                            <Button
+                                size="sm"
+                                variant={isLivePreview ? 'secondary' : 'ghost'}
+                                className="flex-1 gap-1.5 h-9"
+                                onClick={() => onLivePreview(cert)}
+                            >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span className="text-xs">{t('معاينة', 'Preview')}</span>
+                            </Button>
+                        )}
+
+                        {/* Share Dropdown */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="flex-1 gap-1.5 h-9">
+                                    <Share2 className="w-3.5 h-3.5" />
+                                    <span className="text-xs">{t('مشاركة', 'Share')}</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/verify/${cert.verification_code}`;
+                                        navigator.clipboard.writeText(url);
+                                        toast.success(t('تم نسخ الرابط!', 'Link copied!'));
+                                    }}
+                                    className="gap-2"
+                                >
+                                    <Copy className="w-4 h-4" />
+                                    {t('نسخ رابط التحقق', 'Copy verification link')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/verify/${cert.verification_code}`;
+                                        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
+                                    }}
+                                    className="gap-2"
+                                >
+                                    <Linkedin className="w-4 h-4" />
+                                    {t('مشاركة على LinkedIn', 'Share on LinkedIn')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/verify/${cert.verification_code}`;
+                                        const text = t(`لقد حصلت للتو على شهادة في ${cert.course_name}!`, `I just earned a certificate in ${cert.course_name}!`);
+                                        window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+                                    }}
+                                    className="gap-2"
+                                >
+                                    <Twitter className="w-4 h-4" />
+                                    {t('مشاركة على X', 'Share on X')}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Verify Link */}
                         <Button
                             size="sm"
-                            variant={isLivePreview ? 'secondary' : 'ghost'}
-                            className="gap-1.5 px-2"
-                            onClick={() => onLivePreview(cert)}
-                            title={t('معاينة حيّة', 'Live Preview')}
+                            variant="ghost"
+                            className="h-9 w-10 p-0 shrink-0"
+                            onClick={() => window.open(`/verify/${cert.verification_code}`, '_blank')}
+                            title={t('تحقق', 'Verify')}
                         >
-                            <Eye className="w-3.5 h-3.5" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                         </Button>
-                    )}
-
-                    {/* Share Dropdown */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost" className="gap-1.5 px-2">
-                                <Share2 className="w-3.5 h-3.5" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    const url = `${window.location.origin}/verify/${cert.verification_code}`;
-                                    navigator.clipboard.writeText(url);
-                                    toast.success(t('تم نسخ الرابط!', 'Link copied!'));
-                                }}
-                                className="gap-2"
-                            >
-                                <Copy className="w-4 h-4" />
-                                {t('نسخ رابط التحقق', 'Copy verification link')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    const url = `${window.location.origin}/verify/${cert.verification_code}`;
-                                    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
-                                }}
-                                className="gap-2"
-                            >
-                                <Linkedin className="w-4 h-4" />
-                                {t('مشاركة على LinkedIn', 'Share on LinkedIn')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    const url = `${window.location.origin}/verify/${cert.verification_code}`;
-                                    const text = t(`لقد حصلت للتو على شهادة في ${cert.course_name}!`, `I just earned a certificate in ${cert.course_name}!`);
-                                    window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
-                                }}
-                                className="gap-2"
-                            >
-                                <Twitter className="w-4 h-4" />
-                                {t('مشاركة على X', 'Share on X')}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    {/* Verify Link */}
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1.5 px-2"
-                        onClick={() => window.open(`/verify/${cert.verification_code}`, '_blank')}
-                    >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                    </Button>
+                    </div>
                 </div>
             </div>
         </div>

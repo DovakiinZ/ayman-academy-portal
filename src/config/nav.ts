@@ -16,6 +16,7 @@ import {
   Ticket,
   Award,
   Megaphone,
+  Star,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -55,6 +56,7 @@ const teacherNav: NavItem[] = [
   { path: '/teacher/lessons', icon: BookOpen, label: { ar: 'دروسي', en: 'My Lessons' } },
   { path: '/teacher/quizzes', icon: ClipboardList, label: { ar: 'الاختبارات', en: 'Quizzes' } },
   { path: '/teacher/announcements', icon: Megaphone, label: { ar: 'الإعلانات', en: 'Announcements' } },
+  { path: '/teacher/reviews', icon: Star, label: { ar: 'التقييمات والآراء', en: 'Ratings & Feedback' } },
   { path: '/teacher/certificates', icon: Award, label: { ar: 'الشهادات', en: 'Certificates' } },
   { path: '/teacher/messages', icon: MessageSquare, label: { ar: 'الرسائل', en: 'Messages' } },
   { path: '/teacher/profile', icon: User, label: { ar: 'ملفي الشخصي', en: 'My Profile' } },

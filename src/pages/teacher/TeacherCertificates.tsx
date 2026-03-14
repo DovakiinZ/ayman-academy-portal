@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
     Award, Loader2, Users, CheckCircle, Clock, AlertCircle,
-    BookMarked, ChevronDown, ChevronUp
+    BookMarked, ChevronDown, ChevronUp, ExternalLink
 } from 'lucide-react';
 
 interface Subject {
@@ -124,10 +124,10 @@ function SubjectCertCard({ subject, userId }: { subject: Subject; userId: string
         queryFn: async () => {
             const { data } = await supabase
                 .from('certificates')
-                .select('student_id')
+                .select('student_id, student_name, verification_code')
                 .eq('subject_id', subject.id)
-                .eq('status', 'issued');
-            return (data || []).map(c => c.student_id);
+                .in('status', ['issued', 'pending_approval']);
+            return data || [];
         },
         enabled: expanded,
     });
@@ -156,7 +156,15 @@ function SubjectCertCard({ subject, userId }: { subject: Subject; userId: string
                 p_subject_id: subject.id,
             });
             if (error) throw error;
-            return data;
+            // The RPC returns errors inside the data object
+            const result = data as any;
+            if (result?.error) {
+                throw new Error(result.error);
+            }
+            if (result?.status === 'already_exists') {
+                throw new Error(t('الشهادة صدرت مسبقاً لهذا الطالب', 'Certificate already issued for this student'));
+            }
+            return result;
         },
         onSuccess: () => {
             toast.success(t('تم إصدار الشهادة بنجاح', 'Certificate issued successfully'));
@@ -214,38 +222,53 @@ function SubjectCertCard({ subject, userId }: { subject: Subject; userId: string
                         <div className="flex justify-center py-6">
                             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                         </div>
-                    ) : eligible.length === 0 ? (
+                    ) : (eligible as any[]).length === 0 ? (
                         <div className="text-center py-6 text-sm text-muted-foreground">
                             <AlertCircle className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
                             {t('لا يوجد طلاب مؤهلون بعد', 'No eligible students yet')}
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {eligible.map((student) => {
-                                const hasIssued = issuedCerts.includes(student.user_id);
+                            {(eligible as any[]).map((student) => {
+                                // Robust matching: by ID or by email
+                                const issuedCert = (issuedCerts as any[]).find(c =>
+                                    c.student_id === student.user_id
+                                );
+                                const hasIssued = !!issuedCert;
+                                
                                 return (
-                                    <div key={student.user_id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-secondary/50">
+                                    <div key={student.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-secondary/50">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
                                                 <CheckCircle className="w-4 h-4" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-medium text-foreground truncate">{student.full_name}</p>
-                                                <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+                                                <p className="text-[10px] text-muted-foreground truncate">{student.email}</p>
                                             </div>
                                         </div>
-                                        <div className="flex-shrink-0">
+                                        <div className="flex-shrink-0 flex items-center gap-2">
                                             {hasIssued ? (
-                                                <Badge variant="default" className="gap-1">
-                                                    <CheckCircle className="w-3 h-3" />
-                                                    {t('صدرت', 'Issued')}
-                                                </Badge>
+                                                <>
+                                                    <Badge variant="default" className="gap-1 h-8">
+                                                        <CheckCircle className="w-3 h-3" />
+                                                        {t('صدرت', 'Issued')}
+                                                    </Badge>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        className="h-8 w-8 p-0"
+                                                        onClick={() => window.open(`/verify/${(issuedCert as any).verification_code}`, '_blank')}
+                                                    >
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                </>
                                             ) : (
                                                 <Button
                                                     size="sm"
                                                     disabled={!subject.certificate_enabled || issueCert.isPending}
                                                     onClick={() => issueCert.mutate(student.user_id)}
-                                                    className="gap-1.5"
+                                                    className="gap-1.5 h-8 flex-1 sm:flex-none"
                                                 >
                                                     {issueCert.isPending ? (
                                                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -287,18 +310,18 @@ export default function TeacherCertificates() {
             </div>
 
             {/* Summary */}
-            <div className="grid grid-cols-3 gap-4">
-                <div className="bg-background rounded-xl border border-border p-4 text-center">
-                    <p className="text-2xl font-bold text-foreground">{subjects.length}</p>
-                    <p className="text-xs text-muted-foreground">{t('إجمالي المواد', 'Total Subjects')}</p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                <div className="bg-background rounded-xl border border-border p-3 md:p-4 text-center">
+                    <p className="text-xl md:text-2xl font-bold text-foreground">{subjects.length}</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground">{t('إجمالي المواد', 'Total Subjects')}</p>
                 </div>
-                <div className="bg-background rounded-xl border border-border p-4 text-center">
-                    <p className="text-2xl font-bold text-green-600">{enabledCount}</p>
-                    <p className="text-xs text-muted-foreground">{t('شهادة مفعّلة', 'Certs Enabled')}</p>
+                <div className="bg-background rounded-xl border border-border p-3 md:p-4 text-center">
+                    <p className="text-xl md:text-2xl font-bold text-green-600">{enabledCount}</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground">{t('شهادة مفعّلة', 'Certs Enabled')}</p>
                 </div>
-                <div className="bg-background rounded-xl border border-border p-4 text-center">
-                    <p className="text-2xl font-bold text-muted-foreground">{subjects.length - enabledCount}</p>
-                    <p className="text-xs text-muted-foreground">{t('معطّلة', 'Disabled')}</p>
+                <div className="bg-background rounded-xl border border-border p-3 md:p-4 text-center col-span-2 lg:col-span-1">
+                    <p className="text-xl md:text-2xl font-bold text-muted-foreground">{subjects.length - enabledCount}</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground">{t('معطّلة', 'Disabled')}</p>
                 </div>
             </div>
 

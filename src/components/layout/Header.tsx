@@ -37,7 +37,7 @@ const Header = () => {
       case 'teacher':
         return '/teacher';
       case 'student':
-        return '/student/dashboard';
+        return '/student';
       default:
         return '/';
     }

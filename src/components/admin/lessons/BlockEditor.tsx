@@ -65,7 +65,7 @@ export default function BlockEditor({ blocks, onReorder, onCreateBlock, onUpdate
             </DndContext>
 
             {/* Add Block Area */}
-            <div className="flex justify-center mt-8">
+            <div className="flex justify-center mt-8 px-2">
                 <AddBlockMenu onAdd={onCreateBlock} />
             </div>
         </div>
@@ -100,8 +100,8 @@ function AddBlockMenu({ onAdd }: { onAdd: (type: LessonBlockType) => void }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2 border-dashed">
-                    <Plus className="w-4 h-4" />
+                <Button variant="outline" className="gap-2 border-dashed w-full md:w-auto h-12 md:h-9">
+                    <Plus className="w-5 h-5 md:w-4 md:h-4" />
                     {t('إضافة محتوى', 'Add Content')}
                 </Button>
             </DropdownMenuTrigger>
@@ -183,34 +183,44 @@ function SortableBlock({
             !block.is_published && "opacity-60"
         )}>
             {/* Drag Handle */}
-            <div {...attributes} {...listeners} className="absolute start-0 top-2 p-2 rounded hover:bg-accent cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
+            <div 
+                {...attributes} 
+                {...listeners} 
+                className={cn(
+                    "absolute start-0 top-0 bottom-0 w-8 flex items-center justify-center hover:bg-accent cursor-grab transition-opacity z-10",
+                    "md:opacity-0 md:group-hover:opacity-100" // Hide on desktop hover, show always on mobile
+                )}
+            >
                 <GripVertical className="w-5 h-5 text-muted-foreground" />
             </div>
 
             {/* Block Content Wrapper */}
             <div className="min-h-[3rem] rounded-lg border border-transparent group-hover:border-border/50 bg-background transition-colors p-1 relative">
                 {/* Block Header */}
-                <div className="flex items-center justify-between px-2 py-1 mb-1">
+                <div className="flex flex-wrap items-center justify-between px-2 py-1 mb-1 gap-2">
                     <div className="flex items-center gap-2">
                         <Icon className={cn("w-3.5 h-3.5", cfg.color)} />
                         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                             {t(cfg.label_ar, cfg.label_en)}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className={cn(
+                        "flex items-center gap-2 transition-opacity",
+                        "md:opacity-0 md:group-hover:opacity-100" // Hide on desktop hover, show always on mobile
+                    )}>
                         {/* AR/EN tabs */}
-                        <div className="flex bg-secondary rounded-md overflow-hidden me-1">
+                        <div className="flex bg-secondary rounded-md overflow-hidden me-1 h-8 md:h-7">
                             <button
                                 onClick={() => setLang('ar')}
                                 className={cn(
-                                    "px-2 py-0.5 text-[10px] font-medium transition-colors",
+                                    "px-3 md:px-2 py-0.5 text-xs md:text-[10px] font-medium transition-colors",
                                     lang === 'ar' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                                 )}
                             >AR</button>
                             <button
                                 onClick={() => setLang('en')}
                                 className={cn(
-                                    "px-2 py-0.5 text-[10px] font-medium transition-colors",
+                                    "px-3 md:px-2 py-0.5 text-xs md:text-[10px] font-medium transition-colors",
                                     lang === 'en' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                                 )}
                             >EN</button>
@@ -219,23 +229,23 @@ function SortableBlock({
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
+                            className="h-9 w-9 md:h-7 md:w-7"
                             onClick={() => onUpdate(block.id, { is_published: !block.is_published })}
                             title={block.is_published ? t('إخفاء', 'Unpublish') : t('نشر', 'Publish')}
                         >
                             {block.is_published
-                                ? <Eye className="w-3.5 h-3.5 text-green-500" />
-                                : <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                                ? <Eye className="w-4 h-4 md:w-3.5 md:h-3.5 text-green-500" />
+                                : <EyeOff className="w-4 h-4 md:w-3.5 md:h-3.5 text-muted-foreground" />
                             }
                         </Button>
                         {/* Delete */}
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                            className="h-9 w-9 md:h-7 md:w-7 text-destructive hover:bg-destructive/10"
                             onClick={() => onDelete(block.id)}
                         >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-4 h-4 md:w-3.5 md:h-3.5" />
                         </Button>
                     </div>
                 </div>
