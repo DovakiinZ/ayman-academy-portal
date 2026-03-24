@@ -27,7 +27,7 @@ export function useStages() {
         subjects_count: s.subjects?.length || 0,
       }));
     },
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -56,7 +56,7 @@ export function useSubjects(stageId?: string) {
         lessons_count: s.lessons?.length || 0,
       }));
     },
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -76,7 +76,7 @@ export function useStage(stageId: string | undefined) {
       return data;
     },
     enabled: !!stageId,
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -481,7 +481,7 @@ export function useFeaturedSubjects() {
       if (error) throw error;
       return data || [];
     },
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -503,7 +503,7 @@ export function useFeaturedLessons() {
       if (error) throw error;
       return data || [];
     },
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -523,7 +523,7 @@ export function useFeaturedTeachers() {
       if (error) throw error;
       return data || [];
     },
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -551,7 +551,7 @@ export function useAllTeachers() {
       if (error) throw error;
       return data || [];
     },
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -568,7 +568,7 @@ export function useHomeStages() {
       if (error) throw error;
       return data || [];
     },
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -627,7 +627,7 @@ export function useTeacherProfile(teacherId: string | undefined) {
       return data;
     },
     enabled: !!teacherId,
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 
@@ -801,7 +801,7 @@ export function useTeacherShowcaseData(teacherId: string | undefined) {
       };
     },
     enabled: !!teacherId,
-    staleTime: STALE.static,
+    staleTime: STALE.user,
   });
 }
 // ─── Teacher Feedback ────────────────────────────────────

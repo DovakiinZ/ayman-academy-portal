@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function TeacherProfilePublic() {
     const { id } = useParams();
-    const { t, direction } = useLanguage();
+    const { t, direction, language } = useLanguage();
     const { data: showcase, isLoading, error } = useTeacherShowcaseData(id);
 
     const ChevronIcon = direction === 'rtl' ? ChevronLeft : ChevronRight;
@@ -104,9 +104,15 @@ export default function TeacherProfilePublic() {
                                 <h1 className="text-4xl md:text-5xl font-black text-foreground mb-3 tracking-tight">
                                     {profile.full_name}
                                 </h1>
-                                <p className="text-xl text-primary font-medium mb-4">
+                                <p className="text-xl text-primary font-medium mb-2">
                                     {t('خبير متخصص ومقدم محتوى تعليمي متميز', 'Expert Educator & Premium Content Creator')}
                                 </p>
+                                {profile.qualifications && (
+                                    <p className="text-sm bg-primary/10 text-primary-foreground/90 border border-primary/20 px-3 py-1 rounded-lg inline-block mb-4 font-medium">
+                                        <GraduationCap className="w-4 h-4 inline-block me-2" />
+                                        {profile.qualifications}
+                                    </p>
+                                )}
                                 <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto md:mx-0">
                                     {/* Using teaser or first part of bio as a positioning statement */}
                                     {t(
@@ -241,7 +247,9 @@ export default function TeacherProfilePublic() {
                                 {t('مجالات التخصص', 'Areas of Expertise')}
                             </h3>
                             <div className="flex flex-wrap gap-2">
-                                {(profile.expertise_tags_ar as string[]).map((tag: string, i: number) => (
+                                {((language === 'en' && profile.expertise_tags_en && (profile.expertise_tags_en as string[]).length > 0) 
+                                    ? (profile.expertise_tags_en as string[]) 
+                                    : (profile.expertise_tags_ar as string[])).map((tag: string, i: number) => (
                                     <Badge key={i} variant="secondary" className="bg-primary/5 text-primary border border-primary/20 px-4 py-1.5 text-sm rounded-full">
                                         {tag}
                                     </Badge>

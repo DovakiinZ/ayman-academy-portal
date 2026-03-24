@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, Save, User, Camera, BookOpen, Upload, CreditCard, Award, Phone } from 'lucide-react';
+import { queryClient } from '@/lib/queryConfig';
 import type { Profile } from '@/types/database';
 
 export default function TeacherProfile() {
@@ -32,6 +33,8 @@ export default function TeacherProfile() {
             instagram: '',
             website: ''
         } as Record<string, string>,
+        expertise_tags_ar: '' as string,
+        expertise_tags_en: '' as string,
     });
 
     const { isTranslating: bioTranslating } = useAutoTranslate(
@@ -62,6 +65,8 @@ export default function TeacherProfile() {
                     instagram: '',
                     website: ''
                 },
+                expertise_tags_ar: (p.expertise_tags_ar || []).join(', '),
+                expertise_tags_en: (p.expertise_tags_en || []).join(', '),
             });
         }
     }, [profile]);
@@ -88,10 +93,16 @@ export default function TeacherProfile() {
                 shamcash_account_name: form.shamcash_account_name.trim() || null,
                 shamcash_account_number: form.shamcash_account_number.trim() || null,
                 social_links: form.social_links,
+                expertise_tags_ar: form.expertise_tags_ar.split(',').map(s => s.trim()).filter(s => !!s),
+                expertise_tags_en: form.expertise_tags_en.split(',').map(s => s.trim()).filter(s => !!s),
                 updated_at: new Date().toISOString(),
             }).eq('id', profile.id);
 
             if (error) throw error;
+
+            // Invalidate teacher queries to reflect changes immediately
+            queryClient.invalidateQueries({ queryKey: ['teacher-profile', profile.id] });
+            queryClient.invalidateQueries({ queryKey: ['teacher-showcase', profile.id] });
 
             await refreshProfile();
             setSaved(true);
@@ -432,6 +443,32 @@ export default function TeacherProfile() {
                                 })}
                             />
                         </div>
+                    </div>
+                </div>
+
+                {/* Expertise Tags */}
+                <div className="border-t border-border pt-6 space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Award className="w-5 h-5 text-primary" />
+                        <h3 className="text-base font-semibold">{t('مجالات التخصص', 'Areas of Expertise')}</h3>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="expertise_tags_ar">{t('التخصصات (بالعربية، افصل بينها بفاصلة)', 'Specialties (Arabic, comma separated)')}</Label>
+                        <Input
+                            id="expertise_tags_ar"
+                            placeholder={t('مثال: فيزياء، كيمياء، رياضيات', 'e.g. Physics, Chemistry, Math')}
+                            value={form.expertise_tags_ar}
+                            onChange={(e) => setForm({ ...form, expertise_tags_ar: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="expertise_tags_en">{t('التخصصات (بالإنجليزية، افصل بينها بفاصلة)', 'Specialties (English, comma separated)')}</Label>
+                        <Input
+                            id="expertise_tags_en"
+                            placeholder="e.g. Physics, Chemistry, Mathematics"
+                            value={form.expertise_tags_en}
+                            onChange={(e) => setForm({ ...form, expertise_tags_en: e.target.value })}
+                        />
                     </div>
                 </div>
 
