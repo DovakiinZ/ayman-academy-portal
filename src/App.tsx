@@ -25,6 +25,7 @@ import PublicMarketplace from "./pages/PublicMarketplace";
 import PublicCoursePreview from "./pages/PublicCoursePreview";
 import TeacherApplication from "./pages/TeacherApplication";
 import VerifyCertificate from "./pages/VerifyCertificate";
+import Instructors from "./pages/Instructors";
 
 // Legal pages
 import TermsPage from "./pages/legal/TermsPage";
@@ -118,7 +119,8 @@ const App = () => (
                   <Route path="/lesson/:lessonId" element={<LessonPage />} />
                   <Route path="/plans" element={<Plans />} />
                   <Route path="/account" element={<Account />} />
-                  <Route path="/teacher/:id" element={<TeacherProfilePublic />} />
+                  <Route path="/t/:id" element={<TeacherProfilePublic />} />
+                  <Route path="/teachers" element={<Instructors />} />
                   <Route path="/verify/:code" element={<VerifyCertificate />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />

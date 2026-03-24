@@ -513,11 +513,40 @@ export function useFeaturedTeachers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, bio_ar, bio_en')
+        .select('id, full_name, avatar_url, bio_ar, bio_en, social_links, home_order')
         .eq('role', 'teacher')
         .eq('is_active', true)
-        .order('full_name', { ascending: true })
+        .eq('show_on_home', true)
+        .order('home_order', { ascending: true })
         .limit(6);
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: STALE.static,
+  });
+}
+
+export function useAllTeachers() {
+  return useQuery({
+    queryKey: ['all-teachers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          avatar_url,
+          bio_ar,
+          bio_en,
+          qualifications,
+          social_links,
+          phone,
+          is_active
+        `)
+        .eq('role', 'teacher')
+        .eq('is_active', true)
+        .order('full_name', { ascending: true });
 
       if (error) throw error;
       return data || [];

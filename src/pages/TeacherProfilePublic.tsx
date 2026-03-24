@@ -3,7 +3,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTeacherShowcaseData } from '@/hooks/useQueryHooks';
 import {
     User, ChevronLeft, ChevronRight, BookOpen, GraduationCap,
-    Star, Users, Clock, CheckCircle, Quote, Medal, Video
+    Star, Users, Clock, CheckCircle, Quote, Medal, Video,
+    Facebook, Twitter, Linkedin, Instagram, Globe
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -114,6 +115,37 @@ export default function TeacherProfilePublic() {
                                     )}
                                 </p>
                             </div>
+
+                            {/* Social Links Bar */}
+                            {profile.social_links && Object.values(profile.social_links).some(v => !!v) && (
+                                <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                                    {profile.social_links.facebook && (
+                                        <a href={profile.social_links.facebook} target="_blank" rel="noopener noreferrer" className="p-2.5 bg-background rounded-xl border border-border hover:text-primary transition-all hover:scale-110 shadow-sm">
+                                            <Facebook className="w-5 h-5" />
+                                        </a>
+                                    )}
+                                    {profile.social_links.twitter && (
+                                        <a href={profile.social_links.twitter} target="_blank" rel="noopener noreferrer" className="p-2.5 bg-background rounded-xl border border-border hover:text-primary transition-all hover:scale-110 shadow-sm">
+                                            <Twitter className="w-5 h-5" />
+                                        </a>
+                                    )}
+                                    {profile.social_links.linkedin && (
+                                        <a href={profile.social_links.linkedin} target="_blank" rel="noopener noreferrer" className="p-2.5 bg-background rounded-xl border border-border hover:text-primary transition-all hover:scale-110 shadow-sm">
+                                            <Linkedin className="w-5 h-5" />
+                                        </a>
+                                    )}
+                                    {profile.social_links.instagram && (
+                                        <a href={profile.social_links.instagram} target="_blank" rel="noopener noreferrer" className="p-2.5 bg-background rounded-xl border border-border hover:text-primary transition-all hover:scale-110 shadow-sm">
+                                            <Instagram className="w-5 h-5" />
+                                        </a>
+                                    )}
+                                    {profile.social_links.website && (
+                                        <a href={profile.social_links.website} target="_blank" rel="noopener noreferrer" className="p-2.5 bg-background rounded-xl border border-border hover:text-primary transition-all hover:scale-110 shadow-sm">
+                                            <Globe className="w-5 h-5" />
+                                        </a>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Trust Indicators / Stats */}
                             <div className="flex flex-wrap justify-center md:justify-start gap-6 py-4 border-y border-border/50">

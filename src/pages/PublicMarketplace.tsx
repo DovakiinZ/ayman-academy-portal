@@ -57,18 +57,21 @@ export default function PublicMarketplace() {
                 .order('sort_order', { ascending: true });
             if (error) throw error;
 
-            const teacherIds = [...new Set((subjectsData || []).map(s => s.teacher_id).filter(Boolean))];
+            const subjects = (subjectsData || []) as any[];
+            const teacherIds = [...new Set(subjects.map(s => s.teacher_id).filter(Boolean))];
             const teacherMap = new Map();
             if (teacherIds.length > 0) {
-                const { data: teachers } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', teacherIds);
-                (teachers || []).forEach(t => teacherMap.set(t.id, t));
+                const { data: teachersData } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', teacherIds);
+                const teachers = (teachersData || []) as any[];
+                teachers.forEach(t => teacherMap.set(t.id, t));
             }
 
-            const subjectIds = (subjectsData || []).map(s => s.id);
+            const subjectIds = subjects.map(s => s.id);
             const lessonCountMap = new Map();
             if (subjectIds.length > 0) {
-                const { data: lessons } = await supabase.from('lessons').select('subject_id, duration_minutes').in('subject_id', subjectIds).eq('is_published', true);
-                (lessons || []).forEach(l => {
+                const { data: lessonsData } = await supabase.from('lessons').select('subject_id, duration_minutes').in('subject_id', subjectIds).eq('is_published', true);
+                const lessons = (lessonsData || []) as any[];
+                lessons.forEach(l => {
                     const prev = lessonCountMap.get(l.subject_id) || { count: 0, duration: 0 };
                     lessonCountMap.set(l.subject_id, { count: prev.count + 1, duration: prev.duration + (l.duration_minutes || 0) });
                 });
@@ -79,23 +82,26 @@ export default function PublicMarketplace() {
             const ratingMap = new Map<string, { avg: number; count: number }>();
             if (subjectIds.length > 0) {
                 // Get all lesson IDs for these subjects
-                const { data: subjectLessons } = await supabase.from('lessons').select('id, subject_id').in('subject_id', subjectIds).eq('is_published', true);
-                const lessonIds = (subjectLessons || []).map(l => l.id);
-                const lessonToSubject = new Map((subjectLessons || []).map(l => [l.id, l.subject_id]));
+                const { data: subjectLessonsData } = await supabase.from('lessons').select('id, subject_id').in('subject_id', subjectIds).eq('is_published', true);
+                const subjectLessons = (subjectLessonsData || []) as any[];
+                const lessonIds = subjectLessons.map(l => l.id);
+                const lessonToSubject = new Map(subjectLessons.map(l => [l.id, l.subject_id]));
 
                 if (lessonIds.length > 0) {
-                    const { data: ratings } = await supabase.from('ratings').select('entity_id, stars').eq('entity_type', 'lesson').in('entity_id', lessonIds);
+                    const { data: ratingsData } = await supabase.from('ratings').select('entity_id, stars').eq('entity_type', 'lesson').in('entity_id', lessonIds);
+                    const ratings = (ratingsData || []) as any[];
                     // Also check for direct subject ratings
-                    const { data: subjectRatings } = await supabase.from('ratings').select('entity_id, stars').eq('entity_type', 'subject').in('entity_id', subjectIds);
+                    const { data: subjectRatingsData } = await supabase.from('ratings').select('entity_id, stars').eq('entity_type', 'subject').in('entity_id', subjectIds);
+                    const subjectRatings = (subjectRatingsData || []) as any[];
 
                     const grouped = new Map<string, number[]>();
                     // Aggregate lesson ratings to their subject
-                    (ratings || []).forEach(r => {
+                    ratings.forEach(r => {
                         const sid = lessonToSubject.get(r.entity_id);
                         if (sid) { const arr = grouped.get(sid) || []; arr.push(r.stars); grouped.set(sid, arr); }
                     });
                     // Add direct subject ratings
-                    (subjectRatings || []).forEach(r => {
+                    subjectRatings.forEach(r => {
                         const arr = grouped.get(r.entity_id) || []; arr.push(r.stars); grouped.set(r.entity_id, arr);
                     });
                     grouped.forEach((stars, id) => {
@@ -104,7 +110,7 @@ export default function PublicMarketplace() {
                 }
             }
 
-            return (subjectsData || []).map(s => ({
+            return subjects.map(s => ({
                 ...s,
                 teacher: s.teacher_id ? teacherMap.get(s.teacher_id) : null,
                 lesson_count: lessonCountMap.get(s.id)?.count || 0,
@@ -387,9 +393,9 @@ export default function PublicMarketplace() {
 
                                                     {/* Teacher */}
                                                     {subject.teacher && (
-                                                        <p className="text-xs text-muted-foreground mb-2.5 truncate">
+                                                        <Link to={`/t/${subject.teacher.id}`} className="text-xs text-muted-foreground mb-2.5 truncate block hover:text-primary transition-colors">
                                                             {subject.teacher.full_name}
-                                                        </p>
+                                                        </Link>
                                                     )}
 
                                                     {/* Meta row: lessons · duration */}

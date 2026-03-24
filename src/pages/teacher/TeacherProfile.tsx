@@ -25,6 +25,13 @@ export default function TeacherProfile() {
         avatar_url: '',
         shamcash_account_name: '',
         shamcash_account_number: '',
+        social_links: {
+            facebook: '',
+            twitter: '',
+            linkedin: '',
+            instagram: '',
+            website: ''
+        } as Record<string, string>,
     });
 
     const { isTranslating: bioTranslating } = useAutoTranslate(
@@ -48,6 +55,13 @@ export default function TeacherProfile() {
                 avatar_url: p.avatar_url || '',
                 shamcash_account_name: p.shamcash_account_name || '',
                 shamcash_account_number: p.shamcash_account_number || '',
+                social_links: p.social_links || {
+                    facebook: '',
+                    twitter: '',
+                    linkedin: '',
+                    instagram: '',
+                    website: ''
+                },
             });
         }
     }, [profile]);
@@ -73,6 +87,7 @@ export default function TeacherProfile() {
                 qualifications: form.qualifications.trim() || null,
                 shamcash_account_name: form.shamcash_account_name.trim() || null,
                 shamcash_account_number: form.shamcash_account_number.trim() || null,
+                social_links: form.social_links,
                 updated_at: new Date().toISOString(),
             }).eq('id', profile.id);
 
@@ -348,6 +363,76 @@ export default function TeacherProfile() {
                         value={form.bio_en}
                         onChange={(e) => setForm({ ...form, bio_en: e.target.value })}
                     />
+                </div>
+
+                {/* Social Links */}
+                <div className="border-t border-border pt-6">
+                    <div className="flex items-center gap-2 mb-4">
+                        <User className="w-5 h-5 text-primary" />
+                        <h3 className="text-base font-semibold">{t('الروابط الاجتماعية', 'Social Links')}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="social_facebook">{t('فيسبوك', 'Facebook')}</Label>
+                            <Input
+                                id="social_facebook"
+                                placeholder="https://facebook.com/..."
+                                value={form.social_links.facebook}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    social_links: { ...form.social_links, facebook: e.target.value }
+                                })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="social_twitter">{t('تويتر (X)', 'Twitter (X)')}</Label>
+                            <Input
+                                id="social_twitter"
+                                placeholder="https://twitter.com/..."
+                                value={form.social_links.twitter}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    social_links: { ...form.social_links, twitter: e.target.value }
+                                })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="social_linkedin">{t('لينكد إن', 'LinkedIn')}</Label>
+                            <Input
+                                id="social_linkedin"
+                                placeholder="https://linkedin.com/in/..."
+                                value={form.social_links.linkedin}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    social_links: { ...form.social_links, linkedin: e.target.value }
+                                })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="social_instagram">{t('إنستغرام', 'Instagram')}</Label>
+                            <Input
+                                id="social_instagram"
+                                placeholder="https://instagram.com/..."
+                                value={form.social_links.instagram}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    social_links: { ...form.social_links, instagram: e.target.value }
+                                })}
+                            />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="social_website">{t('الموقع الشخصي', 'Personal Website')}</Label>
+                            <Input
+                                id="social_website"
+                                placeholder="https://..."
+                                value={form.social_links.website}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    social_links: { ...form.social_links, website: e.target.value }
+                                })}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <Button type="submit" disabled={submitting} className="w-full sm:w-auto">

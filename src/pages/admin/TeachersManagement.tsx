@@ -84,6 +84,13 @@ export default function TeachersManagement() {
         bio_en: '',
         show_on_home: false,
         home_order: 0,
+        social_links: {
+            facebook: '',
+            twitter: '',
+            linkedin: '',
+            instagram: '',
+            website: ''
+        } as Record<string, string>,
     });
 
     // Auto-translate hooks
@@ -324,7 +331,6 @@ export default function TeachersManagement() {
         }
     };
 
-    // --- Teacher Editing ---
     const handleOpenEditDialog = (teacher: Profile) => {
         setEditingTeacher(teacher);
         setEditForm({
@@ -333,6 +339,13 @@ export default function TeachersManagement() {
             bio_en: teacher.bio_en || '',
             show_on_home: teacher.show_on_home || false,
             home_order: teacher.home_order || 0,
+            social_links: (teacher as any).social_links || {
+                facebook: '',
+                twitter: '',
+                linkedin: '',
+                instagram: '',
+                website: ''
+            },
         });
         setEditDialogOpen(true);
     };
@@ -358,6 +371,7 @@ export default function TeachersManagement() {
                     bio_en: editForm.bio_en || null,
                     show_on_home: editForm.show_on_home,
                     home_order: editForm.home_order,
+                    social_links: editForm.social_links,
                 },
                 {
                     successMessage: { ar: 'تم تحديث بيانات المعلم', en: 'Teacher updated successfully' },
@@ -941,6 +955,66 @@ export default function TeachersManagement() {
                                 onChange={(e) => setEditForm({ ...editForm, bio_en: e.target.value })}
                                 rows={3}
                             />
+                        </div>
+                        <div className="border-t pt-4 mt-4">
+                            <h3 className="font-medium mb-3">{t('الروابط الاجتماعية', 'Social Links')}</h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs">{t('فيسبوك', 'Facebook')}</Label>
+                                    <Input
+                                        size="sm"
+                                        value={editForm.social_links.facebook}
+                                        onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            social_links: { ...editForm.social_links, facebook: e.target.value }
+                                        })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">{t('تويتر', 'Twitter')}</Label>
+                                    <Input
+                                        size="sm"
+                                        value={editForm.social_links.twitter}
+                                        onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            social_links: { ...editForm.social_links, twitter: e.target.value }
+                                        })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">{t('لينكد إن', 'LinkedIn')}</Label>
+                                    <Input
+                                        size="sm"
+                                        value={editForm.social_links.linkedin}
+                                        onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            social_links: { ...editForm.social_links, linkedin: e.target.value }
+                                        })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">{t('إنستغرام', 'Instagram')}</Label>
+                                    <Input
+                                        size="sm"
+                                        value={editForm.social_links.instagram}
+                                        onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            social_links: { ...editForm.social_links, instagram: e.target.value }
+                                        })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <Label className="text-xs">{t('الموقع الشخصي', 'Personal Website')}</Label>
+                                    <Input
+                                        size="sm"
+                                        value={editForm.social_links.website}
+                                        onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            social_links: { ...editForm.social_links, website: e.target.value }
+                                        })}
+                                    />
+                                </div>
+                            </div>
                         </div>
                         <div className="flex items-center justify-between">
                             <Label htmlFor="show_on_home">{t('عرض في الصفحة الرئيسية', 'Show on Home Page')}</Label>

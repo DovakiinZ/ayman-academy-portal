@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useHomeStages } from '@/hooks/useQueryHooks';
+import { useHomeStages, useFeaturedTeachers } from '@/hooks/useQueryHooks';
 import { supabase } from '@/lib/supabase';
 import {
   GraduationCap,
@@ -107,6 +107,7 @@ export default function LandingPreview() {
   const { language, direction, toggleLanguage, t } = useLanguage();
   const { isAuthenticated, role } = useAuth();
   const { data: stages = [] } = useHomeStages();
+  const { data: featuredTeachers = [] } = useFeaturedTeachers();
 
   // Inject styles once
   useEffect(() => {
@@ -424,6 +425,65 @@ export default function LandingPreview() {
           })()}
         </div>
       </section>
+
+      {/* ====================== MEET OUR TEACHERS ====================== */}
+      {featuredTeachers.length > 0 && (
+        <section
+          id="teachers"
+          className="relative py-28 noise"
+          style={{ background: 'linear-gradient(180deg, #0d1225 0%, #0a0e1a 100%)' }}
+        >
+          <div className="orb orb-3 top-[-10%] start-[-5%] opacity-15" />
+          
+          <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-16">
+              <div className="gold-line mx-auto mb-4" />
+              <h2 className="text-3xl md:text-5xl font-bold mb-4">
+                {t('نخبة معلميننا', 'Meet Our Teachers')}
+              </h2>
+              <p className="text-white/50 max-w-xl mx-auto">
+                {t(
+                  'تعلم على يد أفضل الكفاءات التعليمية المتخصصة في المناهج السورية',
+                  'Learn from the best specialized educational talents in Syrian curricula'
+                )}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredTeachers.map((teacher: any) => (
+                <div key={teacher.id} className="glass rounded-3xl p-8 glass-hover group flex flex-col items-center text-center relative overflow-hidden">
+                   <div className="absolute inset-0 bg-gradient-to-b from-[#d4a853]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                   
+                   <div className="relative z-10 w-full flex flex-col items-center">
+                      <div className="w-28 h-28 rounded-2xl overflow-hidden mb-6 border-2 border-white/10 group-hover:border-[#d4a853]/30 transition-colors shadow-2xl">
+                        {teacher.avatar_url ? (
+                          <img src={teacher.avatar_url} alt={teacher.full_name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        ) : (
+                          <div className="w-full h-full bg-secondary/50 flex items-center justify-center">
+                            <User className="w-12 h-12 text-white/20" />
+                          </div>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl font-bold mb-2 group-hover:text-[#d4a853] transition-colors">{teacher.full_name}</h3>
+                      <p className="text-sm text-white/50 line-clamp-2 mb-6 h-10 overflow-hidden italic leading-relaxed">
+                        "{t(teacher.bio_ar, teacher.bio_en || teacher.bio_ar) || t('معلم خبير في أكاديمية أيمن', 'Expert teacher at Ayman Academy')}"
+                      </p>
+
+                      <Link 
+                        to={`/t/${teacher.id}`}
+                        className="mt-auto inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#d4a853] py-2 px-6 rounded-full border border-[#d4a853]/20 hover:bg-[#d4a853] hover:text-[#0a0e1a] transition-all"
+                      >
+                        {t('عرض الملف', 'View Profile')}
+                        <ArrowUpRight className="w-3 h-3" />
+                      </Link>
+                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ====================== MARKETPLACE PREVIEW ====================== */}
       <section
