@@ -104,22 +104,23 @@ export default function TeacherProfilePublic() {
                                 <h1 className="text-4xl md:text-5xl font-black text-foreground mb-3 tracking-tight">
                                     {profile.full_name}
                                 </h1>
-                                <p className="text-xl text-primary font-medium mb-2">
+                                <p className="text-xl text-yellow-400 font-medium mb-2">
                                     {t('خبير متخصص ومقدم محتوى تعليمي متميز', 'Expert Educator & Premium Content Creator')}
                                 </p>
                                 {profile.qualifications && (
-                                    <p className="text-sm bg-primary/10 text-primary-foreground/90 border border-primary/20 px-3 py-1 rounded-lg inline-block mb-4 font-medium">
+                                    <p className="text-sm bg-primary/10 text-white border border-primary/20 px-3 py-1 rounded-lg inline-block mb-4 font-medium">
                                         <GraduationCap className="w-4 h-4 inline-block me-2" />
                                         {profile.qualifications}
                                     </p>
                                 )}
-                                <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto md:mx-0">
-                                    {/* Using teaser or first part of bio as a positioning statement */}
-                                    {t(
-                                        profile.bio_ar?.slice(0, 120) + (profile.bio_ar?.length > 120 ? '...' : '') || 'معلم خبير بشهادات أكاديمية معتمدة.',
-                                        profile.bio_en?.slice(0, 120) + (profile.bio_en?.length > 120 ? '...' : '') || 'Expert instructor with certified academic credentials.'
-                                    )}
-                                </p>
+                                {(profile.bio_ar || profile.bio_en) && (
+                                    <p className="text-lg text-white/70 leading-relaxed max-w-2xl mx-auto md:mx-0">
+                                        {t(
+                                            profile.bio_ar ? (profile.bio_ar.length > 120 ? profile.bio_ar.slice(0, 120) + '...' : profile.bio_ar) : '',
+                                            profile.bio_en ? (profile.bio_en.length > 120 ? profile.bio_en.slice(0, 120) + '...' : profile.bio_en) : (profile.bio_ar ? (profile.bio_ar.length > 120 ? profile.bio_ar.slice(0, 120) + '...' : profile.bio_ar) : '')
+                                        )}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Social Links Bar */}
@@ -156,17 +157,17 @@ export default function TeacherProfilePublic() {
                             {/* Trust Indicators / Stats */}
                             <div className="flex flex-wrap justify-center md:justify-start gap-6 py-4 border-y border-border/50">
                                 <div className="flex items-center gap-2">
-                                    <div className="bg-amber-500/10 p-2 rounded-lg">
-                                        <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                                    <div className="bg-secondary/50 p-2 rounded-lg">
+                                        <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
                                     </div>
                                     <div className="flex flex-col text-start">
-                                        <span className="font-bold text-lg leading-tight">{stats.averageRating > 0 ? stats.averageRating : 'جديد'}</span>
+                                        <span className="font-bold text-lg leading-tight">{stats.averageRating > 0 ? stats.averageRating : t('جديد', 'New')}</span>
                                         <span className="text-xs text-muted-foreground">{t('التقييمات', 'Reviews')} ({stats.totalReviews})</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="bg-blue-500/10 p-2 rounded-lg">
-                                        <Users className="w-5 h-5 text-blue-500" />
+                                    <div className="bg-secondary/50 p-2 rounded-lg">
+                                        <Users className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex flex-col text-start">
                                         <span className="font-bold text-lg leading-tight">{stats.totalStudents > 0 ? `+${stats.totalStudents}` : '0'}</span>
@@ -174,8 +175,8 @@ export default function TeacherProfilePublic() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="bg-emerald-500/10 p-2 rounded-lg">
-                                        <Video className="w-5 h-5 text-emerald-500" />
+                                    <div className="bg-secondary/50 p-2 rounded-lg">
+                                        <Video className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex flex-col text-start">
                                         <span className="font-bold text-lg leading-tight">{stats.totalCourses}</span>
@@ -231,32 +232,39 @@ export default function TeacherProfilePublic() {
             {/* 6) TEACHER BIO */}
             <section className="py-16 bg-secondary/5 border-y border-border/50">
                 <div className="container-academic max-w-4xl mx-auto">
-                    <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-8 text-center md:text-start">
-                        {t('عن المعلم', 'About the Teacher')}
-                    </h2>
-                    <div className="prose prose-lg prose-invert max-w-none text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                        {t(
-                            profile.bio_ar || 'لا يوجد تفاصيل إضافية عن المعلم في الوقت الحالي.',
-                            profile.bio_en || profile.bio_ar || 'No additional details available for this teacher at this time.'
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <User className="w-5 h-5 text-primary" />
+                        </div>
+                        <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+                            {t('عن المعلم', 'About the Teacher')}
+                        </h2>
+                    </div>
+                    <div className="bg-background/60 rounded-2xl border border-border/50 p-6 md:p-8">
+                        <div className="text-base md:text-lg text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {t(
+                                profile.bio_ar || 'لا يوجد تفاصيل إضافية عن المعلم في الوقت الحالي.',
+                                profile.bio_en || profile.bio_ar || 'No additional details available for this teacher at this time.'
+                            )}
+                        </div>
+                        {/* Expertise Tags */}
+                        {profile.expertise_tags_ar && (profile.expertise_tags_ar as string[]).length > 0 && (
+                            <div className="mt-6 pt-6 border-t border-border/50">
+                                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
+                                    {t('مجالات التخصص', 'Areas of Expertise')}
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {((language === 'en' && profile.expertise_tags_en && (profile.expertise_tags_en as string[]).length > 0)
+                                        ? (profile.expertise_tags_en as string[])
+                                        : (profile.expertise_tags_ar as string[])).map((tag: string, i: number) => (
+                                        <Badge key={i} variant="secondary" className="bg-primary/5 text-primary border border-primary/20 px-4 py-1.5 text-sm rounded-full">
+                                            {tag}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
-                    {/* Expertise Tags */}
-                    {profile.expertise_tags_ar && (profile.expertise_tags_ar as string[]).length > 0 && (
-                        <div className="mt-8">
-                            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
-                                {t('مجالات التخصص', 'Areas of Expertise')}
-                            </h3>
-                            <div className="flex flex-wrap gap-2">
-                                {((language === 'en' && profile.expertise_tags_en && (profile.expertise_tags_en as string[]).length > 0) 
-                                    ? (profile.expertise_tags_en as string[]) 
-                                    : (profile.expertise_tags_ar as string[])).map((tag: string, i: number) => (
-                                    <Badge key={i} variant="secondary" className="bg-primary/5 text-primary border border-primary/20 px-4 py-1.5 text-sm rounded-full">
-                                        {tag}
-                                    </Badge>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             </section>
 

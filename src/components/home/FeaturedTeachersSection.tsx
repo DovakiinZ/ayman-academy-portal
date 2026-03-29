@@ -64,13 +64,15 @@ export default function FeaturedTeachersSection() {
                                     <h3 className="text-base font-medium text-foreground mb-1 truncate">
                                         {teacher.full_name || t('معلم', 'Teacher')}
                                     </h3>
-                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                                        {t(teacher.bio_ar || '', teacher.bio_en || teacher.bio_ar || '')}
-                                    </p>
+                                    {(teacher.bio_ar || teacher.bio_en) && (
+                                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                                            {t(teacher.bio_ar || '', teacher.bio_en || teacher.bio_ar || '')}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="mt-4 pt-4 border-t border-border">
-                                <Link to={`/teacher/${teacher.id}`}>
+                                <Link to={`/t/${teacher.id}`}>
                                     <Button variant="ghost" size="sm" className="w-full justify-between">
                                         {t('عرض الملف', 'View Profile')}
                                         <ChevronIcon className="w-4 h-4" />
