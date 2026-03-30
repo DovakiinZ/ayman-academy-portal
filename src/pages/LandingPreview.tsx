@@ -466,7 +466,7 @@ export default function LandingPreview() {
                       </div>
 
                       <h3 className="text-xl font-bold mb-2 group-hover:text-[#d4a853] transition-colors">{teacher.full_name}</h3>
-                      <p className="text-sm text-white/50 line-clamp-2 mb-6 h-10 overflow-hidden italic leading-relaxed">
+                      <p className="text-sm text-white/50 line-clamp-4 mb-6 overflow-hidden italic leading-relaxed">
                         "{t(teacher.bio_ar, teacher.bio_en || teacher.bio_ar) || t('معلم خبير في أكاديمية أيمن', 'Expert teacher at Ayman Academy')}"
                       </p>
 
