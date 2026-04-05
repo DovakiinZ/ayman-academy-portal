@@ -1,0 +1,78 @@
+name: ayman_academy_app
+description: "Ayman Academy - Arabic-first K-12 educational platform"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Core
+  supabase_flutter: ^2.5.0
+  flutter_riverpod: ^2.5.1
+  go_router: ^13.2.0
+
+  # UI / UX
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+
+  # Video
+  youtube_player_flutter: ^9.1.1
+  url_launcher: ^6.2.6
+
+  # Content rendering
+  flutter_markdown: ^0.7.3
+
+  # Local storage / cache
+  hive_flutter: ^1.1.0
+
+  # Localization / RTL
+  intl: any
+
+  # Media
+  image_picker: ^1.1.2
+
+  # Certificates
+  qr_flutter: ^4.1.0
+  pdf: ^3.10.8
+  path_provider: ^2.1.5
+  share_plus: ^12.0.2
+
+  # Charts (teacher dashboard)
+  fl_chart: ^0.68.0
+
+  # Notifications
+  onesignal_flutter: ^5.1.2
+
+  # Utils
+  connectivity_plus: ^6.0.3
+  package_info_plus: ^8.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/lottie/
+
+  fonts:
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700

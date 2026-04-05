@@ -1,0 +1,34 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ayman_academy_app/core/theme/app_colors.dart';
+import 'package:ayman_academy_app/shared/providers/connectivity_provider.dart';
+import 'package:ayman_academy_app/shared/providers/language_provider.dart';
+
+class ConnectivityBanner extends ConsumerWidget {
+  const ConnectivityBanner({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isOnline = ref.watch(isOnlineProvider);
+    final t = ref.read(languageProvider.notifier).t;
+
+    if (isOnline) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      color: AppColors.error,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.wifi_off, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            t('لا يوجد اتصال بالإنترنت', 'No internet connection'),
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+}
