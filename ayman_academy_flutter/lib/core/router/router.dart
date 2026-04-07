@@ -29,6 +29,11 @@ import 'package:ayman_academy_app/features/teacher/announcements/screens/teacher
 import 'package:ayman_academy_app/features/teacher/messages/screens/teacher_messages_screen.dart';
 import 'package:ayman_academy_app/features/teacher/profile/screens/teacher_profile_screen.dart';
 import 'package:ayman_academy_app/features/teacher/orders/screens/teacher_orders_screen.dart';
+import 'package:ayman_academy_app/features/teacher/subjects/screens/course_editor_screen.dart';
+import 'package:ayman_academy_app/features/teacher/subjects/screens/teacher_reviews_screen.dart';
+import 'package:ayman_academy_app/features/teacher/certificates/screens/teacher_certificates_screen.dart';
+import 'package:ayman_academy_app/features/student/dashboard/screens/achievements_screen.dart';
+import 'package:ayman_academy_app/features/student/subjects/screens/student_teachers_screen.dart';
 import 'package:ayman_academy_app/shared/widgets/shells/student_shell.dart';
 import 'package:ayman_academy_app/shared/widgets/shells/teacher_shell.dart';
 
@@ -163,6 +168,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/student/discover', builder: (_, _) => const DiscoverScreen()),
+      GoRoute(path: '/student/achievements', builder: (_, _) => const AchievementsScreen()),
+      GoRoute(path: '/student/teachers', builder: (_, _) => const StudentTeachersScreen()),
 
       // Teacher shell
       StatefulShellRoute.indexedStack(
@@ -200,6 +207,16 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Standalone teacher routes
       GoRoute(path: Routes.teacherOrders, builder: (_, _) => const TeacherOrdersScreen()),
+      GoRoute(path: Routes.teacherCertificates, builder: (_, _) => const TeacherCertificatesScreen()),
+      GoRoute(path: '/teacher/reviews', builder: (_, _) => const TeacherReviewsScreen()),
+      GoRoute(
+        path: '/teacher/course/new',
+        builder: (_, _) => const CourseEditorScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/course/:subjectId/edit',
+        builder: (_, state) => CourseEditorScreen(subjectId: state.pathParameters['subjectId']!),
+      ),
     ],
   );
 });

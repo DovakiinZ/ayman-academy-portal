@@ -40,6 +40,14 @@ class TeacherSubjectsScreen extends ConsumerWidget {
               tooltip: t('الطلبات', 'Orders'),
               onPressed: () => context.push('/teacher/orders'),
             ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              tooltip: t('مادة جديدة', 'New Subject'),
+              onPressed: () async {
+                final result = await context.push('/teacher/course/new');
+                if (result == true) ref.invalidate(teacherSubjectsProvider);
+              },
+            ),
           ],
         ),
         body: subjectsAsync.when(
@@ -123,6 +131,18 @@ class TeacherSubjectsScreen extends ConsumerWidget {
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final result = await context.push('/teacher/course/${s.id}/edit');
+                                if (result == true) ref.invalidate(teacherSubjectsProvider);
+                              },
+                              icon: const Icon(Icons.edit, size: 16),
+                              label: Text(t('تعديل المادة', 'Edit Subject'), style: const TextStyle(fontSize: 13)),
+                            ),
                           ),
                         ],
                       ),

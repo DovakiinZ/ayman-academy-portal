@@ -74,6 +74,10 @@ class TeacherShell extends ConsumerWidget {
                         Navigator.pop(context);
                         navigationShell.goBranch(2);
                       }),
+                      _DrawerItem(icon: Icons.star, label: t('التقييمات والآراء', 'Ratings & Reviews'), onTap: () {
+                        Navigator.pop(context);
+                        context.push('/teacher/reviews');
+                      }),
                       _DrawerItem(icon: Icons.workspace_premium, label: t('الشهادات', 'Certificates'), onTap: () {
                         Navigator.pop(context);
                         context.push(Routes.teacherCertificates);

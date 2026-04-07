@@ -5,6 +5,8 @@ import 'package:ayman_academy_app/core/theme/app_colors.dart';
 import 'package:ayman_academy_app/shared/models/lesson.dart';
 import 'package:ayman_academy_app/shared/providers/language_provider.dart';
 import 'package:ayman_academy_app/shared/widgets/loading_shimmer.dart';
+import 'package:ayman_academy_app/features/teacher/lessons/screens/lesson_editor_screen.dart';
+import 'package:ayman_academy_app/features/teacher/quizzes/screens/quiz_builder_screen.dart';
 
 final teacherLessonsProvider = FutureProvider.family<List<Lesson>, String>((ref, subjectId) async {
   final data = await supabase
@@ -29,7 +31,21 @@ class TeacherLessonsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        appBar: AppBar(title: Text(subjectTitle)),
+        appBar: AppBar(
+          title: Text(subjectTitle),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              tooltip: t('درس جديد', 'New Lesson'),
+              onPressed: () async {
+                final result = await Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => LessonEditorScreen(subjectId: subjectId),
+                ));
+                if (result == true) ref.invalidate(teacherLessonsProvider(subjectId));
+              },
+            ),
+          ],
+        ),
         body: lessonsAsync.when(
           loading: () => const LoadingShimmer(),
           error: (e, _) => Center(child: Text('$e')),
@@ -105,14 +121,34 @@ class TeacherLessonsScreen extends ConsumerWidget {
                           ],
                         ],
                       ),
-                      trailing: Switch(
-                        value: l.isPublished,
-                        activeTrackColor: AppColors.success,
-                        onChanged: (val) async {
-                          await supabase.from('lessons').update({'is_published': val}).eq('id', l.id);
-                          ref.invalidate(teacherLessonsProvider(subjectId));
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.quiz, size: 18, color: AppColors.info),
+                            tooltip: t('اختبار', 'Quiz'),
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(
+                                builder: (_) => QuizBuilderScreen(lessonId: l.id, lessonTitle: l.title(lang)),
+                              ));
+                            },
+                          ),
+                          Switch(
+                            value: l.isPublished,
+                            activeTrackColor: AppColors.success,
+                            onChanged: (val) async {
+                              await supabase.from('lessons').update({'is_published': val}).eq('id', l.id);
+                              ref.invalidate(teacherLessonsProvider(subjectId));
+                            },
+                          ),
+                        ],
                       ),
+                      onTap: () async {
+                        final result = await Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => LessonEditorScreen(subjectId: subjectId, lessonId: l.id),
+                        ));
+                        if (result == true) ref.invalidate(teacherLessonsProvider(subjectId));
+                      },
                     ),
                   );
                 },

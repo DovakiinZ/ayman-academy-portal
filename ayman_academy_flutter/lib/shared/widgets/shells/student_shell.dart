@@ -72,7 +72,11 @@ class StudentShell extends ConsumerWidget {
                       }),
                       _DrawerItem(icon: Icons.people, label: t('المعلمون', 'Teachers'), onTap: () {
                         Navigator.pop(context);
-                        context.push('/student/discover');
+                        context.push('/student/teachers');
+                      }),
+                      _DrawerItem(icon: Icons.emoji_events, label: t('إنجازاتي', 'Achievements'), onTap: () {
+                        Navigator.pop(context);
+                        context.push('/student/achievements');
                       }),
                       _DrawerItem(icon: Icons.workspace_premium, label: t('شهاداتي', 'Certificates'), onTap: () {
                         Navigator.pop(context);
