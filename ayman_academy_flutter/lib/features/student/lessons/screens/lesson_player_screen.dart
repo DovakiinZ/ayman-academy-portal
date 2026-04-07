@@ -116,11 +116,11 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
               const SizedBox(height: 8),
               // Existing notes
               Consumer(
-                builder: (_, ref, __) {
+                builder: (_, ref, _) {
                   final notesAsync = ref.watch(lessonNotesProvider(widget.lessonId));
                   return notesAsync.when(
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                     data: (notes) {
                       if (notes.isEmpty) return const SizedBox.shrink();
                       return Column(
@@ -194,7 +194,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
               const SizedBox(height: 12),
               Flexible(
                 child: Consumer(
-                  builder: (_, ref, __) {
+                  builder: (_, ref, _) {
                     final commentsAsync = ref.watch(lessonCommentsProvider(widget.lessonId));
                     return commentsAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
@@ -296,7 +296,7 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
           title: lessonAsync.when(
             data: (l) => Text(l?.title(lang) ?? '', style: const TextStyle(fontSize: 16)),
             loading: () => const Text('...'),
-            error: (_, __) => const Text(''),
+            error: (_, _) => const Text(''),
           ),
           actions: [
             IconButton(icon: const Icon(Icons.note_add_outlined), onPressed: _showNotesSheet, tooltip: t('ملاحظات', 'Notes')),

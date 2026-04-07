@@ -84,7 +84,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   Expanded(
                     child: ListView.separated(
                       itemCount: q.options.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (_, i) {
                         final option = q.options[i];
                         final selected = _answers[q.id] == option;

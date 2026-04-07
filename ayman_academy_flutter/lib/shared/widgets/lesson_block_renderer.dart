@@ -187,8 +187,8 @@ class _VideoBlock extends StatelessWidget {
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: 200,
-                placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-                errorWidget: (_, __, ___) => const Icon(Icons.error),
+                placeholder: (_, _) => const Center(child: CircularProgressIndicator()),
+                errorWidget: (_, _2, ___) => const Icon(Icons.error),
               ),
               Container(
                 decoration: BoxDecoration(
@@ -220,11 +220,11 @@ class _ImageBlock extends StatelessWidget {
         imageUrl: url!,
         width: double.infinity,
         fit: BoxFit.contain,
-        placeholder: (_, __) => const SizedBox(
+        placeholder: (_, _) => const SizedBox(
           height: 150,
           child: Center(child: CircularProgressIndicator()),
         ),
-        errorWidget: (_, __, ___) => Container(
+        errorWidget: (_, _2, ___) => Container(
           height: 150,
           color: Colors.grey[200],
           child: const Center(child: Icon(Icons.broken_image, size: 40)),

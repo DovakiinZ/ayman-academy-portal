@@ -19,26 +19,30 @@ class StudentDashboardScreen extends ConsumerWidget {
 
     return Directionality(
       textDirection: lang.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(t('أكاديمية أيمن', 'Ayman Academy')),
-          actions: [
-            IconButton(
-              icon: Icon(ref.watch(themeProvider) == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
-              onPressed: () => ref.read(themeProvider.notifier).toggle(),
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            leading: IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
-            IconButton(
-              icon: const Icon(Icons.language),
-              onPressed: () => ref.read(languageProvider.notifier).toggle(),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
+            title: Text(t('أكاديمية أيمن', 'Ayman Academy')),
+            actions: [
+              IconButton(
+                icon: Icon(ref.watch(themeProvider) == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+                onPressed: () => ref.read(themeProvider.notifier).toggle(),
+              ),
+              IconButton(
+                icon: const Icon(Icons.language),
+                onPressed: () => ref.read(languageProvider.notifier).toggle(),
+              ),
+            ],
+          ),
+          SliverPadding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
                 // Greeting
                 Text(
                   t('مرحباً، ${auth.profile?.fullName ?? "طالب"}!', 'Hello, ${auth.profile?.fullName ?? "Student"}!'),
@@ -121,10 +125,10 @@ class StudentDashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-              ],
+              ]),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

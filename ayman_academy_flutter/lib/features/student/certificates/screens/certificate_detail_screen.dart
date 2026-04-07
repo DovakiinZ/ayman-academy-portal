@@ -32,8 +32,8 @@ class CertificateDetailScreen extends ConsumerWidget {
                 return IconButton(
                   icon: const Icon(Icons.share),
                   onPressed: () {
-                    Share.share(
-                      '${t("شهادة إتمام", "Certificate of Completion")} - ${cert.courseName}\n${cert.verifyUrl}',
+                    SharePlus.instance.share(
+                      ShareParams(text: '${t("شهادة إتمام", "Certificate of Completion")} - ${cert.courseName}\n${cert.verifyUrl}'),
                     );
                   },
                 );

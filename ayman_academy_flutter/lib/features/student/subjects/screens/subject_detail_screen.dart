@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:ayman_academy_app/core/theme/app_colors.dart';
-import 'package:ayman_academy_app/shared/models/subject.dart';
-import 'package:ayman_academy_app/shared/models/lesson.dart';
 import 'package:ayman_academy_app/shared/providers/language_provider.dart';
 import 'package:ayman_academy_app/shared/widgets/loading_shimmer.dart';
 import 'package:ayman_academy_app/features/student/subjects/providers/subjects_provider.dart';
@@ -84,7 +82,7 @@ class SubjectDetailScreen extends ConsumerWidget {
                               label: lessonsAsync.when(
                                 data: (l) => '${l.length} ${t("درس", "lessons")}',
                                 loading: () => '...',
-                                error: (_, __) => '-',
+                                error: (_, _) => '-',
                               ),
                             ),
                             const SizedBox(width: 12),

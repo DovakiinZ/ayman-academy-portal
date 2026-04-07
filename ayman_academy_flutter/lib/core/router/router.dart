@@ -78,23 +78,23 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       // Auth routes
-      GoRoute(path: Routes.login, builder: (_, __) => const LoginScreen()),
-      GoRoute(path: Routes.register, builder: (_, __) => const RegisterScreen()),
-      GoRoute(path: Routes.resetPassword, builder: (_, __) => const ResetPasswordScreen()),
-      GoRoute(path: Routes.onboarding, builder: (_, __) => const StudentOnboardingScreen()),
-      GoRoute(path: Routes.adminWebOnly, builder: (_, __) => const AdminWebOnlyScreen()),
+      GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
+      GoRoute(path: Routes.register, builder: (_, _) => const RegisterScreen()),
+      GoRoute(path: Routes.resetPassword, builder: (_, _) => const ResetPasswordScreen()),
+      GoRoute(path: Routes.onboarding, builder: (_, _) => const StudentOnboardingScreen()),
+      GoRoute(path: Routes.adminWebOnly, builder: (_, _) => const AdminWebOnlyScreen()),
 
       // Student shell
       StatefulShellRoute.indexedStack(
-        builder: (_, __, shell) => StudentShell(navigationShell: shell),
+        builder: (_, _2, shell) => StudentShell(navigationShell: shell),
         branches: [
           StatefulShellBranch(routes: [
-            GoRoute(path: Routes.studentHome, builder: (_, __) => const StudentDashboardScreen()),
+            GoRoute(path: Routes.studentHome, builder: (_, _) => const StudentDashboardScreen()),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
               path: Routes.mySubjects,
-              builder: (_, __) => const MySubjectsScreen(),
+              builder: (_, _) => const MySubjectsScreen(),
               routes: [
                 GoRoute(
                   path: 'subject/:subjectId',
@@ -122,7 +122,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [
             GoRoute(
               path: Routes.certificates,
-              builder: (_, __) => const MyCertificatesScreen(),
+              builder: (_, _) => const MyCertificatesScreen(),
               routes: [
                 GoRoute(
                   path: ':certId',
@@ -136,7 +136,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [
             GoRoute(
               path: Routes.studentMessages,
-              builder: (_, __) => const MessagesContactsScreen(),
+              builder: (_, _) => const MessagesContactsScreen(),
               routes: [
                 GoRoute(
                   path: ':contactId',
@@ -149,38 +149,38 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: Routes.studentProfile, builder: (_, __) => const StudentProfileScreen()),
+            GoRoute(path: Routes.studentProfile, builder: (_, _) => const StudentProfileScreen()),
           ]),
         ],
       ),
 
       // Standalone student routes (outside shell)
-      GoRoute(path: Routes.marketplace, builder: (_, __) => const MarketplaceScreen()),
+      GoRoute(path: Routes.marketplace, builder: (_, _) => const MarketplaceScreen()),
       GoRoute(
         path: '/student/marketplace/checkout/:subjectId',
         builder: (_, state) => CheckoutScreen(
           subjectId: state.pathParameters['subjectId']!,
         ),
       ),
-      GoRoute(path: '/student/discover', builder: (_, __) => const DiscoverScreen()),
+      GoRoute(path: '/student/discover', builder: (_, _) => const DiscoverScreen()),
 
       // Teacher shell
       StatefulShellRoute.indexedStack(
-        builder: (_, __, shell) => TeacherShell(navigationShell: shell),
+        builder: (_, _2, shell) => TeacherShell(navigationShell: shell),
         branches: [
           StatefulShellBranch(routes: [
-            GoRoute(path: Routes.teacherHome, builder: (_, __) => const TeacherDashboardScreen()),
+            GoRoute(path: Routes.teacherHome, builder: (_, _) => const TeacherDashboardScreen()),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: Routes.teacherSubjects, builder: (_, __) => const TeacherSubjectsScreen()),
+            GoRoute(path: Routes.teacherSubjects, builder: (_, _) => const TeacherSubjectsScreen()),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: Routes.teacherAnnouncements, builder: (_, __) => const TeacherAnnouncementsScreen()),
+            GoRoute(path: Routes.teacherAnnouncements, builder: (_, _) => const TeacherAnnouncementsScreen()),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
               path: Routes.teacherMessages,
-              builder: (_, __) => const TeacherMessagesScreen(),
+              builder: (_, _) => const TeacherMessagesScreen(),
               routes: [
                 GoRoute(
                   path: ':contactId',
@@ -193,13 +193,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: Routes.teacherProfile, builder: (_, __) => const TeacherProfileScreen()),
+            GoRoute(path: Routes.teacherProfile, builder: (_, _) => const TeacherProfileScreen()),
           ]),
         ],
       ),
 
       // Standalone teacher routes
-      GoRoute(path: Routes.teacherOrders, builder: (_, __) => const TeacherOrdersScreen()),
+      GoRoute(path: Routes.teacherOrders, builder: (_, _) => const TeacherOrdersScreen()),
     ],
   );
 });

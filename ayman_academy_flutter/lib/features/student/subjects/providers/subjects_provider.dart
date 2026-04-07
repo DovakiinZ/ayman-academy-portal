@@ -2,33 +2,83 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ayman_academy_app/core/supabase_client.dart';
 import 'package:ayman_academy_app/shared/models/subject.dart';
 import 'package:ayman_academy_app/shared/models/lesson.dart';
-import 'package:ayman_academy_app/shared/services/cached_provider_helpers.dart';
-import 'package:ayman_academy_app/shared/services/cache_service.dart';
+
 
 final mySubjectsProvider = FutureProvider<List<Subject>>((ref) async {
-  return cachedListFetch<Subject>(
-    cacheKey: 'my_subjects',
-    boxName: 'subjects_cache',
-    ttl: CacheService.subjectsTtl,
-    fetch: () async {
-      final data = await supabase.rpc('get_student_subjects');
-      return data is List ? data : [];
-    },
-    fromJson: (json) => Subject.fromJson(json),
-  );
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) return [];
+
+  // Try RPC first
+  try {
+    final data = await supabase.rpc('get_student_subjects', params: {'p_student_id': userId});
+    if (data is List && data.isNotEmpty) {
+      return data.map((e) => Subject.fromJson(e as Map<String, dynamic>)).toList();
+    }
+  } catch (_) {
+    // RPC unavailable, fall through
+  }
+
+  // Fallback: get student's stage, then subjects for that stage
+  final profile = await supabase
+      .from('profiles')
+      .select('student_stage')
+      .eq('id', userId)
+      .single();
+  final stage = profile['student_stage'] as String?;
+  if (stage == null) return [];
+
+  // Get stage id from slug
+  final stageRow = await supabase
+      .from('stages')
+      .select('id')
+      .eq('slug', stage)
+      .eq('is_active', true)
+      .maybeSingle();
+  if (stageRow == null) return [];
+
+  final data = await supabase
+      .from('subjects')
+      .select('*, stage:stages(id, slug, title_ar, title_en), teacher:profiles!teacher_id(full_name, avatar_url)')
+      .eq('stage_id', stageRow['id'])
+      .eq('is_active', true)
+      .order('sort_order');
+
+  return (data as List).map((e) {
+    final map = Map<String, dynamic>.from(e);
+    if (map['teacher'] is Map) {
+      map['teacher_name'] = map['teacher']['full_name'];
+    }
+    return Subject.fromJson(map);
+  }).toList();
 });
 
 final discoverSubjectsProvider = FutureProvider<List<Subject>>((ref) async {
-  return cachedListFetch<Subject>(
-    cacheKey: 'discover_subjects',
-    boxName: 'subjects_cache',
-    ttl: CacheService.subjectsTtl,
-    fetch: () async {
-      final data = await supabase.rpc('get_discover_subjects');
-      return data is List ? data : [];
-    },
-    fromJson: (json) => Subject.fromJson(json),
-  );
+  final userId = supabase.auth.currentUser?.id;
+
+  // Try RPC first
+  if (userId != null) {
+    try {
+      final data = await supabase.rpc('get_discover_subjects', params: {'p_student_id': userId});
+      if (data is List && data.isNotEmpty) {
+        return data.map((e) => Subject.fromJson(e as Map<String, dynamic>)).toList();
+      }
+    } catch (_) {}
+  }
+
+  // Fallback: get all active subjects
+  final data = await supabase
+      .from('subjects')
+      .select('*, stage:stages(id, slug, title_ar, title_en), teacher:profiles!teacher_id(full_name, avatar_url)')
+      .eq('is_active', true)
+      .order('sort_order');
+
+  return (data as List).map((e) {
+    final map = Map<String, dynamic>.from(e);
+    if (map['teacher'] is Map) {
+      map['teacher_name'] = map['teacher']['full_name'];
+    }
+    return Subject.fromJson(map);
+  }).toList();
 });
 
 final subjectDetailProvider = FutureProvider.family<Subject?, String>((ref, subjectId) async {
@@ -37,39 +87,21 @@ final subjectDetailProvider = FutureProvider.family<Subject?, String>((ref, subj
       .select('*, stage:stages(id, slug, title_ar, title_en), teacher:profiles!teacher_id(full_name, avatar_url, bio_ar, bio_en)')
       .eq('id', subjectId)
       .single();
-  return Subject.fromJson(data);
+  final map = Map<String, dynamic>.from(data);
+  if (map['teacher'] is Map) {
+    map['teacher_name'] = map['teacher']['full_name'];
+  }
+  return Subject.fromJson(map);
 });
 
 final subjectLessonsProvider = FutureProvider.family<List<Lesson>, String>((ref, subjectId) async {
-  final userId = supabase.auth.currentUser?.id;
   final data = await supabase
       .from('lessons')
       .select('*')
       .eq('subject_id', subjectId)
       .eq('is_published', true)
       .order('sort_order');
-
-  final lessons = (data as List).map((e) => Lesson.fromJson(e as Map<String, dynamic>)).toList();
-
-  // Fetch progress for each lesson if user is logged in
-  if (userId != null && lessons.isNotEmpty) {
-    final lessonIds = lessons.map((l) => l.id).toList();
-    final progressData = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .inFilter('lesson_id', lessonIds);
-
-    final progressMap = <String, Map<String, dynamic>>{};
-    for (final p in (progressData as List)) {
-      progressMap[p['lesson_id'] as String] = p as Map<String, dynamic>;
-    }
-
-    // We can't modify immutable Lesson objects, so we return as-is
-    // Progress will be fetched separately per lesson
-  }
-
-  return lessons;
+  return (data as List).map((e) => Lesson.fromJson(e as Map<String, dynamic>)).toList();
 });
 
 final lessonProgressMapProvider = FutureProvider.family<Map<String, int>, String>((ref, subjectId) async {
@@ -99,11 +131,16 @@ final lessonProgressMapProvider = FutureProvider.family<Map<String, int>, String
 });
 
 final checkSubjectAccessProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, subjectId) async {
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) return {'has_access': false};
   try {
-    final result = await supabase.rpc('check_subject_access', params: {'p_subject_id': subjectId});
+    final result = await supabase.rpc('check_subject_access', params: {
+      'p_student_id': userId,
+      'p_subject_id': subjectId,
+    });
     if (result is Map) return Map<String, dynamic>.from(result);
-    return {'has_access': false};
+    return {'has_access': true};
   } catch (_) {
-    return {'has_access': true}; // Default to allowing if RPC fails
+    return {'has_access': true};
   }
 });

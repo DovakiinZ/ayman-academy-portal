@@ -40,82 +40,88 @@ class TeacherDashboardScreen extends ConsumerWidget {
 
     return Directionality(
       textDirection: lang.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(t('لوحة التحكم', 'Dashboard')),
-          actions: [
-            IconButton(
-              icon: Icon(ref.watch(themeProvider) == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
-              onPressed: () => ref.read(themeProvider.notifier).toggle(),
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            leading: IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
-            IconButton(
-              icon: const Icon(Icons.language),
-              onPressed: () => ref.read(languageProvider.notifier).toggle(),
-            ),
-          ],
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                t('مرحباً، ${auth.profile?.fullName ?? "معلم"}!', 'Hello, ${auth.profile?.fullName ?? "Teacher"}!'),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            title: Text(t('لوحة التحكم', 'Dashboard')),
+            actions: [
+              IconButton(
+                icon: Icon(ref.watch(themeProvider) == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+                onPressed: () => ref.read(themeProvider.notifier).toggle(),
               ),
-              const SizedBox(height: 4),
-              Text(
-                t('إدارة موادك ومتابعة طلابك', 'Manage your subjects and track students'),
-                style: const TextStyle(color: AppColors.inkMuted),
+              IconButton(
+                icon: const Icon(Icons.language),
+                onPressed: () => ref.read(languageProvider.notifier).toggle(),
               ),
-              const SizedBox(height: 24),
-              statsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text('$e'),
-                data: (stats) => Row(
-                  children: [
-                    Expanded(child: _StatCard(
-                      icon: Icons.menu_book,
-                      value: '${stats['subjects'] ?? 0}',
-                      label: t('المواد', 'Subjects'),
-                      color: AppColors.primary,
-                    )),
-                    const SizedBox(width: 12),
-                    Expanded(child: _StatCard(
-                      icon: Icons.article,
-                      value: '${stats['lessons'] ?? 0}',
-                      label: t('الدروس', 'Lessons'),
-                      color: AppColors.gold,
-                    )),
-                  ],
+            ],
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                Text(
+                  t('مرحباً، ${auth.profile?.fullName ?? "معلم"}!', 'Hello, ${auth.profile?.fullName ?? "Teacher"}!'),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(height: 24),
-              // ShamCash warning
-              if (auth.profile?.shamcashAccountNumber == null || (auth.profile?.shamcashAccountNumber ?? '').isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
+                const SizedBox(height: 4),
+                Text(
+                  t('إدارة موادك ومتابعة طلابك', 'Manage your subjects and track students'),
+                  style: const TextStyle(color: AppColors.inkMuted),
+                ),
+                const SizedBox(height: 24),
+                statsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Text('$e'),
+                  data: (stats) => Row(
                     children: [
-                      const Icon(Icons.warning_amber, color: AppColors.warning),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          t('أضف بيانات ShamCash لتفعيل بيع الكورسات', 'Add ShamCash info to enable course sales'),
-                          style: const TextStyle(color: AppColors.warning, fontSize: 13),
-                        ),
-                      ),
+                      Expanded(child: _StatCard(
+                        icon: Icons.menu_book,
+                        value: '${stats['subjects'] ?? 0}',
+                        label: t('المواد', 'Subjects'),
+                        color: AppColors.primary,
+                      )),
+                      const SizedBox(width: 12),
+                      Expanded(child: _StatCard(
+                        icon: Icons.article,
+                        value: '${stats['lessons'] ?? 0}',
+                        label: t('الدروس', 'Lessons'),
+                        color: AppColors.gold,
+                      )),
                     ],
                   ),
                 ),
-            ],
+                const SizedBox(height: 24),
+                // ShamCash warning
+                if (auth.profile?.shamcashAccountNumber == null || (auth.profile?.shamcashAccountNumber ?? '').isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            t('أضف بيانات ShamCash لتفعيل بيع الكورسات', 'Add ShamCash info to enable course sales'),
+                            style: const TextStyle(color: AppColors.warning, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ]),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -184,9 +183,11 @@ class PdfService {
     final file = File('${tempDir.path}/certificate_${cert.id.substring(0, 8)}.pdf');
     await file.writeAsBytes(bytes);
 
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'شهادة إتمام - $courseName',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        text: 'شهادة إتمام - $courseName',
+      ),
     );
   }
 }

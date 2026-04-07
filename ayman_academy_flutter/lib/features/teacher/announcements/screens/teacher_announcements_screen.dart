@@ -58,11 +58,11 @@ class TeacherAnnouncementsScreen extends ConsumerWidget {
 
                 // Subject picker
                 Consumer(
-                  builder: (_, ref, __) {
+                  builder: (_, ref, _) {
                     final subjectsAsync = ref.watch(_teacherSubjectsForAnnouncementProvider);
                     return subjectsAsync.when(
                       loading: () => const LinearProgressIndicator(),
-                      error: (_, __) => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
                       data: (subjects) => DropdownButtonFormField<String>(
                         value: selectedSubjectId,
                         decoration: InputDecoration(labelText: t('المادة (اختياري)', 'Subject (optional)')),

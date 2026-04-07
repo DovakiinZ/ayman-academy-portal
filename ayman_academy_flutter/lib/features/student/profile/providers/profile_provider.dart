@@ -17,7 +17,7 @@ final studentLevelProvider = FutureProvider<StudentLevel?>((ref) async {
     }
     return StudentLevel.fromJson(data);
   } catch (_) {
-    return StudentLevel(studentId: userId ?? '');
+    return StudentLevel(studentId: userId);
   }
 });
 

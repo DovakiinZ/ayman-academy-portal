@@ -107,7 +107,7 @@ class TeacherLessonsScreen extends ConsumerWidget {
                       ),
                       trailing: Switch(
                         value: l.isPublished,
-                        activeColor: AppColors.success,
+                        activeTrackColor: AppColors.success,
                         onChanged: (val) async {
                           await supabase.from('lessons').update({'is_published': val}).eq('id', l.id);
                           ref.invalidate(teacherLessonsProvider(subjectId));

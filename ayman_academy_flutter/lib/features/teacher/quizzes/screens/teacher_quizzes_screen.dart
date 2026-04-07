@@ -77,7 +77,7 @@ class TeacherQuizzesScreen extends ConsumerWidget {
                     ),
                     trailing: Switch(
                       value: q.isEnabled,
-                      activeColor: AppColors.success,
+                      activeTrackColor: AppColors.success,
                       onChanged: (val) async {
                         await supabase.from('quizzes').update({'is_enabled': val}).eq('id', q.id);
                         ref.invalidate(teacherQuizzesProvider(subjectId));

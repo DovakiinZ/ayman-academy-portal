@@ -12,7 +12,7 @@ class LoadingShimmer extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: itemCount,
-      itemBuilder: (_, __) => Padding(
+      itemBuilder: (_, _) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Shimmer.fromColors(
           baseColor: AppColors.border,

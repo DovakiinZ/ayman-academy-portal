@@ -17,12 +17,32 @@ class AvatarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty && imageUrl!.startsWith('http');
 
-    if (imageUrl != null && imageUrl!.isNotEmpty) {
+    if (hasImage) {
       return CircleAvatar(
         radius: radius,
-        backgroundImage: CachedNetworkImageProvider(imageUrl!),
         backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: imageUrl!,
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            placeholder: (_, _) => Center(
+              child: Text(
+                initial,
+                style: TextStyle(fontSize: radius * 0.8, fontWeight: FontWeight.bold, color: AppColors.primary),
+              ),
+            ),
+            errorWidget: (_, _, _) => Center(
+              child: Text(
+                initial,
+                style: TextStyle(fontSize: radius * 0.8, fontWeight: FontWeight.bold, color: AppColors.primary),
+              ),
+            ),
+          ),
+        ),
       );
     }
 
