@@ -26,6 +26,10 @@ class Subject {
   final String? lockReason;
   // Teacher name from join
   final String? teacherName;
+  // Rating data
+  final double? averageRating;
+  final int? ratingCount;
+  final int? enrollmentCount;
 
   const Subject({
     required this.id,
@@ -51,6 +55,9 @@ class Subject {
     this.entitlementReason,
     this.lockReason,
     this.teacherName,
+    this.averageRating,
+    this.ratingCount,
+    this.enrollmentCount,
   });
 
   factory Subject.fromJson(Map<String, dynamic> json) => Subject(
@@ -79,6 +86,9 @@ class Subject {
     entitlementReason: json['entitlement_reason'] as String?,
     lockReason: json['lock_reason'] as String?,
     teacherName: json['teacher_name'] as String? ?? (json['teacher'] is Map ? json['teacher']['full_name'] as String? : null),
+    averageRating: (json['average_rating'] as num?)?.toDouble(),
+    ratingCount: json['rating_count'] as int?,
+    enrollmentCount: json['enrollment_count'] as int?,
   );
 
   String title(String lang) => lang == 'ar' ? titleAr : (titleEn ?? titleAr);

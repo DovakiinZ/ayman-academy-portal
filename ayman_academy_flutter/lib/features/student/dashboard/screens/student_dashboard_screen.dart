@@ -6,9 +6,9 @@ import 'package:ayman_academy_app/core/theme/app_colors.dart';
 import 'package:ayman_academy_app/features/auth/providers/auth_provider.dart';
 import 'package:ayman_academy_app/shared/models/subject.dart';
 import 'package:ayman_academy_app/shared/providers/language_provider.dart';
-import 'package:ayman_academy_app/shared/providers/theme_provider.dart';
-import 'package:ayman_academy_app/shared/widgets/xp_progress_bar.dart';
 import 'package:ayman_academy_app/shared/widgets/avatar_widget.dart';
+import 'package:ayman_academy_app/shared/widgets/star_rating.dart';
+import 'package:ayman_academy_app/shared/widgets/subject_card.dart';
 import 'package:ayman_academy_app/features/student/subjects/providers/subjects_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -27,300 +27,167 @@ class StudentDashboardScreen extends ConsumerWidget {
 
     return Directionality(
       textDirection: lang.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      child: CustomScrollView(
-        slivers: [
-          // App bar
-          SliverAppBar(
-            floating: true,
-            leading: IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-            title: Row(
-              children: [
-                Text(
-                  t('أكاديمية أيمن', 'Ayman Academy'),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            // ── App Bar — Clean, iOS-style ──
+            SliverAppBar(
+              floating: true,
+              pinned: false,
+              leading: IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.search_rounded, size: 24),
+                  onPressed: () => context.push('/student/discover'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 12, left: 12),
+                  child: GestureDetector(
+                    onTap: () => Scaffold.of(context).openDrawer(),
+                    child: AvatarWidget(
+                      name: profile?.fullName ?? '?',
+                      imageUrl: profile?.avatarUrl,
+                      radius: 16,
+                    ),
+                  ),
                 ),
               ],
             ),
-            actions: [
-              IconButton(
-                icon: Icon(ref.watch(themeProvider) == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode, size: 22),
-                onPressed: () => ref.read(themeProvider.notifier).toggle(),
-              ),
-              IconButton(
-                icon: const Icon(Icons.language, size: 22),
-                onPressed: () => ref.read(languageProvider.notifier).toggle(),
-              ),
-            ],
-          ),
 
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Greeting header
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isDark
-                          ? [AppColors.surfaceDark, AppColors.backgroundDark]
-                          : [AppColors.primary.withValues(alpha: 0.06), AppColors.background],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      AvatarWidget(
-                        name: profile?.fullName ?? '?',
-                        imageUrl: profile?.avatarUrl,
-                        radius: 26,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              t('مرحباً، ${profile?.fullName ?? ""}', 'Hi, ${profile?.fullName ?? ""}'),
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              t('واصل رحلة التعلم', 'Continue your learning journey'),
-                              style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // XP compact badge
-                      const XPProgressBar(compact: true),
-                    ],
-                  ),
-                ),
-
-                // Continue Learning section
-                mySubjects.when(
-                  loading: () => const SizedBox(height: 180, child: Center(child: CircularProgressIndicator())),
-                  error: (_, __) => const SizedBox.shrink(),
-                  data: (subjects) {
-                    if (subjects.isEmpty) return const SizedBox.shrink();
-                    final inProgress = subjects.where((s) => s.progressPercent != null && s.progressPercent! > 0 && s.progressPercent! < 100).toList();
-                    if (inProgress.isEmpty) return const SizedBox.shrink();
-                    return Column(
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Welcome Section ──
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                          child: Text(
-                            t('متابعة التعلم', 'Continue Learning'),
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        Text(
+                          '${t("مرحباً", "Welcome")}, ${profile?.fullName?.split(" ").first ?? ""}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: AppColors.inkMuted,
                           ),
                         ),
-                        SizedBox(
-                          height: 160,
+                        const SizedBox(height: 2),
+                        Text(
+                          t('ماذا تريد أن تتعلم اليوم؟', 'What do you want to learn today?'),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Continue Learning ──
+                  mySubjects.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (subjects) {
+                      final inProgress = subjects
+                          .where((s) => s.progressPercent != null && s.progressPercent! > 0 && s.progressPercent! < 100)
+                          .toList();
+                      if (inProgress.isEmpty) return const SizedBox.shrink();
+                      return _SectionWidget(
+                        title: t('متابعة التعلم', 'Continue Learning'),
+                        child: SizedBox(
+                          height: 120,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: inProgress.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 14),
-                            itemBuilder: (context, index) {
-                              final s = inProgress[index];
-                              return _ContinueLearningCard(
-                                subject: s,
-                                lang: lang.languageCode,
-                                onTap: () => context.push('/student/subjects/subject/${s.id}'),
-                              );
-                            },
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (context, i) => _ContinueLearningCard(
+                              subject: inProgress[i],
+                              lang: lang.languageCode,
+                              isDark: isDark,
+                              onTap: () => context.push('/student/subjects/subject/${inProgress[i].id}'),
+                            ),
                           ),
                         ),
-                      ],
-                    );
-                  },
-                ),
-
-                // Quick Actions
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                  child: Text(
-                    t('الوصول السريع', 'Quick Access'),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      );
+                    },
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      _QuickAction(
-                        icon: Icons.store,
-                        label: t('المتجر', 'Market'),
-                        color: AppColors.gold,
-                        onTap: () => context.push(Routes.marketplace),
-                      ),
-                      const SizedBox(width: 10),
-                      _QuickAction(
-                        icon: Icons.explore,
-                        label: t('اكتشف', 'Discover'),
-                        color: AppColors.info,
-                        onTap: () => context.push('/student/discover'),
-                      ),
-                      const SizedBox(width: 10),
-                      _QuickAction(
-                        icon: Icons.emoji_events,
-                        label: t('إنجازاتي', 'Achieve'),
-                        color: AppColors.success,
-                        onTap: () => context.push('/student/achievements'),
-                      ),
-                      const SizedBox(width: 10),
-                      _QuickAction(
-                        icon: Icons.people,
-                        label: t('المعلمون', 'Teachers'),
-                        color: AppColors.primary,
-                        onTap: () => context.push('/student/teachers'),
-                      ),
-                    ],
-                  ),
-                ),
 
-                // Discover section
-                discoverSubjects.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                  data: (subjects) {
-                    if (subjects.isEmpty) return const SizedBox.shrink();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
-                          child: Row(
-                            children: [
-                              Text(
-                                t('مواد مقترحة', 'Recommended'),
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              const Spacer(),
-                              TextButton(
-                                onPressed: () => context.push('/student/discover'),
-                                child: Text(t('عرض الكل', 'See All'), style: const TextStyle(fontSize: 13)),
-                              ),
-                            ],
+                  // ── Quick Actions ──
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _QuickActionChip(
+                            label: t('المتجر', 'Marketplace'),
+                            icon: Icons.store_rounded,
+                            onTap: () => context.push(Routes.marketplace),
                           ),
+                          _QuickActionChip(
+                            label: t('استكشف', 'Discover'),
+                            icon: Icons.explore_rounded,
+                            onTap: () => context.push('/student/discover'),
+                          ),
+                          _QuickActionChip(
+                            label: t('المعلمون', 'Teachers'),
+                            icon: Icons.people_rounded,
+                            onTap: () => context.push('/student/teachers'),
+                          ),
+                          _QuickActionChip(
+                            label: t('إنجازاتي', 'Achievements'),
+                            icon: Icons.emoji_events_rounded,
+                            onTap: () => context.push('/student/achievements'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ── Recommended Courses ──
+                  discoverSubjects.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (subjects) {
+                      if (subjects.isEmpty) return const SizedBox.shrink();
+                      return _SectionWidget(
+                        title: t('مواد مقترحة لك', 'Recommended for you'),
+                        trailing: TextButton(
+                          onPressed: () => context.push('/student/discover'),
+                          child: Text(t('عرض الكل', 'See all')),
                         ),
-                        SizedBox(
-                          height: 220,
+                        child: SizedBox(
+                          height: 260,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: subjects.take(6).length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 14),
-                            itemBuilder: (context, index) {
-                              final s = subjects[index];
-                              return _DiscoverCard(
-                                subject: s,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (context, i) => SizedBox(
+                              width: 180,
+                              child: SubjectCard(
+                                subject: subjects[i],
                                 lang: lang.languageCode,
-                                isDark: isDark,
-                                onTap: () => context.push('/student/subjects/subject/${s.id}'),
-                              );
-                            },
+                                onTap: () => context.push('/student/subjects/subject/${subjects[i].id}'),
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 32),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Continue Learning Card — horizontal
-class _ContinueLearningCard extends StatelessWidget {
-  final Subject subject;
-  final String lang;
-  final VoidCallback onTap;
-
-  const _ContinueLearningCard({required this.subject, required this.lang, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = subject.progressPercent ?? 0;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 280,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06), blurRadius: 12, offset: const Offset(0, 4))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryLight]),
-                    borderRadius: BorderRadius.circular(12),
+                      );
+                    },
                   ),
-                  child: const Center(child: Icon(Icons.menu_book, color: Colors.white, size: 22)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(subject.title(lang), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      if (subject.teacherName != null)
-                        Text(subject.teacherName!, style: const TextStyle(fontSize: 11, color: AppColors.inkMuted)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            // Progress
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: progress / 100,
-                      backgroundColor: isDark ? AppColors.borderDark : AppColors.secondary,
-                      valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-                      minHeight: 6,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text('$progress%', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primary)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                lang == 'ar' ? 'متابعة' : 'Continue',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+
+                  const SizedBox(height: 32),
+                ],
               ),
             ),
           ],
@@ -330,106 +197,177 @@ class _ContinueLearningCard extends StatelessWidget {
   }
 }
 
-// Quick Action chip
-class _QuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+// ── Section Header ──
+class _SectionWidget extends StatelessWidget {
+  final String title;
+  final Widget? trailing;
+  final Widget child;
 
-  const _QuickAction({required this.icon, required this.label, required this.color, required this.onTap});
+  const _SectionWidget({required this.title, this.trailing, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withValues(alpha: 0.15)),
-          ),
-          child: Column(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
+          child: Row(
             children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(height: 6),
-              Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const Spacer(),
+              if (trailing != null) trailing!,
             ],
           ),
         ),
-      ),
+        child,
+      ],
     );
   }
 }
 
-// Discover/Recommended Card
-class _DiscoverCard extends StatelessWidget {
+// ── Continue Learning Card ──
+class _ContinueLearningCard extends StatelessWidget {
   final Subject subject;
   final String lang;
   final bool isDark;
   final VoidCallback onTap;
 
-  const _DiscoverCard({required this.subject, required this.lang, required this.isDark, required this.onTap});
+  const _ContinueLearningCard({
+    required this.subject,
+    required this.lang,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final progress = subject.progressPercent ?? 0;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 170,
+        width: 300,
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 3))],
+          color: isDark ? AppColors.surfaceDark : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? AppColors.borderDark : AppColors.border,
+            width: 0.5,
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            // Cover
-            Container(
-              height: 100,
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            // Thumbnail
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 72,
+                height: 72,
+                color: AppColors.secondary,
+                child: subject.coverImageUrl != null && subject.coverImageUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: subject.coverImageUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) => const Icon(Icons.play_circle_outline, color: AppColors.inkMuted),
+                      )
+                    : const Icon(Icons.play_circle_outline, color: AppColors.inkMuted, size: 28),
               ),
-              child: subject.coverImageUrl != null && subject.coverImageUrl!.isNotEmpty
-                  ? CachedNetworkImage(imageUrl: subject.coverImageUrl!, fit: BoxFit.cover, errorWidget: (_, __, ___) => const Center(child: Icon(Icons.menu_book, color: Colors.white30, size: 32)))
-                  : const Center(child: Icon(Icons.menu_book, color: Colors.white30, size: 32)),
             ),
-            Padding(
-              padding: const EdgeInsets.all(10),
+            const SizedBox(width: 14),
+            // Info
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     subject.title(lang),
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, height: 1.3),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   if (subject.teacherName != null)
-                    Text(subject.teacherName!, style: const TextStyle(fontSize: 11, color: AppColors.inkMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  if (subject.isPaid == true)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: AppColors.gold.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                      child: Text('${subject.priceAmount?.toInt() ?? 0} ${subject.priceCurrency ?? "SYP"}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.gold)),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                      child: Text(lang == 'ar' ? 'مجاني' : 'Free', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.success)),
+                    Text(
+                      subject.teacherName!,
+                      style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                  const SizedBox(height: 10),
+                  // Progress bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: progress / 100,
+                      backgroundColor: isDark ? AppColors.borderDark : AppColors.border,
+                      valueColor: AlwaysStoppedAnimation(
+                        progress >= 80 ? AppColors.success : AppColors.accent,
+                      ),
+                      minHeight: 4,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$progress% ${lang == "ar" ? "مكتمل" : "complete"}',
+                    style: const TextStyle(fontSize: 11, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
+                  ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Quick Action Chip ──
+class _QuickActionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _QuickActionChip({required this.label, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8, left: 0),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.secondaryDark : AppColors.secondary,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: isDark ? AppColors.inkDark : AppColors.ink),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

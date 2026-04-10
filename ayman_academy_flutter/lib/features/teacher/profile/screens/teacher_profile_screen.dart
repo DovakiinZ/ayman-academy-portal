@@ -65,116 +65,438 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     }
   }
 
+  void _showEditField({
+    required String title,
+    required TextEditingController controller,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    TextDirection? textDirection,
+  }) {
+    final t = ref.read(languageProvider.notifier).t;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final editController = TextEditingController(text: controller.text);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            fontWeight: FontWeight.w700,
+            color: isDark ? AppColors.inkDark : AppColors.ink,
+          ),
+        ),
+        content: TextField(
+          controller: editController,
+          autofocus: true,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          textDirection: textDirection,
+          style: TextStyle(
+            fontFamily: 'IBMPlexSansArabic',
+            color: isDark ? AppColors.inkDark : AppColors.ink,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: isDark ? AppColors.secondaryDark : AppColors.secondary,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.accent, width: 1),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(t('إلغاء', 'Cancel'), style: const TextStyle(color: AppColors.inkMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => controller.text = editController.text);
+              Navigator.pop(ctx);
+            },
+            child: Text(t('تم', 'Done'), style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = ref.read(languageProvider.notifier).t;
     final lang = ref.watch(languageProvider);
     final auth = ref.watch(authProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Directionality(
       textDirection: lang.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.secondary,
         appBar: AppBar(
-          title: Text(t('ملفي الشخصي', 'My Profile')),
+          backgroundColor: isDark ? AppColors.backgroundDark : AppColors.secondary,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            t('ملفي الشخصي', 'My Profile'),
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.inkDark : AppColors.ink,
+            ),
+          ),
+          centerTitle: true,
           actions: [
             TextButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(t('حفظ', 'Save')),
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent))
+                  : Text(
+                      t('حفظ', 'Save'),
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
             ),
           ],
         ),
         body: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           children: [
-            // Avatar
+            const SizedBox(height: 16),
+
+            // ── Avatar with initial ──
             Center(
-              child: CircleAvatar(
-                radius: 48,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+              child: Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
                 child: Text(
                   (auth.profile?.fullName ?? '?')[0].toUpperCase(),
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  style: const TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.accent,
+                  ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                auth.profile?.fullName ?? '',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Center(
+              child: Text(
+                auth.profile?.email ?? '',
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 14,
+                  color: AppColors.inkMuted,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // ── Section 1: Personal Info ──
+            _sectionHeader(t('المعلومات الشخصية', 'Personal Info')),
+            const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _settingsRow(
+                    icon: Icons.person_outline_rounded,
+                    label: t('الاسم', 'Name'),
+                    value: _nameController.text,
+                    isDark: isDark,
+                    onTap: () => _showEditField(
+                      title: t('تعديل الاسم', 'Edit Name'),
+                      controller: _nameController,
+                    ),
+                    showDivider: true,
+                  ),
+                  _settingsRow(
+                    icon: Icons.description_outlined,
+                    label: t('نبذة عني', 'Bio'),
+                    value: _bioArController.text.isEmpty ? t('لم يتم الإضافة', 'Not set') : _bioArController.text,
+                    isDark: isDark,
+                    onTap: () => _showEditField(
+                      title: t('تعديل النبذة', 'Edit Bio'),
+                      controller: _bioArController,
+                      maxLines: 3,
+                    ),
+                    showDivider: false,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // Name
-            TextFormField(
-              controller: _nameController,
-              decoration: InputDecoration(labelText: t('الاسم الكامل', 'Full Name')),
+            // ── Section 2: ShamCash ──
+            _sectionHeader(t('بيانات ShamCash', 'ShamCash Details')),
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 4, right: 4, bottom: 6),
+              child: Text(
+                t('مطلوبة لاستقبال مدفوعات الطلاب', 'Required to receive student payments'),
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 12,
+                  color: AppColors.inkMuted,
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
-
-            // Bio
-            TextFormField(
-              controller: _bioArController,
-              maxLines: 3,
-              decoration: InputDecoration(labelText: t('نبذة عني', 'Bio')),
-            ),
-            const SizedBox(height: 24),
-
-            // ShamCash section
-            Text(t('بيانات ShamCash', 'ShamCash Details'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(t('مطلوبة لاستقبال مدفوعات الطلاب', 'Required to receive student payments'), style: const TextStyle(color: AppColors.inkMuted, fontSize: 12)),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _shamcashNameController,
-              decoration: InputDecoration(labelText: t('اسم الحساب', 'Account Name')),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _shamcashNumberController,
-              keyboardType: TextInputType.number,
-              textDirection: TextDirection.ltr,
-              decoration: InputDecoration(labelText: t('رقم الحساب', 'Account Number')),
-            ),
-            const SizedBox(height: 24),
-
-            // Settings
-            Card(
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.language),
-                    title: Text(t('اللغة', 'Language')),
-                    trailing: Text(lang.languageCode == 'ar' ? 'العربية' : 'English'),
-                    onTap: () => ref.read(languageProvider.notifier).toggle(),
+                  _settingsRow(
+                    icon: Icons.account_circle_outlined,
+                    label: t('اسم الحساب', 'Account Name'),
+                    value: _shamcashNameController.text.isEmpty ? t('لم يتم الإضافة', 'Not set') : _shamcashNameController.text,
+                    isDark: isDark,
+                    onTap: () => _showEditField(
+                      title: t('اسم حساب ShamCash', 'ShamCash Account Name'),
+                      controller: _shamcashNameController,
+                    ),
+                    showDivider: true,
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.dark_mode),
-                    title: Text(t('الوضع الداكن', 'Dark Mode')),
-                    trailing: Switch(
-                      value: ref.watch(themeProvider) == ThemeMode.dark,
-                      onChanged: (_) => ref.read(themeProvider.notifier).toggle(),
+                  _settingsRow(
+                    icon: Icons.numbers_rounded,
+                    label: t('رقم الحساب', 'Account Number'),
+                    value: _shamcashNumberController.text.isEmpty ? t('لم يتم الإضافة', 'Not set') : _shamcashNumberController.text,
+                    isDark: isDark,
+                    onTap: () => _showEditField(
+                      title: t('رقم حساب ShamCash', 'ShamCash Account Number'),
+                      controller: _shamcashNumberController,
+                      keyboardType: TextInputType.number,
+                      textDirection: TextDirection.ltr,
+                    ),
+                    showDivider: false,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ── Section 3: Settings ──
+            _sectionHeader(t('الإعدادات', 'Settings')),
+            const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  // Language toggle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.language_rounded, size: 20, color: isDark ? AppColors.inkMuted : AppColors.inkSecondary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            t('اللغة', 'Language'),
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontSize: 15,
+                              color: isDark ? AppColors.inkDark : AppColors.ink,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => ref.read(languageProvider.notifier).toggle(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.secondaryDark : AppColors.secondary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              lang.languageCode == 'ar' ? 'العربية' : 'English',
+                              style: TextStyle(
+                                fontFamily: 'IBMPlexSansArabic',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.accent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 0.5, thickness: 0.5, indent: 48, color: isDark ? AppColors.borderDark : AppColors.border),
+                  // Dark mode toggle
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.dark_mode_outlined, size: 20, color: isDark ? AppColors.inkMuted : AppColors.inkSecondary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            t('الوضع الداكن', 'Dark Mode'),
+                            style: TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontSize: 15,
+                              color: isDark ? AppColors.inkDark : AppColors.ink,
+                            ),
+                          ),
+                        ),
+                        Switch.adaptive(
+                          value: ref.watch(themeProvider) == ThemeMode.dark,
+                          onChanged: (_) => ref.read(themeProvider.notifier).toggle(),
+                          activeColor: AppColors.accent,
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
-            // Sign out
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => ref.read(authProvider.notifier).signOut(),
-                icon: const Icon(Icons.logout, color: AppColors.error),
-                label: Text(t('تسجيل الخروج', 'Sign Out'), style: const TextStyle(color: AppColors.error)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.error),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+            // ── Section 4: Sign Out ──
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: InkWell(
+                onTap: () => ref.read(authProvider.notifier).signOut(),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.logout_rounded, size: 20, color: AppColors.error),
+                      const SizedBox(width: 12),
+                      Text(
+                        t('تسجيل الخروج', 'Sign Out'),
+                        style: const TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 40),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontFamily: 'IBMPlexSansArabic',
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AppColors.inkMuted,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDark,
+    VoidCallback? onTap,
+    bool showDivider = true,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: isDark ? AppColors.inkMuted : AppColors.inkSecondary),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 15,
+                    color: isDark ? AppColors.inkDark : AppColors.ink,
+                  ),
+                ),
+                const Spacer(),
+                Flexible(
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 14,
+                      color: AppColors.inkMuted,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                if (onTap != null) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.inkMuted),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (showDivider)
+          Divider(
+            height: 0.5,
+            thickness: 0.5,
+            indent: 48,
+            color: isDark ? AppColors.borderDark : AppColors.border,
+          ),
+      ],
     );
   }
 }

@@ -59,12 +59,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       textDirection: lang.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(t('إنشاء حساب', 'Create Account')),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            onPressed: () => context.pop(),
+          ),
         ),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: _success ? _buildSuccess(t) : _buildForm(t),
             ),
           ),
@@ -77,20 +80,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.check_circle, size: 80, color: AppColors.success),
-        const SizedBox(height: 16),
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: AppColors.success.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.check_rounded, size: 44, color: AppColors.success),
+        ),
+        const SizedBox(height: 24),
         Text(
-          t('تم إنشاء الحساب بنجاح!', 'Account created successfully!'),
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          t('تم إنشاء الحساب بنجاح!', 'Account created!'),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          t('يرجى تأكيد بريدك الإلكتروني ثم تسجيل الدخول', 'Please verify your email then sign in'),
-          style: const TextStyle(color: AppColors.inkMuted),
+          t('يرجى تأكيد بريدك الإلكتروني ثم تسجيل الدخول', 'Please verify your email, then sign in'),
+          style: const TextStyle(color: AppColors.inkMuted, fontSize: 15, height: 1.5),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
         ElevatedButton(
           onPressed: () => context.go(Routes.login),
           child: Text(t('تسجيل الدخول', 'Sign In')),
@@ -103,50 +114,78 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Form(
       key: _formKey,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Title ──
+          Text(
+            t('إنشاء حساب', 'Create account'),
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            t('ابدأ رحلة التعلم مع أكاديمية أيمن', 'Start your learning journey'),
+            style: const TextStyle(fontSize: 16, color: AppColors.inkMuted),
+          ),
+          const SizedBox(height: 32),
+
+          // ── Error ──
           if (_error != null)
             Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 16),
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+              child: Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 14)),
             ),
 
+          // Full Name
+          _fieldLabel(t('الاسم الكامل', 'Full name')),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _nameController,
             decoration: InputDecoration(
-              labelText: t('الاسم الكامل', 'Full Name'),
-              prefixIcon: const Icon(Icons.person_outlined),
+              hintText: t('أدخل اسمك الكامل', 'Enter your full name'),
             ),
             validator: (v) => (v == null || v.isEmpty) ? t('مطلوب', 'Required') : null,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
+          // Email
+          _fieldLabel(t('البريد الإلكتروني', 'Email')),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             textDirection: TextDirection.ltr,
             decoration: InputDecoration(
-              labelText: t('البريد الإلكتروني', 'Email'),
-              prefixIcon: const Icon(Icons.email_outlined),
+              hintText: t('أدخل بريدك الإلكتروني', 'Enter your email'),
             ),
             validator: (v) => (v == null || v.isEmpty) ? t('مطلوب', 'Required') : null,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
+          // Password
+          _fieldLabel(t('كلمة المرور', 'Password')),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
             textDirection: TextDirection.ltr,
             decoration: InputDecoration(
-              labelText: t('كلمة المرور', 'Password'),
-              prefixIcon: const Icon(Icons.lock_outlined),
+              hintText: t('6 أحرف على الأقل', 'At least 6 characters'),
               suffixIcon: IconButton(
-                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  size: 20,
+                  color: AppColors.inkMuted,
+                ),
                 onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
@@ -156,46 +195,72 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
+          // Confirm Password
+          _fieldLabel(t('تأكيد كلمة المرور', 'Confirm password')),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _confirmController,
             obscureText: true,
             textDirection: TextDirection.ltr,
             decoration: InputDecoration(
-              labelText: t('تأكيد كلمة المرور', 'Confirm Password'),
-              prefixIcon: const Icon(Icons.lock_outlined),
+              hintText: t('أعد إدخال كلمة المرور', 'Re-enter your password'),
             ),
             validator: (v) {
               if (v != _passwordController.text) return t('كلمة المرور غير متطابقة', 'Passwords do not match');
               return null;
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
-          SizedBox(
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _loading ? null : _submit,
-              child: _loading
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(t('إنشاء حساب', 'Create Account'), style: const TextStyle(fontSize: 16)),
+          // Submit
+          ElevatedButton(
+            onPressed: _loading ? null : _submit,
+            child: _loading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                  )
+                : Text(t('إنشاء حساب', 'Create account')),
+          ),
+          const SizedBox(height: 20),
+
+          // Login link
+          Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  t('لديك حساب بالفعل؟', 'Already have an account?'),
+                  style: const TextStyle(color: AppColors.inkMuted, fontSize: 14),
+                ),
+                TextButton(
+                  onPressed: () => context.go(Routes.login),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    t('تسجيل الدخول', 'Sign in'),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(t('لديك حساب بالفعل؟', 'Already have an account?')),
-              TextButton(
-                onPressed: () => context.go(Routes.login),
-                child: Text(t('تسجيل الدخول', 'Sign In'), style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
+          const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  Widget _fieldLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
     );
   }
 }

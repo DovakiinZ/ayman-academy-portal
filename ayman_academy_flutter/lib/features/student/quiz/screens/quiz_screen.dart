@@ -42,11 +42,35 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final t = ref.read(languageProvider.notifier).t;
     final lang = ref.watch(languageProvider).languageCode;
     final quizAsync = ref.watch(quizDetailProvider(widget.quizId));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Directionality(
       textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        appBar: AppBar(title: Text(t('اختبار', 'Quiz'))),
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        appBar: AppBar(
+          backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 20,
+              color: isDark ? AppColors.inkDark : AppColors.ink,
+            ),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+          title: Text(
+            t('اختبار', 'Quiz'),
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.inkDark : AppColors.ink,
+            ),
+          ),
+          centerTitle: true,
+        ),
         body: quizAsync.when(
           loading: () => const LoadingShimmer(),
           error: (e, _) => Center(child: Text('$e')),
@@ -55,65 +79,102 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             final questions = quiz.questions ?? [];
             if (questions.isEmpty) return Center(child: Text(t('لا توجد أسئلة', 'No questions')));
 
-            if (_submitted && _result != null) return _buildResult(quiz, questions, t, lang);
+            if (_submitted && _result != null) return _buildResult(quiz, questions, t, lang, isDark);
 
             final q = questions[_currentIndex];
             return Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Progress
-                  LinearProgressIndicator(
-                    value: (_currentIndex + 1) / questions.length,
-                    backgroundColor: AppColors.border,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  // Progress bar - thin 3px
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: (_currentIndex + 1) / questions.length,
+                      backgroundColor: isDark ? AppColors.secondaryDark : AppColors.secondary,
+                      valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+                      minHeight: 3,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
                     '${t("سؤال", "Question")} ${_currentIndex + 1} / ${questions.length}',
-                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
+                    style: const TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      color: AppColors.inkMuted,
+                      fontSize: 13,
+                    ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
 
-                  // Question
-                  Text(q.question(lang), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, height: 1.5)),
-                  const SizedBox(height: 24),
+                  // Question text
+                  Text(
+                    q.question(lang),
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      height: 1.5,
+                      color: isDark ? AppColors.inkDark : AppColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
 
                   // Options
                   Expanded(
                     child: ListView.separated(
                       itemCount: q.options.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (_, i) {
                         final option = q.options[i];
                         final selected = _answers[q.id] == option;
-                        return InkWell(
+                        return GestureDetector(
                           onTap: () => setState(() => _answers[q.id] = option),
-                          borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: selected ? AppColors.primary.withValues(alpha: 0.08) : AppColors.surface,
-                              borderRadius: BorderRadius.circular(10),
+                              color: selected
+                                  ? AppColors.accent.withValues(alpha: 0.08)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: selected ? AppColors.primary : AppColors.border,
-                                width: selected ? 2 : 1,
+                                color: selected
+                                    ? AppColors.accent
+                                    : (isDark ? AppColors.borderDark : AppColors.border),
+                                width: selected ? 1.5 : 1,
                               ),
                             ),
                             child: Row(
                               children: [
+                                // Custom radio circle
                                 Container(
-                                  width: 28, height: 28,
+                                  width: 22,
+                                  height: 22,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: selected ? AppColors.primary : Colors.transparent,
-                                    border: Border.all(color: selected ? AppColors.primary : AppColors.inkMuted),
+                                    color: selected ? AppColors.accent : Colors.transparent,
+                                    border: Border.all(
+                                      color: selected ? AppColors.accent : AppColors.inkMuted,
+                                      width: selected ? 0 : 1.5,
+                                    ),
                                   ),
-                                  child: selected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                                  child: selected
+                                      ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                                      : null,
                                 ),
                                 const SizedBox(width: 12),
-                                Expanded(child: Text(option, style: TextStyle(fontSize: 15, fontWeight: selected ? FontWeight.w600 : FontWeight.normal))),
+                                Expanded(
+                                  child: Text(
+                                    option,
+                                    style: TextStyle(
+                                      fontFamily: 'IBMPlexSansArabic',
+                                      fontSize: 15,
+                                      fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                                      color: isDark ? AppColors.inkDark : AppColors.ink,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -122,29 +183,69 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                     ),
                   ),
 
-                  // Navigation
+                  const SizedBox(height: 16),
+
+                  // Navigation buttons
                   Row(
                     children: [
                       if (_currentIndex > 0)
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => setState(() => _currentIndex--),
-                            child: Text(t('السابق', 'Previous')),
+                          child: SizedBox(
+                            height: 50,
+                            child: OutlinedButton(
+                              onPressed: () => setState(() => _currentIndex--),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: isDark ? AppColors.borderDark : AppColors.border,
+                                  width: 1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                t('السابق', 'Previous'),
+                                style: TextStyle(
+                                  fontFamily: 'IBMPlexSansArabic',
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       if (_currentIndex > 0) const SizedBox(width: 12),
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: _submitting ? null : () {
-                            if (_currentIndex < questions.length - 1) {
-                              setState(() => _currentIndex++);
-                            } else {
-                              _submit(quiz);
-                            }
-                          },
-                          child: _submitting
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : Text(_currentIndex < questions.length - 1 ? t('التالي', 'Next') : t('إرسال', 'Submit')),
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _submitting ? null : () {
+                              if (_currentIndex < questions.length - 1) {
+                                setState(() => _currentIndex++);
+                              } else {
+                                _submit(quiz);
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _submitting
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : Text(
+                                    _currentIndex < questions.length - 1 ? t('التالي', 'Next') : t('إرسال', 'Submit'),
+                                    style: const TextStyle(
+                                      fontFamily: 'IBMPlexSansArabic',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                          ),
                         ),
                       ),
                     ],
@@ -158,90 +259,225 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 
-  Widget _buildResult(Quiz quiz, List<QuizQuestion> questions, String Function(String, String) t, String lang) {
+  Widget _buildResult(Quiz quiz, List<QuizQuestion> questions, String Function(String, String) t, String lang, bool isDark) {
     final passed = _result!['passed'] as bool;
     final score = _result!['score'] as double;
     final correct = _result!['correct'] as int;
     final total = _result!['total'] as int;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          const SizedBox(height: 24),
-          Icon(
-            passed ? Icons.emoji_events : Icons.sentiment_dissatisfied,
-            size: 80,
-            color: passed ? AppColors.gold : AppColors.error,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            passed ? t('أحسنت! نجحت', 'Great! You passed') : t('لم تنجح هذه المرة', 'Not passed this time'),
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: passed ? AppColors.success : AppColors.error),
-          ),
-          const SizedBox(height: 8),
-          Text('${score.toInt()}%', style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: AppColors.primary)),
-          Text('$correct / $total ${t("صحيح", "correct")}', style: const TextStyle(color: AppColors.inkMuted)),
-          if (passed) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: AppColors.gold.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text('+100 XP', style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
-            ),
-          ],
           const SizedBox(height: 32),
 
-          // Review answers
-          Text(t('مراجعة الإجابات', 'Review Answers'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
+          // Large score circle
+          Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: passed ? AppColors.accent : AppColors.error,
+                width: 4,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${score.toInt()}%',
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
+                    color: passed ? AppColors.accent : AppColors.error,
+                  ),
+                ),
+                Icon(
+                  passed ? Icons.check_rounded : Icons.close_rounded,
+                  color: passed ? AppColors.accent : AppColors.error,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          Text(
+            passed ? t('أحسنت! نجحت', 'Great! You passed') : t('لم تنجح هذه المرة', 'Not passed this time'),
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: isDark ? AppColors.inkDark : AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Clean stats
+          Text(
+            '$correct / $total ${t("صحيح", "correct")}',
+            style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 15,
+              color: AppColors.inkMuted,
+            ),
+          ),
+
+          if (passed) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '+100 XP',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  color: AppColors.gold,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 36),
+
+          // Review answers header
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              t('مراجعة الإجابات', 'Review Answers'),
+              style: TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.inkDark : AppColors.ink,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Review list
           ...questions.asMap().entries.map((entry) {
             final i = entry.key;
             final q = entry.value;
             final userAnswer = _answers[q.id] ?? '';
             final isCorrect = userAnswer == q.correctAnswer;
-            return Card(
+            return Container(
               margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(isCorrect ? Icons.check_circle : Icons.cancel, color: isCorrect ? AppColors.success : AppColors.error, size: 20),
-                        const SizedBox(width: 8),
-                        Text('${t("سؤال", "Q")} ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(q.question(lang), style: const TextStyle(fontSize: 14)),
-                    const SizedBox(height: 8),
-                    if (!isCorrect) ...[
-                      Text('${t("إجابتك", "Your answer")}: $userAnswer', style: const TextStyle(color: AppColors.error, fontSize: 13)),
-                      Text('${t("الصحيح", "Correct")}: ${q.correctAnswer}', style: const TextStyle(color: AppColors.success, fontSize: 13)),
-                    ],
-                    if (q.explanation(lang) != null && q.explanation(lang)!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: AppColors.info.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(6)),
-                        child: Text(q.explanation(lang)!, style: const TextStyle(fontSize: 12, color: AppColors.info)),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.borderDark : AppColors.border,
+                  width: 0.5,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        color: isCorrect ? AppColors.success : AppColors.error,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${t("سؤال", "Q")} ${i + 1}',
+                        style: TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? AppColors.inkDark : AppColors.ink,
+                        ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    q.question(lang),
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 14,
+                      color: isDark ? AppColors.inkDark : AppColors.ink,
+                    ),
+                  ),
+                  if (!isCorrect) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '${t("إجابتك", "Your answer")}: $userAnswer',
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        color: AppColors.error,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '${t("الصحيح", "Correct")}: ${q.correctAnswer}',
+                      style: const TextStyle(
+                        fontFamily: 'IBMPlexSansArabic',
+                        color: AppColors.success,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
-                ),
+                  if (q.explanation(lang) != null && q.explanation(lang)!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        q.explanation(lang)!,
+                        style: const TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 12,
+                          color: AppColors.info,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             );
           }),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+
+          // Go back button
           SizedBox(
             width: double.infinity,
+            height: 50,
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(t('العودة', 'Go Back')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                t('العودة', 'Go Back'),
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
             ),
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );

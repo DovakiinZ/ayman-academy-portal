@@ -19,7 +19,13 @@ class MarketplaceScreen extends ConsumerWidget {
     return Directionality(
       textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        appBar: AppBar(title: Text(t('المتجر', 'Marketplace'))),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(t('المتجر', 'Marketplace')),
+        ),
         body: subjectsAsync.when(
           loading: () => const LoadingShimmer(),
           error: (e, _) => Center(child: Text('$e')),
@@ -29,24 +35,22 @@ class MarketplaceScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.store, size: 64, color: AppColors.inkMuted),
+                    Icon(Icons.store_outlined, size: 56, color: AppColors.inkMuted.withValues(alpha: 0.4)),
                     const SizedBox(height: 16),
-                    Text(t('لا توجد مواد مدفوعة حالياً', 'No paid subjects available'), style: const TextStyle(color: AppColors.inkMuted)),
+                    Text(
+                      t('لا توجد مواد مدفوعة حالياً', 'No paid courses available'),
+                      style: const TextStyle(color: AppColors.inkMuted, fontSize: 16),
+                    ),
                   ],
                 ),
               );
             }
             return RefreshIndicator(
               onRefresh: () async => ref.invalidate(marketplaceSubjectsProvider),
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.68,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 itemCount: subjects.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 16),
                 itemBuilder: (context, index) {
                   final s = subjects[index];
                   return SubjectCard(

@@ -1,30 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:ayman_academy_app/core/router/routes.dart';
 import 'package:ayman_academy_app/core/supabase_client.dart';
 import 'package:ayman_academy_app/core/theme/app_colors.dart';
 import 'package:ayman_academy_app/features/auth/providers/auth_provider.dart';
 import 'package:ayman_academy_app/shared/providers/language_provider.dart';
 import 'package:ayman_academy_app/shared/providers/theme_provider.dart';
+import 'package:ayman_academy_app/shared/widgets/avatar_widget.dart';
 
-final _teacherStatsProvider = FutureProvider<Map<String, int>>((ref) async {
+// ── Data providers ──
+final _teacherStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final userId = supabase.auth.currentUser?.id;
   if (userId == null) return {};
-  final subjects = await supabase
-      .from('subjects')
-      .select('id')
-      .eq('teacher_id', userId);
+
+  final subjects = await supabase.from('subjects').select('id').eq('teacher_id', userId);
   final subjectIds = (subjects as List).map((e) => e['id'] as String).toList();
+
   int lessonCount = 0;
+  int studentCount = 0;
+  int pendingOrders = 0;
+  double totalRevenue = 0;
+
   if (subjectIds.isNotEmpty) {
-    final lessons = await supabase
-        .from('lessons')
-        .select('id')
-        .inFilter('subject_id', subjectIds);
+    final lessons = await supabase.from('lessons').select('id').inFilter('subject_id', subjectIds);
     lessonCount = (lessons as List).length;
+
+    try {
+      final enrollments = await supabase.from('student_subjects').select('id').inFilter('subject_id', subjectIds);
+      studentCount = (enrollments as List).length;
+    } catch (_) {}
+
+    try {
+      final orders = await supabase.from('orders').select('id, status, total_amount').eq('teacher_id', userId);
+      for (final o in (orders as List)) {
+        if (o['status'] == 'pending_payment') pendingOrders++;
+        if (o['status'] == 'paid') totalRevenue += (o['total_amount'] as num?)?.toDouble() ?? 0;
+      }
+    } catch (_) {}
   }
+
   return {
     'subjects': subjectIds.length,
     'lessons': lessonCount,
+    'students': studentCount,
+    'pending_orders': pendingOrders,
+    'revenue': totalRevenue,
   };
 });
 
@@ -37,88 +58,463 @@ class TeacherDashboardScreen extends ConsumerWidget {
     final t = ref.read(languageProvider.notifier).t;
     final lang = ref.watch(languageProvider);
     final statsAsync = ref.watch(_teacherStatsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final profile = auth.profile;
+    final firstName = profile?.fullName?.split(' ').first ?? '';
 
     return Directionality(
       textDirection: lang.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      child: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            leading: IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-            title: Text(t('لوحة التحكم', 'Dashboard')),
-            actions: [
-              IconButton(
-                icon: Icon(ref.watch(themeProvider) == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
-                onPressed: () => ref.read(themeProvider.notifier).toggle(),
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            // ── App Bar ──
+            SliverAppBar(
+              floating: true,
+              leading: IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-              IconButton(
-                icon: const Icon(Icons.language),
-                onPressed: () => ref.read(languageProvider.notifier).toggle(),
-              ),
-            ],
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Text(
-                  t('مرحباً، ${auth.profile?.fullName ?? "معلم"}!', 'Hello, ${auth.profile?.fullName ?? "Teacher"}!'),
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  t('إدارة موادك ومتابعة طلابك', 'Manage your subjects and track students'),
-                  style: const TextStyle(color: AppColors.inkMuted),
-                ),
-                const SizedBox(height: 24),
-                statsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('$e'),
-                  data: (stats) => Row(
-                    children: [
-                      Expanded(child: _StatCard(
-                        icon: Icons.menu_book,
-                        value: '${stats['subjects'] ?? 0}',
-                        label: t('المواد', 'Subjects'),
-                        color: AppColors.primary,
-                      )),
-                      const SizedBox(width: 12),
-                      Expanded(child: _StatCard(
-                        icon: Icons.article,
-                        value: '${stats['lessons'] ?? 0}',
-                        label: t('الدروس', 'Lessons'),
-                        color: AppColors.gold,
-                      )),
-                    ],
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    ref.watch(themeProvider) == ThemeMode.dark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                    size: 22,
                   ),
+                  onPressed: () => ref.read(themeProvider.notifier).toggle(),
                 ),
-                const SizedBox(height: 24),
-                // ShamCash warning
-                if (auth.profile?.shamcashAccountNumber == null || (auth.profile?.shamcashAccountNumber ?? '').isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning_amber, color: AppColors.warning),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            t('أضف بيانات ShamCash لتفعيل بيع الكورسات', 'Add ShamCash info to enable course sales'),
-                            style: const TextStyle(color: AppColors.warning, fontSize: 13),
+                IconButton(
+                  icon: const Icon(Icons.language_rounded, size: 22),
+                  onPressed: () => ref.read(languageProvider.notifier).toggle(),
+                ),
+              ],
+            ),
+
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ═══════════════════════════════════════
+                  //  WELCOME HERO CARD
+                  // ═══════════════════════════════════════
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isDark
+                              ? [const Color(0xFF2D1B69), const Color(0xFF1A1A3E)]
+                              : [AppColors.accent, const Color(0xFF7C4DFF)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              AvatarWidget(
+                                name: profile?.fullName ?? '?',
+                                imageUrl: profile?.avatarUrl,
+                                radius: 24,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${t("مرحباً", "Welcome back")}, $firstName',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white70,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      t('لوحة تحكم المعلم', 'Teacher Dashboard'),
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
+                          const SizedBox(height: 20),
+                          // Mini stats in hero
+                          statsAsync.when(
+                            loading: () => const SizedBox(
+                              height: 30,
+                              child: Center(
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white38),
+                              ),
+                            ),
+                            error: (_, __) => const SizedBox.shrink(),
+                            data: (stats) => Row(
+                              children: [
+                                _HeroStat(
+                                  value: '${stats['subjects'] ?? 0}',
+                                  label: t('مواد', 'Courses'),
+                                ),
+                                _heroDivider(),
+                                _HeroStat(
+                                  value: '${stats['lessons'] ?? 0}',
+                                  label: t('دروس', 'Lessons'),
+                                ),
+                                _heroDivider(),
+                                _HeroStat(
+                                  value: '${stats['students'] ?? 0}',
+                                  label: t('طلاب', 'Students'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ═══════════════════════════════════════
+                  //  PENDING ORDERS ALERT
+                  // ═══════════════════════════════════════
+                  statsAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (stats) {
+                      final pending = stats['pending_orders'] ?? 0;
+                      if (pending <= 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                        child: GestureDetector(
+                          onTap: () => context.push(Routes.teacherOrders),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.warning.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.receipt_long_rounded, color: AppColors.warning, size: 20),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        t('طلبات بانتظار التأكيد', 'Orders awaiting confirmation'),
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                      ),
+                                      Text(
+                                        '$pending ${t("طلب", "order")}${pending > 1 && lang.languageCode == 'en' ? 's' : ''}',
+                                        style: const TextStyle(fontSize: 13, color: AppColors.warning),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.warning),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // ═══════════════════════════════════════
+                  //  REVENUE CARD
+                  // ═══════════════════════════════════════
+                  statsAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (stats) {
+                      final revenue = stats['revenue'] ?? 0.0;
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.trending_up_rounded, color: AppColors.success, size: 22),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    t('إجمالي الإيرادات', 'Total Revenue'),
+                                    style: const TextStyle(fontSize: 14, color: AppColors.inkMuted, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '${revenue.toStringAsFixed(0)} SYP',
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                t('من الطلبات المؤكدة', 'from confirmed orders'),
+                                style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // ═══════════════════════════════════════
+                  //  QUICK ACTIONS GRID
+                  // ═══════════════════════════════════════
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Text(
+                      t('إجراءات سريعة', 'Quick Actions'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.4,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      children: [
+                        _ActionCard(
+                          icon: Icons.add_circle_outline_rounded,
+                          label: t('مادة جديدة', 'New Course'),
+                          subtitle: t('إنشاء مادة', 'Create a course'),
+                          color: AppColors.accent,
+                          isDark: isDark,
+                          onTap: () => context.push('/teacher/course/new'),
+                        ),
+                        _ActionCard(
+                          icon: Icons.receipt_long_rounded,
+                          label: t('الطلبات', 'Orders'),
+                          subtitle: t('إدارة المبيعات', 'Manage sales'),
+                          color: AppColors.info,
+                          isDark: isDark,
+                          onTap: () => context.push(Routes.teacherOrders),
+                        ),
+                        _ActionCard(
+                          icon: Icons.campaign_rounded,
+                          label: t('إعلان', 'Announce'),
+                          subtitle: t('أخبر طلابك', 'Notify students'),
+                          color: AppColors.warning,
+                          isDark: isDark,
+                          onTap: () {},
+                        ),
+                        _ActionCard(
+                          icon: Icons.star_rounded,
+                          label: t('التقييمات', 'Reviews'),
+                          subtitle: t('آراء الطلاب', 'Student feedback'),
+                          color: AppColors.starFilled,
+                          isDark: isDark,
+                          onTap: () => context.push('/teacher/reviews'),
                         ),
                       ],
                     ),
                   ),
-              ]),
+                  const SizedBox(height: 24),
+
+                  // ═══════════════════════════════════════
+                  //  SHAMCASH WARNING
+                  // ═══════════════════════════════════════
+                  if (profile?.shamcashAccountNumber == null || (profile?.shamcashAccountNumber ?? '').isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.error.withValues(alpha: 0.08),
+                              AppColors.error.withValues(alpha: 0.03),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.error, size: 22),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t('بيانات الدفع مفقودة', 'Payment info missing'),
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    t('أضف حساب ShamCash لبدء البيع', 'Add ShamCash to start selling'),
+                                    style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {},
+                              child: Text(
+                                t('إعداد', 'Setup'),
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // ═══════════════════════════════════════
+                  //  TIPS SECTION
+                  // ═══════════════════════════════════════
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Text(
+                      t('نصائح للمعلمين', 'Teacher Tips'),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 140,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      children: [
+                        _TipCard(
+                          emoji: '🎯',
+                          title: t('أضف صورة غلاف', 'Add cover images'),
+                          body: t(
+                            'المواد مع صور غلاف جذابة تحصل على 3x مشاهدات',
+                            'Courses with cover images get 3x more views',
+                          ),
+                          gradient: [const Color(0xFFF0EDFF), const Color(0xFFE8E4FF)],
+                          isDark: isDark,
+                        ),
+                        const SizedBox(width: 12),
+                        _TipCard(
+                          emoji: '📝',
+                          title: t('اكتب وصفاً مفصلاً', 'Write detailed descriptions'),
+                          body: t(
+                            'وصف المادة الجيد يساعد الطلاب على اتخاذ قرار الشراء',
+                            'Good descriptions help students decide to enroll',
+                          ),
+                          gradient: [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
+                          isDark: isDark,
+                        ),
+                        const SizedBox(width: 12),
+                        _TipCard(
+                          emoji: '🎬',
+                          title: t('أضف فيديوهات', 'Add video lessons'),
+                          body: t(
+                            'الدروس المرئية أكثر تفاعلاً وتحقق تقييمات أعلى',
+                            'Video lessons boost engagement & ratings',
+                          ),
+                          gradient: [const Color(0xFFFFF3E0), const Color(0xFFFFE0B2)],
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _heroDivider() {
+    return Container(
+      width: 1,
+      height: 30,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: Colors.white24,
+    );
+  }
+}
+
+// ── Hero stat (inside the purple card) ──
+class _HeroStat extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _HeroStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white60,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -127,30 +523,118 @@ class TeacherDashboardScreen extends ConsumerWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
+// ── Quick Action Card ──
+class _ActionCard extends StatelessWidget {
   final IconData icon;
-  final String value;
   final String label;
+  final String subtitle;
   final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
 
-  const _StatCard({required this.icon, required this.value, required this.label, required this.color});
+  const _ActionCard({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tip Card (horizontal scroll) ──
+class _TipCard extends StatelessWidget {
+  final String emoji;
+  final String title;
+  final String body;
+  final List<Color> gradient;
+  final bool isDark;
+
+  const _TipCard({
+    required this.emoji,
+    required this.title,
+    required this.body,
+    required this.gradient,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: 240,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        gradient: isDark
+            ? null
+            : LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        color: isDark ? AppColors.surfaceDark : null,
+        borderRadius: BorderRadius.circular(16),
+        border: isDark ? Border.all(color: AppColors.borderDark, width: 0.5) : null,
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 28, color: color),
+          Text(emoji, style: const TextStyle(fontSize: 24)),
           const SizedBox(height: 8),
-          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: color)),
+          Text(
+            body,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? AppColors.inkMuted : AppColors.inkSecondary,
+              height: 1.4,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

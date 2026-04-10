@@ -20,11 +20,25 @@ class MySubjectsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: lang.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
+        backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
         appBar: AppBar(
-          title: Text(t('موادي', 'My Subjects')),
+          title: Text(
+            t('موادي', 'My Learning'),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: isDark ? AppColors.inkDark : AppColors.ink,
+            ),
+          ),
+          backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
           actions: [
             IconButton(
-              icon: const Icon(Icons.explore),
+              icon: Icon(
+                Icons.explore_outlined,
+                color: isDark ? AppColors.inkDark : AppColors.ink,
+              ),
               tooltip: t('اكتشف', 'Discover'),
               onPressed: () => context.push('/student/discover'),
             ),
@@ -39,116 +53,120 @@ class MySubjectsScreen extends ConsumerWidget {
                 icon: Icons.menu_book,
                 title: t('لا توجد مواد مسجلة', 'No enrolled subjects'),
                 subtitle: t('اكتشف المواد المتاحة وابدأ رحلة التعلم', 'Discover available subjects and start learning'),
-                action: ElevatedButton.icon(
-                  onPressed: () => context.push('/student/discover'),
-                  icon: const Icon(Icons.explore),
-                  label: Text(t('اكتشف المواد', 'Discover Subjects')),
+                action: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push('/student/discover'),
+                    icon: const Icon(Icons.explore_outlined),
+                    label: Text(
+                      t('اكتشف المواد', 'Discover Subjects'),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                 ),
               );
             }
             return RefreshIndicator(
+              color: AppColors.accent,
               onRefresh: () async => ref.invalidate(mySubjectsProvider),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: subjects.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  indent: 90,
+                  color: isDark ? AppColors.borderDark : AppColors.border,
+                ),
                 itemBuilder: (context, index) {
                   final s = subjects[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceDark : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => context.push('/student/subjects/subject/${s.id}'),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              // Subject icon/cover
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [AppColors.primary, AppColors.primaryLight],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: const Center(
-                                  child: Icon(Icons.menu_book, color: Colors.white, size: 26),
-                                ),
+                  return InkWell(
+                    onTap: () => context.push('/student/subjects/subject/${s.id}'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      child: Row(
+                        children: [
+                          // Thumbnail
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.secondaryDark : AppColors.secondary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.menu_book,
+                                color: isDark ? AppColors.borderDark : AppColors.inkMuted,
+                                size: 24,
                               ),
-                              const SizedBox(width: 14),
-
-                              // Info
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      s.title(lang.languageCode),
-                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (s.teacherName != null) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        s.teacherName!,
-                                        style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
-                                      ),
-                                    ],
-                                    if (s.progressPercent != null) ...[
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(6),
-                                              child: LinearProgressIndicator(
-                                                value: s.progressPercent! / 100,
-                                                backgroundColor: isDark ? AppColors.borderDark : AppColors.secondary,
-                                                valueColor: AlwaysStoppedAnimation(
-                                                  s.progressPercent! >= 100 ? AppColors.success : AppColors.primary,
-                                                ),
-                                                minHeight: 6,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${s.progressPercent}%',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: s.progressPercent! >= 100 ? AppColors.success : AppColors.primary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(width: 8),
-                              Icon(Icons.chevron_right, color: AppColors.inkMuted, size: 20),
-                            ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 14),
+
+                          // Info
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s.title(lang.languageCode),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                    color: isDark ? AppColors.inkDark : AppColors.ink,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (s.teacherName != null) ...[
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    s.teacherName!,
+                                    style: const TextStyle(
+                                      color: AppColors.inkMuted,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                                if (s.progressPercent != null) ...[
+                                  const SizedBox(height: 8),
+                                  // Thin progress bar
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(2),
+                                    child: LinearProgressIndicator(
+                                      value: s.progressPercent! / 100,
+                                      backgroundColor: isDark ? AppColors.borderDark : AppColors.border,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        s.progressPercent! >= 100 ? AppColors.success : AppColors.accent,
+                                      ),
+                                      minHeight: 3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    s.progressPercent! >= 100
+                                        ? t('مكتمل', 'Complete')
+                                        : '${s.progressPercent}% ${t("مكتمل", "complete")}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: s.progressPercent! >= 100 ? AppColors.success : AppColors.inkMuted,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );

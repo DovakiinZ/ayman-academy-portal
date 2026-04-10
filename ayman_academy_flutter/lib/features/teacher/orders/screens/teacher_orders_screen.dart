@@ -25,35 +25,80 @@ class TeacherOrdersScreen extends ConsumerWidget {
     final t = ref.read(languageProvider.notifier).t;
     final lang = ref.watch(languageProvider).languageCode;
     final ordersAsync = ref.watch(_teacherOrdersProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Directionality(
       textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        appBar: AppBar(title: Text(t('الطلبات', 'Orders'))),
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        appBar: AppBar(
+          backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 20,
+              color: isDark ? AppColors.inkDark : AppColors.ink,
+            ),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+          title: Text(
+            t('الطلبات', 'Orders'),
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.inkDark : AppColors.ink,
+            ),
+          ),
+          centerTitle: true,
+        ),
         body: ordersAsync.when(
           loading: () => const LoadingShimmer(),
           error: (e, _) => Center(child: Text('$e')),
           data: (orders) {
             if (orders.isEmpty) {
               return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.receipt_long, size: 64, color: AppColors.inkMuted),
-                    const SizedBox(height: 16),
-                    Text(t('لا توجد طلبات', 'No orders yet'), style: const TextStyle(color: AppColors.inkMuted)),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.receipt_long_outlined,
+                        size: 72,
+                        color: AppColors.inkMuted.withValues(alpha: 0.3),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        t('لا توجد طلبات', 'No orders yet'),
+                        style: const TextStyle(
+                          fontFamily: 'IBMPlexSansArabic',
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.inkMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
             return RefreshIndicator(
+              color: AppColors.accent,
               onRefresh: () async => ref.invalidate(_teacherOrdersProvider),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: orders.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  color: isDark ? AppColors.borderDark : AppColors.border,
+                ),
                 itemBuilder: (context, index) {
                   final o = orders[index];
-                  return _OrderCard(order: o, t: t, lang: lang, ref: ref);
+                  return _OrderRow(order: o, t: t, lang: lang, ref: ref, isDark: isDark);
                 },
               ),
             );
@@ -64,13 +109,14 @@ class TeacherOrdersScreen extends ConsumerWidget {
   }
 }
 
-class _OrderCard extends StatelessWidget {
+class _OrderRow extends StatelessWidget {
   final Order order;
   final String Function(String, String) t;
   final String lang;
   final WidgetRef ref;
+  final bool isDark;
 
-  const _OrderCard({required this.order, required this.t, required this.lang, required this.ref});
+  const _OrderRow({required this.order, required this.t, required this.lang, required this.ref, required this.isDark});
 
   Color _statusColor(String status) {
     switch (status) {
@@ -135,71 +181,145 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Status badge + subject
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: _statusColor(order.status).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    _statusLabel(order.status, t),
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _statusColor(order.status)),
+    final sColor = _statusColor(order.status);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row: student name + amount
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  order.studentFullName,
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.inkDark : AppColors.ink,
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  '${order.amount.toInt()} ${order.currency}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.gold),
+              ),
+              Text(
+                '${order.amount.toInt()} ${order.currency}',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
+          // ShamCash info
+          Text(
+            '${t("حساب ShamCash", "ShamCash Account")}: ${order.studentPaymentAccount}',
+            style: const TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 13,
+              color: AppColors.inkMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Status badge pill
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: sColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _statusLabel(order.status, t),
+                  style: TextStyle(
+                    fontFamily: 'IBMPlexSansArabic',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: sColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Actions for pending orders
+          if (order.status == 'pending_payment') ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: ElevatedButton(
+                      onPressed: () => _confirmPayment(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.check_rounded, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            t('تأكيد الدفع', 'Confirm'),
+                            style: const TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: OutlinedButton(
+                      onPressed: () => _rejectOrder(context),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.error, width: 1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.close_rounded, size: 16, color: AppColors.error),
+                          const SizedBox(width: 6),
+                          Text(
+                            t('رفض', 'Reject'),
+                            style: const TextStyle(
+                              fontFamily: 'IBMPlexSansArabic',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            // Student info
-            Text(order.studentFullName, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(
-              '${t("حساب ShamCash", "ShamCash Account")}: ${order.studentPaymentAccount}',
-              style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
-            ),
-
-            // Actions for pending orders
-            if (order.status == 'pending_payment') ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _confirmPayment(context),
-                      icon: const Icon(Icons.check, size: 18),
-                      label: Text(t('تأكيد الدفع', 'Confirm')),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _rejectOrder(context),
-                      icon: const Icon(Icons.close, size: 18, color: AppColors.error),
-                      label: Text(t('رفض', 'Reject'), style: const TextStyle(color: AppColors.error)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }

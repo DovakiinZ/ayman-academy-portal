@@ -81,37 +81,90 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
   void _showNotesSheet() {
     final t = ref.read(languageProvider.notifier).t;
     final noteController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(t('ملاحظاتي', 'My Notes'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
+              // Drag handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 36,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.borderDark : AppColors.border,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              Text(
+                t('ملاحظاتي', 'My Notes'),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: noteController,
                 maxLines: 3,
-                decoration: InputDecoration(hintText: t('اكتب ملاحظة...', 'Write a note...')),
+                decoration: InputDecoration(
+                  hintText: t('اكتب ملاحظة...', 'Write a note...'),
+                  hintStyle: const TextStyle(color: AppColors.inkMuted),
+                  filled: true,
+                  fillColor: isDark ? AppColors.secondaryDark : AppColors.secondary,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.all(14),
+                ),
               ),
               const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () async {
-                  if (noteController.text.trim().isEmpty) return;
-                  await LessonProgressService.addNote(
-                    lessonId: widget.lessonId,
-                    content: noteController.text.trim(),
-                  );
-                  ref.invalidate(lessonNotesProvider(widget.lessonId));
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-                child: Text(t('حفظ', 'Save')),
+              SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (noteController.text.trim().isEmpty) return;
+                    await LessonProgressService.addNote(
+                      lessonId: widget.lessonId,
+                      content: noteController.text.trim(),
+                    );
+                    ref.invalidate(lessonNotesProvider(widget.lessonId));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    t('حفظ', 'Save'),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               // Existing notes
@@ -125,16 +178,40 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                       if (notes.isEmpty) return const SizedBox.shrink();
                       return Column(
                         children: [
-                          const Divider(),
-                          ...notes.take(5).map((n) => ListTile(
-                            dense: true,
-                            title: Text(n['content'] as String? ?? '', style: const TextStyle(fontSize: 13)),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18),
-                              onPressed: () async {
-                                await LessonProgressService.deleteNote(n['id'] as String);
-                                ref.invalidate(lessonNotesProvider(widget.lessonId));
-                              },
+                          Divider(
+                            height: 24,
+                            thickness: 0.5,
+                            color: isDark ? AppColors.borderDark : AppColors.border,
+                          ),
+                          ...notes.take(5).map((n) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    n['content'] as String? ?? '',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isDark ? AppColors.inkSecondaryDark : AppColors.inkSecondary,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () async {
+                                    await LessonProgressService.deleteNote(n['id'] as String);
+                                    ref.invalidate(lessonNotesProvider(widget.lessonId));
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.delete_outline,
+                                      size: 18,
+                                      color: AppColors.inkMuted,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           )),
                         ],
@@ -153,33 +230,72 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
   void _showCommentsSheet() {
     final t = ref.read(languageProvider.notifier).t;
     final commentController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
-          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(t('التعليقات', 'Comments'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
+              // Drag handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 36,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.borderDark : AppColors.border,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              Text(
+                t('التعليقات', 'Comments'),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Comment input row
               Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: commentController,
-                      decoration: InputDecoration(hintText: t('أضف تعليق...', 'Add comment...')),
+                      decoration: InputDecoration(
+                        hintText: t('أضف تعليق...', 'Add comment...'),
+                        hintStyle: const TextStyle(color: AppColors.inkMuted),
+                        filled: true,
+                        fillColor: isDark ? AppColors.secondaryDark : AppColors.secondary,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send, color: AppColors.primary),
-                    onPressed: () async {
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () async {
                       if (commentController.text.trim().isEmpty) return;
                       await LessonProgressService.addComment(
                         lessonId: widget.lessonId,
@@ -188,39 +304,91 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                       commentController.clear();
                       ref.invalidate(lessonCommentsProvider(widget.lessonId));
                     },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.send, color: Colors.white, size: 20),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Flexible(
                 child: Consumer(
                   builder: (_, ref, _) {
                     final commentsAsync = ref.watch(lessonCommentsProvider(widget.lessonId));
                     return commentsAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                      ),
                       error: (e, _) => Text('$e'),
                       data: (comments) {
                         if (comments.isEmpty) {
-                          return Center(child: Text(t('لا توجد تعليقات', 'No comments yet'), style: const TextStyle(color: AppColors.inkMuted)));
+                          return Center(
+                            child: Text(
+                              t('لا توجد تعليقات', 'No comments yet'),
+                              style: const TextStyle(color: AppColors.inkMuted),
+                            ),
+                          );
                         }
-                        return ListView.builder(
+                        return ListView.separated(
                           shrinkWrap: true,
                           itemCount: comments.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            thickness: 0.5,
+                            color: isDark ? AppColors.borderDark : AppColors.border,
+                          ),
                           itemBuilder: (_, i) {
                             final c = comments[i];
                             final user = c['user'] as Map<String, dynamic>?;
-                            return ListTile(
-                              dense: true,
-                              leading: CircleAvatar(
-                                radius: 14,
-                                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                                child: Text(
-                                  (user?['full_name'] as String? ?? '?')[0],
-                                  style: const TextStyle(fontSize: 11, color: AppColors.primary),
-                                ),
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                                    child: Text(
+                                      (user?['full_name'] as String? ?? '?')[0],
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.accent,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          user?['full_name'] as String? ?? '',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? AppColors.inkDark : AppColors.ink,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          c['content'] as String? ?? '',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isDark ? AppColors.inkSecondaryDark : AppColors.inkSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              title: Text(user?['full_name'] as String? ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                              subtitle: Text(c['content'] as String? ?? '', style: const TextStyle(fontSize: 13)),
                             );
                           },
                         );
@@ -238,45 +406,122 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
 
   void _showRatingDialog() {
     final t = ref.read(languageProvider.notifier).t;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     int selectedStars = 5;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(t('تقييم الدرس', 'Rate Lesson')),
-          content: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (i) => IconButton(
-              icon: Icon(
-                i < selectedStars ? Icons.star : Icons.star_border,
-                color: AppColors.gold,
-                size: 32,
-              ),
-              onPressed: () => setDialogState(() => selectedStars = i + 1),
-            )),
+        builder: (ctx, setDialogState) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(t('إلغاء', 'Cancel')),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await LessonProgressService.rateLesson(
-                  lessonId: widget.lessonId,
-                  stars: selectedStars,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(t('شكراً لتقييمك!', 'Thanks for rating!')), backgroundColor: AppColors.success),
-                  );
-                }
-              },
-              child: Text(t('تقييم', 'Rate')),
-            ),
-          ],
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 36,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.borderDark : AppColors.border,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              Text(
+                t('تقييم الدرس', 'Rate Lesson'),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.inkDark : AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) => GestureDetector(
+                  onTap: () => setDialogState(() => selectedStars = i + 1),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(
+                      i < selectedStars ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: AppColors.starFilled,
+                      size: 40,
+                    ),
+                  ),
+                )),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 50,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDark ? AppColors.inkDark : AppColors.ink,
+                          side: BorderSide(
+                            color: isDark ? AppColors.borderDark : AppColors.border,
+                            width: 0.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          t('إلغاء', 'Cancel'),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await LessonProgressService.rateLesson(
+                            lessonId: widget.lessonId,
+                            stars: selectedStars,
+                          );
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(t('شكراً لتقييمك!', 'Thanks for rating!')),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          t('تقييم', 'Rate'),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -288,32 +533,47 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
     final lang = ref.watch(languageProvider).languageCode;
     final lessonAsync = ref.watch(lessonDetailProvider(widget.lessonId));
     final blocksAsync = ref.watch(lessonBlocksProvider(widget.lessonId));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Directionality(
       textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
+        backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
           title: lessonAsync.when(
-            data: (l) => Text(l?.title(lang) ?? '', style: const TextStyle(fontSize: 16)),
+            data: (l) => Text(
+              l?.title(lang) ?? '',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.inkDark : AppColors.ink,
+              ),
+            ),
             loading: () => const Text('...'),
             error: (_, _) => const Text(''),
           ),
-          actions: [
-            IconButton(icon: const Icon(Icons.note_add_outlined), onPressed: _showNotesSheet, tooltip: t('ملاحظات', 'Notes')),
-            IconButton(icon: const Icon(Icons.comment_outlined), onPressed: _showCommentsSheet, tooltip: t('تعليقات', 'Comments')),
-            IconButton(icon: const Icon(Icons.star_outline), onPressed: _showRatingDialog, tooltip: t('تقييم', 'Rate')),
-          ],
+          backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: isDark ? AppColors.inkDark : AppColors.ink,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(2),
+            child: LinearProgressIndicator(
+              value: _scrollProgress / 100,
+              backgroundColor: isDark ? AppColors.borderDark : AppColors.border,
+              valueColor: AlwaysStoppedAnimation(
+                _scrollProgress >= 90 ? AppColors.success : AppColors.accent,
+              ),
+              minHeight: 2,
+            ),
+          ),
         ),
         body: Column(
           children: [
-            // Progress bar
-            LinearProgressIndicator(
-              value: _scrollProgress / 100,
-              backgroundColor: AppColors.border,
-              valueColor: AlwaysStoppedAnimation(_scrollProgress >= 90 ? AppColors.success : AppColors.primary),
-              minHeight: 3,
-            ),
-
             // Content
             Expanded(
               child: blocksAsync.when(
@@ -321,17 +581,107 @@ class _LessonPlayerScreenState extends ConsumerState<LessonPlayerScreen> {
                 error: (e, _) => Center(child: Text('$e')),
                 data: (blocks) {
                   if (blocks.isEmpty) {
-                    return Center(child: Text(t('لا يوجد محتوى بعد', 'No content yet'), style: const TextStyle(color: AppColors.inkMuted)));
+                    return Center(
+                      child: Text(
+                        t('لا يوجد محتوى بعد', 'No content yet'),
+                        style: const TextStyle(color: AppColors.inkMuted),
+                      ),
+                    );
                   }
                   return ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 80),
                     itemCount: blocks.length,
                     itemBuilder: (context, index) {
                       return LessonBlockRenderer(block: blocks[index]);
                     },
                   );
                 },
+              ),
+            ),
+          ],
+        ),
+
+        // Bottom action bar — iOS-style
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            border: Border(
+              top: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.border,
+                width: 0.5,
+              ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _BottomAction(
+                    icon: Icons.note_add_outlined,
+                    label: t('ملاحظات', 'Notes'),
+                    onTap: _showNotesSheet,
+                    isDark: isDark,
+                  ),
+                  _BottomAction(
+                    icon: Icons.comment_outlined,
+                    label: t('تعليقات', 'Comments'),
+                    onTap: _showCommentsSheet,
+                    isDark: isDark,
+                  ),
+                  _BottomAction(
+                    icon: Icons.star_outline_rounded,
+                    label: t('تقييم', 'Rate'),
+                    onTap: _showRatingDialog,
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _BottomAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isDark ? AppColors.inkSecondaryDark : AppColors.inkSecondary,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? AppColors.inkSecondaryDark : AppColors.inkSecondary,
               ),
             ),
           ],
