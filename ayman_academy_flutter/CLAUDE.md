@@ -1,0 +1,432 @@
+# CLAUDE.md — Ayman Academy Flutter App
+
+> **This file is the project brain.** Read it fully before every task. It contains the system prompt, project knowledge, architecture, conventions, and the roadmap. Update it when things change.
+
+---
+
+## System Prompt — How to Handle Every Request
+
+You are a **senior project manager and full-stack developer** working on Ayman Academy Flutter App. You are the technical lead — you own architecture decisions, code quality, and UX.
+
+### On every user message, follow this workflow:
+
+1. **Read CLAUDE.md fully** — understand the current state before touching anything.
+2. **Interpret the request** — even a short message like "fix the login screen" means: understand the full context from this file, identify the relevant files, plan the fix, implement it properly, and verify it works.
+3. **Check the Plan section** — see if the request relates to a planned task. If so, follow the plan. If not, assess whether it should be added.
+4. **Implement with these principles:**
+   - Always consider the **marketplace model** (teachers sell, students buy, platform facilitates).
+   - Always support **bilingual AR/EN** — every user-facing string needs `t('عربي', 'English')` via `LanguageNotifier`.
+   - Always consider **mobile-first** — this IS the mobile app, optimize for touch and small screens.
+   - Use existing patterns (Riverpod providers, GoRouter, Supabase client, CacheService).
+   - Don't over-engineer. Ship working code, iterate later.
+   - When touching UI, make it feel **polished and intentional**, not generic.
+5. **After implementing:**
+   - Update the **Plan section** if a task was completed or new tasks were discovered.
+   - Update the **Known Issues** section if you found/fixed bugs.
+   - Update **Architecture** sections if you changed something structural.
+
+### Rules:
+- **Never guess database schema** — check `shared/models/` and the web app's `src/types/database.ts`.
+- **Never skip bilingual support** — all UI text must use `t()` from `LanguageNotifier`. DB fields use `_ar`/`_en` suffixes.
+- **Never break existing features** — test related flows when changing shared code.
+- **Always use package imports** — `import 'package:ayman_academy_app/...'`, never relative `../` beyond same directory.
+- **Always use Riverpod** for state — never raw `setState` for shared/async state.
+- **When adding screens** — add route in `core/router/routes.dart` + `core/router/router.dart`, add nav item in the appropriate shell.
+- **When adding features** — follow the feature-first folder structure: `features/<role>/<feature>/screens/`, `providers/`, `data/`.
+
+---
+
+## Project Overview
+
+### What Is This?
+**Ayman Academy Flutter App** — The mobile companion to the Ayman Academy web portal. An educational marketplace for Arab school students.
+
+- **Teachers**: Manage courses, verify orders, communicate with students, view analytics.
+- **Students**: Browse courses, learn lessons, take quizzes, earn certificates, message teachers.
+- **Admins**: Redirected to web app (admin features are web-only).
+
+### Target Audience
+- **Students**: School-age, Arabic-speaking. On Android phones. Need supplementary learning for school subjects.
+- **Teachers**: Want to manage their courses and students on the go. Verify payments, post announcements.
+
+### Business Model
+- Courses organized by **stage** (educational level) and **subject** (school subject).
+- Students pay per-course via **Sham Cash** (manual QR payment verification by teacher).
+- Access types: `public | stage | subscription | invite_only | org_only`.
+
+### Current Status: **In Development**
+- Not yet published to Play Store.
+- Shares the same **Supabase** backend as the web app.
+- Mirrors web app features for student and teacher roles.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Flutter 3.41+ / Dart 3.11+ |
+| State Management | flutter_riverpod 2.x (StateNotifier + Provider) |
+| Routing | go_router 13.x (with StatefulShellRoute for bottom nav) |
+| Backend | Supabase (supabase_flutter 2.x — auth, PostgreSQL, storage) |
+| Local Cache | Hive (hive_flutter) — settings, subjects, lessons, progress |
+| Video | youtube_player_flutter |
+| Content Rendering | flutter_markdown |
+| Charts | fl_chart |
+| Certificates | qr_flutter + pdf + share_plus |
+| Notifications | onesignal_flutter |
+| Connectivity | connectivity_plus |
+| Images | cached_network_image + shimmer loading |
+
+### Dev Commands
+```bash
+flutter pub get              # Install dependencies
+flutter run                  # Run on connected device/emulator
+flutter run -d chrome        # Run as web app
+flutter build apk            # Build Android APK
+flutter build apk --release  # Build release APK
+flutter analyze              # Static analysis
+flutter test                 # Run tests
+```
+
+### Environment Variables
+Passed at build time via `--dart-define`:
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=<your-url> \
+  --dart-define=SUPABASE_ANON_KEY=<your-key> \
+  --dart-define=WEB_APP_URL=https://aymanacademy.com \
+  --dart-define=ONESIGNAL_APP_ID=<your-id>
+```
+Defined in `lib/core/env.dart` using `String.fromEnvironment()`.
+
+### Package Name
+`ayman_academy_app` — all imports use `package:ayman_academy_app/...`
+
+---
+
+## Architecture
+
+### Directory Structure
+```
+lib/
+├── main.dart                          # App entry point — init Hive, Supabase, OneSignal
+├── core/                              # Core setup & configuration
+│   ├── env.dart                       # Environment variables (Supabase keys, OneSignal)
+│   ├── supabase_client.dart           # Supabase client singleton + init
+│   ├── router/
+│   │   ├── router.dart                # GoRouter config with auth redirect logic
+│   │   └── routes.dart                # Route path constants (Routes class)
+│   ├── theme/
+│   │   ├── app_colors.dart            # Color palette (navy primary, gold accent, warm ivory bg)
+│   │   └── app_theme.dart             # Light & dark ThemeData
+│   └── utils/
+│       ├── date_formatter.dart        # Date formatting helpers
+│       ├── validators.dart            # Form validation
+│       └── youtube_utils.dart         # YouTube URL/ID parsing
+├── features/                          # Feature modules organized by role
+│   ├── auth/                          # Authentication
+│   │   ├── data/auth_repository.dart  # Supabase auth calls
+│   │   ├── providers/auth_provider.dart # AuthNotifier + AuthState
+│   │   └── screens/                   # Login, Register, ResetPassword, AdminWebOnly
+│   ├── onboarding/
+│   │   └── screens/student_onboarding_screen.dart
+│   ├── student/                       # All student features
+│   │   ├── dashboard/screens/         # StudentDashboard, Achievements
+│   │   ├── subjects/screens/          # MySubjects, SubjectDetail, Discover, Teachers
+│   │   ├── subjects/providers/        # SubjectsProvider
+│   │   ├── lessons/screens/           # LessonPlayer, LessonNotes
+│   │   ├── lessons/providers/         # LessonProvider
+│   │   ├── quiz/screens/              # QuizScreen
+│   │   ├── quiz/providers/            # QuizProvider
+│   │   ├── marketplace/screens/       # Marketplace, Checkout
+│   │   ├── marketplace/providers/     # MarketplaceProvider
+│   │   ├── certificates/screens/      # MyCertificates, CertificateDetail
+│   │   ├── certificates/providers/    # CertificatesProvider
+│   │   ├── messages/screens/          # MessagesContacts, Chat
+│   │   ├── messages/providers/        # MessagesProvider
+│   │   └── profile/screens/           # StudentProfile
+│   └── teacher/                       # All teacher features
+│       ├── dashboard/screens/         # TeacherDashboard
+│       ├── subjects/screens/          # TeacherSubjects, CourseEditor, TeacherReviews
+│       ├── lessons/screens/           # LessonEditor, TeacherLessons
+│       ├── quizzes/screens/           # Quiz management
+│       ├── orders/screens/            # TeacherOrders (payment verification)
+│       ├── certificates/screens/      # TeacherCertificates
+│       ├── announcements/screens/     # TeacherAnnouncements
+│       ├── messages/screens/          # TeacherMessages
+│       └── profile/screens/           # TeacherProfile
+└── shared/                            # Shared across all features
+    ├── models/                        # Dart data classes
+    │   ├── profile.dart               # User profile model
+    │   ├── subject.dart               # Course/subject model
+    │   ├── lesson.dart                # Lesson model
+    │   ├── lesson_block.dart          # Content block model
+    │   ├── lesson_section.dart        # Section model
+    │   ├── lesson_progress.dart       # Progress tracking model
+    │   ├── stage.dart                 # Educational stage model
+    │   ├── student_level.dart         # Student level model
+    │   ├── quiz.dart                  # Quiz + questions + options
+    │   ├── quiz_attempt.dart          # Quiz attempt model
+    │   ├── order.dart                 # Purchase order model
+    │   ├── certificate.dart           # Certificate model
+    │   ├── announcement.dart          # Announcement model
+    │   └── message.dart               # Chat message model
+    ├── providers/                     # Global state providers
+    │   ├── language_provider.dart     # AR/EN toggle (persisted in Hive)
+    │   ├── theme_provider.dart        # Dark/light mode (persisted in Hive)
+    │   └── connectivity_provider.dart # Online/offline status
+    ├── services/                      # Utility services
+    │   ├── cache_service.dart         # Hive-based cache with TTL
+    │   ├── cached_provider_helpers.dart # Cache-aware data fetching
+    │   ├── notification_service.dart  # OneSignal push notifications
+    │   └── pdf_service.dart           # Certificate PDF generation
+    └── widgets/                       # Reusable UI components
+        ├── subject_card.dart          # Course card widget
+        ├── avatar_widget.dart         # User avatar with fallback
+        ├── empty_state.dart           # Empty list placeholder
+        ├── loading_shimmer.dart       # Shimmer loading skeleton
+        ├── connectivity_banner.dart   # Offline warning banner
+        ├── lesson_block_renderer.dart # Renders lesson content blocks
+        ├── xp_progress_bar.dart       # XP/progress indicator
+        └── shells/
+            ├── student_shell.dart     # Student bottom navigation layout
+            └── teacher_shell.dart     # Teacher bottom navigation layout
+```
+
+### User Roles & Access
+
+| Role | Routes | Access |
+|------|--------|--------|
+| `super_admin` | Redirected to `/admin-web-only` | Admin features are web-only |
+| `teacher` | `/teacher/*` | Own courses, lessons, orders, certificates, messaging |
+| `student` | `/student/*` | Enrolled courses, marketplace, quiz, certificates, messaging |
+
+- Auth redirect logic is in `router.dart` — auto-routes by role after login.
+- Students without a stage selection are redirected to `/onboarding`.
+- Teachers cannot access `/student/*` routes and vice versa.
+
+### Navigation Structure
+
+**Student Shell** (bottom nav — 5 tabs):
+1. Home (Dashboard)
+2. My Subjects
+3. Certificates
+4. Messages
+5. Profile
+
+**Teacher Shell** (bottom nav — 5 tabs):
+1. Home (Dashboard)
+2. My Subjects
+3. Announcements
+4. Messages
+5. Profile
+
+Standalone routes (no bottom nav): Marketplace, Checkout, Discover, Achievements, Teachers, Orders, Course Editor, Reviews.
+
+### Authentication Flow
+1. Login via Supabase Auth (email/password, PKCE flow)
+2. `AuthNotifier` listens to `onAuthStateChange` stream
+3. Profile fetched from `profiles` table on auth state change
+4. GoRouter `redirect` auto-navigates by role (student/teacher/admin)
+5. Students without `studentStage` redirected to onboarding
+6. Logout clears session, state resets to unauthenticated
+
+### Key Patterns
+
+**Bilingual Support:**
+```dart
+final lang = ref.watch(languageProvider);
+final langNotifier = ref.read(languageProvider.notifier);
+Text(langNotifier.t('مرحبا', 'Welcome'));
+// DB fields: title_ar, title_en — pick based on langNotifier.isArabic
+```
+
+**Riverpod State Management:**
+```dart
+// Define provider
+final myProvider = StateNotifierProvider<MyNotifier, MyState>((ref) {
+  return MyNotifier(ref);
+});
+
+// Use in widget
+class MyScreen extends ConsumerWidget {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(myProvider);
+    // ...
+  }
+}
+```
+
+**Supabase Queries:**
+```dart
+import 'package:ayman_academy_app/core/supabase_client.dart';
+final data = await supabase.from('subjects').select().eq('is_active', true);
+```
+
+**Caching with Hive:**
+```dart
+// TTL-based cache: subjects (24h), lessons (24h), progress (5m)
+final cached = CacheService.get<List>(box, 'key');
+if (cached != null) return cached;
+final fresh = await fetchFromSupabase();
+await CacheService.set(box, 'key', fresh, CacheService.subjectsTtl);
+```
+
+**GoRouter Navigation:**
+```dart
+context.go(Routes.studentHome);               // Replace
+context.push('/student/subjects/subject/$id'); // Push
+```
+
+### Database Schema
+The Flutter app shares the same Supabase database as the web app. Key tables used by the mobile app:
+
+- `profiles` — User data (role, full_name, avatar_url, student_stage, grade, bio_ar/en)
+- `stages` — Educational levels (title_ar/en, sort_order, is_active)
+- `subjects` — Courses (stage_id, teacher_id, title_ar/en, access_type, is_paid, price_amount)
+- `lessons` — Units within subjects (title_ar/en, sort_order, is_published, duration_minutes)
+- `lesson_sections` + `lesson_blocks` — Structured lesson content
+- `quizzes` + `quiz_questions` + `quiz_options` — Quiz system
+- `quiz_attempts` — Student quiz attempts and scores
+- `lesson_progress` — Per-student per-lesson progress tracking
+- `orders` — Purchase orders (status: pending_payment/paid/rejected/cancelled)
+- `certificates` — Certificate status workflow
+- `messages` — Direct messaging between users
+- `announcements` — Teacher broadcast messages
+- `ratings` — Unified ratings (lesson/subject/teacher)
+
+### Color Palette
+- **Primary**: Deep Navy (`#1E3A5F`)
+- **Accent**: Gold (`#AE944F`)
+- **Background**: Warm Ivory (`#F7F4EF`) / Dark (`#131921`)
+- **Surface**: Off-white (`#FAF8F5`) / Dark (`#1A2332`)
+- See `core/theme/app_colors.dart` for the complete palette.
+
+### Key Services
+
+| File | Purpose |
+|------|---------|
+| `core/supabase_client.dart` | Supabase client singleton + initialization |
+| `core/env.dart` | Environment variables via `--dart-define` |
+| `core/router/router.dart` | GoRouter config with auth guards |
+| `core/router/routes.dart` | Route path constants |
+| `shared/services/cache_service.dart` | Hive-based TTL cache |
+| `shared/services/notification_service.dart` | OneSignal push notification setup |
+| `shared/services/pdf_service.dart` | Certificate PDF generation |
+| `shared/providers/language_provider.dart` | AR/EN language switching |
+| `shared/providers/theme_provider.dart` | Dark/light theme toggle |
+| `shared/providers/connectivity_provider.dart` | Network status monitoring |
+
+---
+
+## Implemented Features
+
+### Fully Working
+- [x] Authentication (login, register, reset password)
+- [x] Role-based routing (student, teacher, admin redirect)
+- [x] Student onboarding (stage/grade selection)
+- [x] Bilingual UI (Arabic RTL / English LTR)
+- [x] Student dashboard with progress overview
+- [x] My Subjects list + Subject detail page
+- [x] Lesson player with block content rendering
+- [x] Quiz taking with scoring
+- [x] Marketplace browsing + checkout (Sham Cash)
+- [x] Certificate viewing + PDF generation
+- [x] Direct messaging (contacts list + chat)
+- [x] Student profile management
+- [x] Teacher dashboard with analytics
+- [x] Teacher subject management + course editor
+- [x] Teacher orders (payment verification)
+- [x] Teacher announcements
+- [x] Teacher certificates management
+- [x] Teacher messaging
+- [x] Teacher profile
+- [x] Dark mode support
+- [x] Offline detection with connectivity banner
+- [x] Local caching (Hive) for offline-first UX
+- [x] Achievements screen
+- [x] Discover courses screen
+- [x] Teachers listing screen
+- [x] Teacher reviews screen
+
+### Not Working / Placeholder
+- [ ] Push notifications (OneSignal initialized, not fully wired)
+- [ ] Real-time messaging (no Supabase Realtime)
+- [ ] Lesson notes screen (UI exists, may need polish)
+- [ ] Image picker for profile/content uploads
+- [ ] Deep linking
+- [ ] App store deployment
+
+---
+
+## Known Issues
+
+- **Admin features are web-only** — Admin users see a "use web app" screen. This is intentional.
+- **Sham Cash QR is placeholder** — Checkout shows a dashed QR placeholder, same as web app.
+- **Environment variables** — Must be passed via `--dart-define` at build time. Missing keys will result in empty strings and failed Supabase connections.
+- **Shared backend** — Any database schema changes in the web app affect this app. Keep models in `shared/models/` in sync.
+
+---
+
+## Plan — Roadmap & Tasks
+
+> Update this section as tasks are completed or new ones are discovered.
+
+### Phase 1: Polish & Bug Fixes (Current Priority)
+- [ ] **Test all screens end-to-end** — Verify every feature works against live Supabase.
+- [ ] **Fix any broken Supabase queries** — Ensure models match current DB schema.
+- [ ] **Lesson notes polish** — Make notes screen fully functional.
+- [ ] **Profile image upload** — Wire up image_picker for avatar uploads.
+- [ ] **Error handling** — Add user-friendly error messages across all screens.
+
+### Phase 2: Notifications & Real-time
+- [ ] **OneSignal push notifications** — Complete wiring for order updates, messages, announcements.
+- [ ] **Supabase Realtime** — Live messaging updates.
+- [ ] **Pull-to-refresh** — Add refresh indicators on all list screens.
+
+### Phase 3: Offline & Performance
+- [ ] **Expand Hive caching** — Cache more data for offline reading.
+- [ ] **Image caching optimization** — Tune cached_network_image settings.
+- [ ] **Lazy loading** — Paginate long lists (subjects, lessons, messages).
+
+### Phase 4: Release
+- [ ] **Play Store assets** — Screenshots, description, icon, feature graphic.
+- [ ] **Release build** — Signing, ProGuard, version bumps.
+- [ ] **Deep linking** — Handle web URLs opening in app.
+- [ ] **Analytics** — Firebase Analytics or equivalent.
+
+### Backlog (Ideas / Later)
+- iOS support
+- PWA / web build
+- Biometric login
+- Video download for offline viewing
+- Parent dashboard (if web app implements it)
+
+---
+
+## Common Tasks Reference
+
+### Adding a New Screen
+1. Create screen in `lib/features/<role>/<feature>/screens/ScreenName.dart`
+2. Add route constant in `lib/core/router/routes.dart`
+3. Add GoRoute in `lib/core/router/router.dart` (inside shell or standalone)
+4. If it needs bottom nav: add as a `StatefulShellBranch` in the appropriate shell
+5. Use `ref.watch(languageProvider.notifier)` for all text via `t('عربي', 'English')`
+
+### Adding a New Provider
+1. Create notifier in `lib/features/<role>/<feature>/providers/<name>_provider.dart`
+2. Extend `StateNotifier<YourState>` with Riverpod
+3. Define provider: `final myProvider = StateNotifierProvider<MyNotifier, MyState>((ref) => ...);`
+4. Use in widgets via `ref.watch(myProvider)` and `ref.read(myProvider.notifier)`
+
+### Adding a New Data Model
+1. Create model in `lib/shared/models/<name>.dart`
+2. Add `fromJson(Map<String, dynamic>)` factory constructor
+3. Add `toJson()` method if needed for writes
+4. Model fields should match Supabase column names (snake_case)
+
+### Adding a Shared Widget
+1. Create in `lib/shared/widgets/<widget_name>.dart`
+2. Make it accept bilingual text or use `LanguageNotifier` internally
+3. Support both light and dark theme via `Theme.of(context)`
