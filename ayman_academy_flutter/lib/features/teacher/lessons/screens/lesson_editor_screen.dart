@@ -40,7 +40,11 @@ class _LessonEditorScreenState extends ConsumerState<LessonEditorScreen> with Si
   Future<void> _loadLesson() async {
     setState(() => _loading = true);
     try {
-      final data = await supabase.from('lessons').select('*').eq('id', widget.lessonId!).single();
+      final data = await supabase.from('lessons').select('*').eq('id', widget.lessonId!).maybeSingle();
+      if (data == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
       _titleArController.text = data['title_ar'] ?? '';
       _titleEnController.text = data['title_en'] ?? '';
       _summaryController.text = data['summary_ar'] ?? '';
@@ -69,6 +73,15 @@ class _LessonEditorScreenState extends ConsumerState<LessonEditorScreen> with Si
     setState(() => _saving = true);
     final t = ref.read(languageProvider.notifier).t;
     try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to continue')),
+          );
+        }
+        return;
+      }
       final payload = {
         'subject_id': widget.subjectId,
         'title_ar': _titleArController.text.trim(),
@@ -78,7 +91,7 @@ class _LessonEditorScreenState extends ConsumerState<LessonEditorScreen> with Si
         'duration_minutes': int.tryParse(_durationController.text),
         'is_published': _isPublished,
         'is_paid': _isPaid,
-        'created_by': supabase.auth.currentUser!.id,
+        'created_by': userId,
       };
       if (widget.lessonId != null) {
         await supabase.from('lessons').update(payload).eq('id', widget.lessonId!);

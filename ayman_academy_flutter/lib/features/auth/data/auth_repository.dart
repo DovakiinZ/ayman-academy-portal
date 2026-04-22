@@ -36,7 +36,8 @@ class AuthRepository {
           .from('profiles')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
+      if (data == null) return null;
       return Profile.fromJson(data);
     } catch (_) {
       return null;

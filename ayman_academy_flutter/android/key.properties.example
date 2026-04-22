@@ -1,0 +1,8 @@
+# Signing configuration for Play Store release builds.
+# Copy this file to key.properties and fill in your values.
+# DO NOT commit key.properties to git!
+
+storeFile=path/to/your/upload-keystore.jks
+storePassword=your_store_password
+keyAlias=upload
+keyPassword=your_key_password

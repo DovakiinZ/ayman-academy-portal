@@ -9,7 +9,8 @@ final lessonDetailProvider = FutureProvider.family<Lesson?, String>((ref, lesson
       .from('lessons')
       .select('*, lesson_sections(*), lesson_blocks(*)')
       .eq('id', lessonId)
-      .single();
+      .maybeSingle();
+  if (data == null) return null;
   return Lesson.fromJson(data);
 });
 

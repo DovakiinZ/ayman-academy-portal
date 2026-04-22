@@ -31,12 +31,34 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   Future<void> _loadTeacherPayment(String teacherId) async {
     if (_teacherPayment != null) return;
-    final data = await supabase
-        .from('profiles')
-        .select('full_name, shamcash_account_name, shamcash_account_number')
-        .eq('id', teacherId)
-        .single();
-    if (mounted) setState(() => _teacherPayment = data);
+    try {
+      final data = await supabase
+          .from('profiles')
+          .select('full_name, shamcash_account_name, shamcash_account_number')
+          .eq('id', teacherId)
+          .maybeSingle();
+      if (data == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(ref.read(languageProvider.notifier).t(
+                'لم يتم العثور على بيانات الدفع للمعلم',
+                'Teacher payment info not found',
+              )),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      if (mounted) setState(() => _teacherPayment = data);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   Future<void> _submitOrder(String teacherId, double amount, String currency) async {

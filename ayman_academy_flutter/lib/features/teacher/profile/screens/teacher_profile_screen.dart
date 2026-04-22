@@ -42,12 +42,21 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to continue')),
+          );
+        }
+        return;
+      }
       await supabase.from('profiles').update({
         'full_name': _nameController.text.trim(),
         'bio_ar': _bioArController.text.trim(),
         'shamcash_account_name': _shamcashNameController.text.trim(),
         'shamcash_account_number': _shamcashNumberController.text.trim(),
-      }).eq('id', supabase.auth.currentUser!.id);
+      }).eq('id', userId);
       await ref.read(authProvider.notifier).refreshProfile();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

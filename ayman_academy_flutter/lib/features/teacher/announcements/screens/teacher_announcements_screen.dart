@@ -92,9 +92,18 @@ class TeacherAnnouncementsScreen extends ConsumerWidget {
                 ElevatedButton(
                   onPressed: () async {
                     if (titleController.text.trim().isEmpty) return;
+                    final userId = supabase.auth.currentUser?.id;
+                    if (userId == null) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Please log in to continue')),
+                        );
+                      }
+                      return;
+                    }
                     try {
                       await supabase.from('announcements').insert({
-                        'teacher_id': supabase.auth.currentUser!.id,
+                        'teacher_id': userId,
                         'subject_id': selectedSubjectId,
                         'title_ar': titleController.text.trim(),
                         'body_ar': bodyController.text.trim().isNotEmpty ? bodyController.text.trim() : null,

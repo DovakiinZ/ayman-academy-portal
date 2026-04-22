@@ -39,8 +39,10 @@ class OrderService {
     required String studentFullName,
     required String studentPaymentAccount,
   }) async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('User not authenticated');
     await supabase.from('orders').insert({
-      'student_id': supabase.auth.currentUser!.id,
+      'student_id': userId,
       'subject_id': subjectId,
       'teacher_id': teacherId,
       'status': 'pending_payment',

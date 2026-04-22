@@ -8,7 +8,8 @@ final quizDetailProvider = FutureProvider.family<Quiz?, String>((ref, quizId) as
       .from('quizzes')
       .select('*, quiz_questions(*)')
       .eq('id', quizId)
-      .single();
+      .maybeSingle();
+  if (data == null) return null;
   return Quiz.fromJson(data);
 });
 
@@ -53,9 +54,12 @@ class QuizService {
     final scorePercent = questions.isEmpty ? 0.0 : (correct / questions.length * 100).roundToDouble();
     final passed = scorePercent >= quiz.passingScore;
 
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('User not authenticated');
+
     await supabase.from('quiz_attempts').insert({
       'quiz_id': quiz.id,
-      'student_id': supabase.auth.currentUser!.id,
+      'student_id': userId,
       'score_percent': scorePercent,
       'answers': answers,
       'passed': passed,
@@ -65,7 +69,7 @@ class QuizService {
     if (passed) {
       try {
         await supabase.from('student_xp').insert({
-          'student_id': supabase.auth.currentUser!.id,
+          'student_id': userId,
           'event_type': 'quiz_pass',
           'points': 100,
           'source_id': quiz.id,

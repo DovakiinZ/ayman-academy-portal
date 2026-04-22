@@ -27,7 +27,15 @@ class _StudentOnboardingScreenState extends ConsumerState<StudentOnboardingScree
     if (_selectedStage == null) return;
     setState(() => _loading = true);
     try {
-      final userId = supabase.auth.currentUser!.id;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to continue')),
+          );
+        }
+        return;
+      }
       await supabase.from('profiles').update({
         'student_stage': _selectedStage,
       }).eq('id', userId);

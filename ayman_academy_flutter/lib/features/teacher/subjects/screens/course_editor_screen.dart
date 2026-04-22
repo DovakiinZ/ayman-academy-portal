@@ -49,7 +49,11 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
           .from('subjects')
           .select('*')
           .eq('id', widget.subjectId!)
-          .single();
+          .maybeSingle();
+      if (data == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
       _titleArController.text = data['title_ar'] ?? '';
       _titleEnController.text = data['title_en'] ?? '';
       _descArController.text = data['description_ar'] ?? '';
@@ -69,6 +73,15 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
     final t = ref.read(languageProvider.notifier).t;
 
     try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to continue')),
+          );
+        }
+        return;
+      }
       final payload = {
         'title_ar': _titleArController.text.trim(),
         'title_en': _titleEnController.text.trim().isNotEmpty ? _titleEnController.text.trim() : null,
@@ -79,7 +92,7 @@ class _CourseEditorScreenState extends ConsumerState<CourseEditorScreen> {
         'is_paid': _isPaid,
         'price_amount': _isPaid ? double.tryParse(_priceController.text) ?? 0 : null,
         'price_currency': _isPaid ? _currency : null,
-        'teacher_id': supabase.auth.currentUser!.id,
+        'teacher_id': userId,
       };
 
       if (widget.subjectId != null) {

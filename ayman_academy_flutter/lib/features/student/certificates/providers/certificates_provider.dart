@@ -18,7 +18,8 @@ final certificateDetailProvider = FutureProvider.family<Certificate?, String>((r
       .from('certificates')
       .select('*')
       .eq('id', certId)
-      .single();
+      .maybeSingle();
+  if (data == null) return null;
   return Certificate.fromJson(data);
 });
 

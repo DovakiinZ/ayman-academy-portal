@@ -23,7 +23,8 @@ final mySubjectsProvider = FutureProvider<List<Subject>>((ref) async {
       .from('profiles')
       .select('student_stage')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
+  if (profile == null) return [];
   final stage = profile['student_stage'] as String?;
   if (stage == null) return [];
 
@@ -86,7 +87,8 @@ final subjectDetailProvider = FutureProvider.family<Subject?, String>((ref, subj
       .from('subjects')
       .select('*, stage:stages(id, slug, title_ar, title_en), teacher:profiles!teacher_id(full_name, avatar_url, bio_ar, bio_en)')
       .eq('id', subjectId)
-      .single();
+      .maybeSingle();
+  if (data == null) return null;
   final map = Map<String, dynamic>.from(data);
   if (map['teacher'] is Map) {
     map['teacher_name'] = map['teacher']['full_name'];
