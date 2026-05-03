@@ -186,33 +186,11 @@ const CertificateTemplate = forwardRef<HTMLDivElement, CertificateTemplateProps>
                     {score !== undefined && score !== null && (
                         <span>الدرجة: <strong style={{ color: '#374151' }}>{score}%</strong></span>
                     )}
-                    <span>التاريخ: <strong style={{ color: '#374151' }}>{new Date(issuedDate).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></span>
-                </div>
-
-                {/* Signer Section */}
-                <div style={{
-                    marginTop: '8mm',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: '40mm',
-                    width: '100%',
-                }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{
-                            width: '50mm',
-                            borderBottom: '1px solid #9ca3af',
-                            marginBottom: '2mm',
-                            paddingBottom: '2mm',
-                            fontSize: '12pt',
-                            fontWeight: 600,
-                            color: '#1e3a5f',
-                        }}>
-                            {signerName}
-                        </div>
-                        <div style={{ fontSize: '9pt', color: '#6b7280' }}>
-                            {signerRole}
-                        </div>
-                    </div>
+                    <span>التاريخ: <strong style={{ color: '#374151' }}>{(() => {
+                        const d = issuedDate ? new Date(issuedDate) : null;
+                        const valid = d && !isNaN(d.getTime()) ? d : new Date();
+                        return valid.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+                    })()}</strong></span>
                 </div>
 
                 {/* Bottom: QR + Certificate ID */}

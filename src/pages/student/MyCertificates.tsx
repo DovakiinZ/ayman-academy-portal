@@ -99,9 +99,26 @@ export default function MyCertificates() {
     };
 
     const handleDownload = useCallback(async (cert: Certificate) => {
+        // Mobile-safe download: use a synthesized <a download> click instead of
+        // window.open(), which mobile browsers (Safari, PWA standalone) block
+        // when called after async work.
+        const triggerDownload = (href: string, filename: string, revoke = false) => {
+            const a = document.createElement('a');
+            a.href = href;
+            a.download = filename;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            if (revoke) setTimeout(() => URL.revokeObjectURL(href), 1000);
+        };
+
+        const filename = `certificate-${cert.verification_code}.pdf`;
+
         // If PDF already exists, just download it
         if (cert.pdf_url) {
-            window.open(cert.pdf_url, '_blank');
+            triggerDownload(cert.pdf_url, filename);
             return;
         }
 
@@ -116,7 +133,13 @@ export default function MyCertificates() {
             setRenderQR(qrDataUrl);
             setRenderData(data);
 
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for the off-screen template to mount AND fonts to load.
+            // Slow mobile networks need this — without it, Arabic glyphs
+            // render as fallback boxes in the PDF.
+            await new Promise(resolve => setTimeout(resolve, 300));
+            if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
+                try { await (document as any).fonts.ready; } catch { /* ignore */ }
+            }
 
             if (!certRef.current) {
                 toast.error(t('فشل إنشاء الشهادة', 'Failed to generate certificate'));
@@ -131,14 +154,10 @@ export default function MyCertificates() {
                 setCertificates(prev =>
                     prev.map(c => c.id === cert.id ? { ...c, pdf_url: pdfUrl } : c)
                 );
-                window.open(pdfUrl, '_blank');
+                triggerDownload(pdfUrl, filename);
             } else {
-                const url = URL.createObjectURL(pdfBlob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `certificate-${cert.verification_code}.pdf`;
-                a.click();
-                URL.revokeObjectURL(url);
+                const blobUrl = URL.createObjectURL(pdfBlob);
+                triggerDownload(blobUrl, filename, true);
             }
 
             toast.success(t('تم تحميل الشهادة', 'Certificate downloaded'));
@@ -359,7 +378,7 @@ export default function MyCertificates() {
                         courseName={renderData?.course_name || renderCert.snapshot_json?.course_name || renderCert.course_name}
                         subjectName={renderCert.subject_name || undefined}
                         score={renderCert.snapshot_json?.score ?? (renderCert.score || undefined)}
-                        issuedDate={renderData?.date || renderCert.snapshot_json?.completion_date || renderCert.issued_at}
+                        issuedDate={renderCert.snapshot_json?.completion_date || renderCert.issued_at || new Date().toISOString()}
                         certificateId={renderCert.id}
                         verificationCode={renderCert.verification_code}
                         qrDataUrl={renderQR}

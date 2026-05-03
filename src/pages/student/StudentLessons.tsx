@@ -37,23 +37,12 @@ function useCertificateClaimStatus(subjectId: string | undefined, studentId: str
         queryFn: async () => {
             if (!subjectId || !studentId) return { canClaim: false, alreadyIssued: false };
 
-            // Check if certificate rule is enabled for this subject
-            const { data: rule } = await supabase
-                .from('certificate_rules')
-                .select('enabled')
-                .eq('subject_id', subjectId)
-                .eq('enabled', true)
-                .maybeSingle();
-
-            if (!rule) return { canClaim: false, alreadyIssued: false };
-
-            // Check if already issued
             const { data: existing } = await supabase
                 .from('certificates')
                 .select('id, status')
                 .eq('subject_id', subjectId)
                 .eq('student_id', studentId)
-                .eq('status', 'issued')
+                .in('status', ['issued', 'valid'])
                 .maybeSingle();
 
             return {
