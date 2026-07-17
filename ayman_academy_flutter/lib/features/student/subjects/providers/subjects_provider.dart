@@ -141,8 +141,11 @@ final checkSubjectAccessProvider = FutureProvider.family<Map<String, dynamic>, S
       'p_subject_id': subjectId,
     });
     if (result is Map) return Map<String, dynamic>.from(result);
-    return {'has_access': true};
+    // Fail closed: an unexpected (non-Map) result must not grant access.
+    return {'has_access': false, 'reason': 'unknown'};
   } catch (_) {
-    return {'has_access': true};
+    // Fail closed: on any RPC/network error, deny access rather than
+    // leaking paid content. The UI can retry.
+    return {'has_access': false, 'reason': 'error'};
   }
 });
