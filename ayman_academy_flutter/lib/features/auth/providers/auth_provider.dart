@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ayman_academy_app/shared/models/profile.dart';
 import 'package:ayman_academy_app/features/auth/data/auth_repository.dart';
+import 'package:ayman_academy_app/shared/services/notification_service.dart';
 
 enum AuthStatus { loading, authenticated, unauthenticated }
 
@@ -39,13 +40,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void _init() {
     _authSub = _repo.authStateChanges.listen((event) async {
       if (event.session != null) {
-        final profile = await _repo.fetchProfile(event.session!.user.id);
+        final userId = event.session!.user.id;
+        final profile = await _repo.fetchProfile(userId);
         if (profile != null) {
+          // Associate this device with the user for targeted push.
+          await NotificationService.login(userId);
           state = AuthState(status: AuthStatus.authenticated, profile: profile);
         } else {
           state = const AuthState(status: AuthStatus.unauthenticated);
         }
       } else {
+        await NotificationService.logout();
         state = const AuthState(status: AuthStatus.unauthenticated);
       }
     });
@@ -57,6 +62,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (session != null) {
       final profile = await _repo.fetchProfile(session.user.id);
       if (profile != null) {
+        // Re-associate on session restore (app relaunch).
+        await NotificationService.login(session.user.id);
         state = AuthState(status: AuthStatus.authenticated, profile: profile);
         return;
       }
@@ -89,6 +96,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    await NotificationService.logout();
     await _repo.signOut();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
