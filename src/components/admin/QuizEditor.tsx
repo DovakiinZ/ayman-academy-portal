@@ -72,7 +72,7 @@ export default function QuizEditor({ lessonId, isOpen, onClose }: QuizEditorProp
                     .eq('quiz_id', quiz.id)
                     .order('sort_order', { ascending: true });
 
-                setQuestions(qData || []);
+                setQuestions((qData || []) as unknown as Question[]);
             } else {
                 setQuizId(null);
                 setQuestions([]);
