@@ -1,6 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lesson, Quiz, QuizQuestion } from '@/types/database';
+import { Lesson, Quiz } from '@/types/database';
+
+// Legacy inline-quiz shape used by this editor: options stored as plain strings
+// plus a single `correct_answer`. Distinct from the normalized
+// QuizQuestion/QuizOption model used elsewhere.
+interface InlineQuizQuestion {
+    id: string;
+    quiz_id?: string;
+    question_ar?: string;
+    question_en?: string | null;
+    options?: string[];
+    correct_answer?: string;
+    sort_order?: number;
+    [key: string]: unknown;
+}
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -28,7 +42,7 @@ interface QuizManagementProps {
 export default function QuizManagement({ lesson }: QuizManagementProps) {
     const { t } = useLanguage();
     const [quiz, setQuiz] = useState<Quiz | null>(null);
-    const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+    const [questions, setQuestions] = useState<InlineQuizQuestion[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -138,7 +152,7 @@ export default function QuizManagement({ lesson }: QuizManagementProps) {
         }
     };
 
-    const handleUpdateQuestion = async (id: string, updates: Partial<QuizQuestion>) => {
+    const handleUpdateQuestion = async (id: string, updates: Partial<InlineQuizQuestion>) => {
         // Optimistic UI update
         const oldQuestions = [...questions];
         setQuestions(questions.map(q => q.id === id ? { ...q, ...updates } : q));
@@ -235,9 +249,9 @@ function QuestionCard({
     onUpdate, 
     onDelete 
 }: { 
-    question: QuizQuestion, 
+    question: InlineQuizQuestion,
     index: number,
-    onUpdate: (updates: Partial<QuizQuestion>) => void,
+    onUpdate: (updates: Partial<InlineQuizQuestion>) => void,
     onDelete: () => void
 }) {
     const { t } = useLanguage();
@@ -248,7 +262,7 @@ function QuestionCard({
         const oldVal = newOptions[optIndex];
         newOptions[optIndex] = newValue;
         
-        const updates: Partial<QuizQuestion> = { options: newOptions };
+        const updates: Partial<InlineQuizQuestion> = { options: newOptions };
         
         // If the changed option was the correct one, update the correct answer too
         if (question.correct_answer === oldVal) {
@@ -271,7 +285,7 @@ function QuestionCard({
         const removedVal = question.options[optIndex];
         const newOptions = question.options.filter((_, i) => i !== optIndex);
         
-        const updates: Partial<QuizQuestion> = { options: newOptions };
+        const updates: Partial<InlineQuizQuestion> = { options: newOptions };
         
         // If we removed the correct answer, pick the first remaining one
         if (question.correct_answer === removedVal) {
