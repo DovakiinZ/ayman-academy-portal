@@ -1,0 +1,25 @@
+# What the Vercel CLI must not upload.
+#
+# Vercel does NOT read .gitignore when packaging a CLI deploy, so without this
+# file `vercel --prod` tries to upload the whole working tree. Here that is
+# ~1.9 GB of Flutter build output and Dart tooling, and the upload aborts.
+#
+# The web app is a Vite build rooted at the repo root; nothing below needs to
+# reach the builder.
+
+# ── Flutter app: not part of the web deployment at all ──
+ayman_academy_flutter/
+
+# ── Dependencies and build output (the builder produces these itself) ──
+node_modules/
+dist/
+
+# ── Local tooling and scratch ──
+.dart_tool/
+.cc-sessions/
+designs/
+*.apk
+
+# ── Never ship these ──
+.env
+.env.*

@@ -3,7 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { verifiedInsert, verifiedUpdate, verifiedDelete, devLog } from '@/lib/adminDb';
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { adminCreateUser, adminSetPassword } from '@/lib/adminUserOps';
 import type { Profile, TeacherInvite } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -241,26 +241,28 @@ export default function TeachersManagement() {
         setSubmitting(true);
 
         try {
-            const admin = getSupabaseAdmin();
-
-            // 1. Create Auth User
-            const { data: authData, error: authError } = await admin.auth.admin.createUser({
+            // 1. Create the auth user, server-side.
+            //
+            // This used to run in the browser against a service_role client.
+            // The key now lives only inside the `admin-user-ops` Edge Function,
+            // which also enforces that the caller is a super_admin.
+            const created = await adminCreateUser({
                 email: createForm.email.trim(),
-                password: createForm.password.trim() || crypto.randomUUID(),
-                email_confirm: true,
-                user_metadata: {
-                    full_name: createForm.full_name.trim(),
-                    role: 'teacher'
-                }
+                fullName: createForm.full_name.trim(),
+                password: createForm.password.trim() || undefined,
             });
 
-            if (authError) {
-                if (authError.message.includes('already exists') || authError.message.includes('registered')) {
+            if (!created.success || !created.userId) {
+                if (created.code === 'email_exists') {
                     toast.error(t('هذا البريد مرتبط بحساب آخر بالفعل', 'Email already used by another account'));
-                    setSubmitting(false);
-                    return;
+                } else {
+                    toast.error(
+                        t('فشل في إنشاء الحساب', 'Failed to create account'),
+                        { description: created.error }
+                    );
                 }
-                throw authError;
+                setSubmitting(false);
+                return;
             }
 
             // Wait a moment for the DB trigger to create the profile row
@@ -269,7 +271,7 @@ export default function TeachersManagement() {
             // 2. Update Profile with extra metadata
             const result = await verifiedUpdate(
                 'profiles',
-                authData.user.id,
+                created.userId,
                 {
                     bio_ar: createForm.bio_ar.trim() || null,
                     bio_en: createForm.bio_en.trim() || null,
@@ -419,48 +421,46 @@ export default function TeachersManagement() {
 
     const handleManualPasswordChange = async () => {
         if (!passwordTargetTeacher || !newPassword) return;
-        if (newPassword.length < 6) {
-            toast.error(t('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'Password must be at least 6 characters'));
+        if (newPassword.length < 8) {
+            // Matches the policy enforced in the admin-user-ops function. The
+            // function is the boundary that actually holds; this is just so the
+            // admin finds out before the round trip.
+            toast.error(t('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'Password must be at least 8 characters'));
             return;
         }
 
         setSubmitting(true);
         try {
-            const admin = getSupabaseAdmin();
-            const { error: updateError } = await admin.auth.admin.updateUserById(passwordTargetTeacher.id, {
-                password: newPassword
+            // The "shadow profile" case — a `profiles` row with no auth account
+            // behind it — is handled inside the function: it creates the account
+            // with this password instead of failing with "user not found", so
+            // the admin's single action does what they meant. Email and name are
+            // passed for exactly that path.
+            const result = await adminSetPassword({
+                userId: passwordTargetTeacher.id,
+                password: newPassword,
+                email: passwordTargetTeacher.email ?? undefined,
+                fullName: passwordTargetTeacher.full_name ?? undefined,
             });
 
-            if (updateError) {
-                // If user doesn't exist in Auth yet (shadow profile)
-                if (updateError.message.toLowerCase().includes('not found') || (updateError as any).status === 404) {
-                    devLog('User not found in auth, creating new auth account for shadow profile');
-                    const { data: createData, error: createError } = await admin.auth.admin.createUser({
-                        email: passwordTargetTeacher.email!,
-                        password: newPassword,
-                        email_confirm: true,
-                        user_metadata: {
-                            full_name: passwordTargetTeacher.full_name,
-                            role: 'teacher'
-                        }
-                    });
+            if (!result.success) {
+                toast.error(
+                    t('فشل في تغيير كلمة المرور', 'Failed to change password'),
+                    { description: result.error }
+                );
+                return;
+            }
 
-                    if (createError) throw createError;
-
-                    toast.success(t('تم إنشاء حساب المعلم وتعيين كلمة المرور', 'Teacher account created and password set'));
-                    fetchData();
-                } else {
-                    throw updateError;
-                }
+            if (result.created) {
+                devLog('No auth user for this profile; created one and set the password');
+                toast.success(t('تم إنشاء حساب المعلم وتعيين كلمة المرور', 'Teacher account created and password set'));
+                fetchData();
             } else {
                 toast.success(t('تم تغيير كلمة المرور بنجاح', 'Password changed successfully'));
             }
 
             setPasswordDialogOpen(false);
             setNewPassword('');
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            toast.error(t('فشل في تغيير كلمة المرور', 'Failed to change password'), { description: message });
         } finally {
             setSubmitting(false);
         }
