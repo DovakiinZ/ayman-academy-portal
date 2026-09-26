@@ -26,7 +26,15 @@ final certificateDetailProvider = FutureProvider.family<Certificate?, String>((r
 class CertificateService {
   static Future<Map<String, dynamic>> requestCertificate(String subjectId) async {
     try {
-      final result = await supabase.rpc('request_certificate', params: {
+      // `request_certificate` does not exist in the database. The real
+      // function is `issue_certificate(p_student_id, p_subject_id)` — the same
+      // one the web client calls — and it takes the student explicitly.
+      final studentId = supabase.auth.currentUser?.id;
+      if (studentId == null) {
+        return {'status': 'error', 'error': 'Not signed in'};
+      }
+      final result = await supabase.rpc('issue_certificate', params: {
+        'p_student_id': studentId,
         'p_subject_id': subjectId,
       });
       if (result is Map) return Map<String, dynamic>.from(result);

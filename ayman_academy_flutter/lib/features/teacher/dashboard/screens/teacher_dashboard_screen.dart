@@ -33,12 +33,20 @@ final _teacherStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
     } catch (_) {}
 
     try {
-      final orders = await supabase.from('orders').select('id, status, total_amount').eq('teacher_id', userId);
+      // The column is `amount`, not `total_amount`. It was the latter here,
+      // which made PostgREST reject the query outright — and because the catch
+      // below swallows everything, the revenue tile just read 0 forever rather
+      // than reporting a problem.
+      final orders = await supabase.from('orders').select('id, status, amount').eq('teacher_id', userId);
       for (final o in (orders as List)) {
         if (o['status'] == 'pending_payment') pendingOrders++;
-        if (o['status'] == 'paid') totalRevenue += (o['total_amount'] as num?)?.toDouble() ?? 0;
+        if (o['status'] == 'paid') totalRevenue += (o['amount'] as num?)?.toDouble() ?? 0;
       }
-    } catch (_) {}
+    } catch (e) {
+      // Still non-fatal — the rest of the dashboard should render — but no
+      // longer silent, so the next schema drift surfaces instead of hiding.
+      debugPrint('teacher dashboard: orders query failed: $e');
+    }
   }
 
   return {
@@ -344,7 +352,10 @@ class TeacherDashboardScreen extends ConsumerWidget {
                           subtitle: t('أخبر طلابك', 'Notify students'),
                           color: AppColors.warning,
                           isDark: isDark,
-                          onTap: () {},
+                          // `go`, not `push`: announcements is a branch of the
+                          // StatefulShellRoute, so it has to switch branch
+                          // rather than stack a copy on top of this one.
+                          onTap: () => context.go(Routes.teacherAnnouncements),
                         ),
                         _ActionCard(
                           icon: Icons.star_rounded,
@@ -406,7 +417,9 @@ class TeacherDashboardScreen extends ConsumerWidget {
                               ),
                             ),
                             TextButton(
-                              onPressed: () {},
+                              // The ShamCash fields live on the profile screen,
+                              // which is another shell branch - hence `go`.
+                              onPressed: () => context.go(Routes.teacherProfile),
                               child: Text(
                                 t('إعداد', 'Setup'),
                                 style: const TextStyle(fontWeight: FontWeight.w700),

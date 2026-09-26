@@ -62,7 +62,7 @@ function useTeacherDashboardData(userId: string | undefined) {
             // Recent announcements
             const { data: announcements } = await supabase
                 .from('announcements')
-                .select('id, title, created_at')
+                .select('id, title_ar, title_en, created_at')
                 .eq('teacher_id', userId)
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
@@ -246,7 +246,9 @@ export default function TeacherDashboard() {
                                 <div key={ann.id} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50">
                                     <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
                                     <div>
-                                        <p className="text-sm font-medium text-foreground line-clamp-1">{ann.title}</p>
+                                        <p className="text-sm font-medium text-foreground line-clamp-1">
+                                            {t(ann.title_ar, ann.title_en || ann.title_ar)}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">
                                             {new Date(ann.created_at).toLocaleDateString()}
                                         </p>

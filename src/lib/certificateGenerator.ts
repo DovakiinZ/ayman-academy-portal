@@ -151,12 +151,23 @@ export interface RequestCertificateResult {
 export async function requestCertificateViaRPC(
     subjectId: string,
 ): Promise<RequestCertificateResult> {
-    const { data, error } = await (supabase.rpc as any)('request_certificate', {
+    // `request_certificate` does not exist in the database — this call always
+    // failed. The real function is `issue_certificate(p_student_id, p_subject_id)`,
+    // which StudentLessons already uses successfully; it takes the student
+    // explicitly rather than reading auth.uid() internally.
+    const { data: userData } = await supabase.auth.getUser();
+    const studentId = userData?.user?.id;
+    if (!studentId) {
+        return { certificate: null, status: 'not_eligible', error: 'Not signed in' };
+    }
+
+    const { data, error } = await (supabase.rpc as any)('issue_certificate', {
+        p_student_id: studentId,
         p_subject_id: subjectId,
     });
 
     if (error) {
-        console.error('RPC request_certificate error:', error);
+        console.error('RPC issue_certificate error:', error);
         return { certificate: null, status: 'not_eligible', error: error.message };
     }
 
@@ -200,6 +211,16 @@ export async function reissueCertificateViaRPC(
     certificateId: string,
     reason?: string
 ): Promise<{ certificate: Certificate | null; error: string | null }> {
+    // NOTE: `admin_reissue_certificate` does NOT exist in the database, so this
+    // path cannot succeed today. Unlike the other two certificate RPCs this one
+    // has no equivalent to redirect to and no client-side substitute: reissuing
+    // means inserting a new certificate row, and INSERT on `certificates` is
+    // closed to clients by design.
+    //
+    // It is left calling the missing function deliberately, but the error is now
+    // translated into something an admin can act on instead of a raw PostgREST
+    // code. See supabase/migrations/106_admin_reissue_certificate.sql for the
+    // function that makes this work; it has not been applied.
     const { data, error } = await (supabase.rpc as any)('admin_reissue_certificate', {
         p_certificate_id: certificateId,
         p_reason: reason || null,
@@ -207,7 +228,14 @@ export async function reissueCertificateViaRPC(
 
     if (error) {
         console.error('RPC admin_reissue_certificate error:', error);
-        return { certificate: null, error: error.message };
+        // PGRST202 = the function does not exist in the schema cache.
+        const missing = (error as any).code === 'PGRST202';
+        return {
+            certificate: null,
+            error: missing
+                ? 'Re-issue is not available yet: the admin_reissue_certificate database function has not been installed. See supabase/migrations/106_admin_reissue_certificate.sql.'
+                : error.message,
+        };
     }
 
     const result = data as any;
@@ -344,19 +372,28 @@ export async function studentRequestReissueViaRPC(
 export async function fetchLatestCertificateVersion(
     certificateId: string,
 ): Promise<Certificate | null> {
-    const { data: latestId, error } = await (supabase.rpc as any)('get_latest_certificate_version', {
-        p_certificate_id: certificateId,
-    });
+    // `get_latest_certificate_version` does not exist in the database. It does
+    // not need to: `certificates` carries `version` and `reissued_from_id`, so
+    // the newest version for this student+subject is a plain query. Resolving it
+    // client-side also removes a migration this feature would otherwise need.
+    const { data: current } = await supabase
+        .from('certificates')
+        .select('id, student_id, subject_id, version')
+        .eq('id', certificateId)
+        .maybeSingle() as any;
 
-    if (error || !latestId) return null;
+    if (!current) return null;
 
-    const { data: cert } = await supabase
+    const { data: latest } = await supabase
         .from('certificates')
         .select('*')
-        .eq('id', latestId)
-        .single() as any;
+        .eq('student_id', current.student_id)
+        .eq('subject_id', current.subject_id)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle() as any;
 
-    return cert as Certificate || null;
+    return (latest as Certificate) || null;
 }
 
 // ============================================
